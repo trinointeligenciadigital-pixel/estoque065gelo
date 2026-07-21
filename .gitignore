@@ -1,0 +1,37 @@
+# Dependências
+node_modules
+
+# Build
+dist
+dist-ssr
+dev-dist
+*.local
+*.tsbuildinfo
+
+# Ferramentas de desenvolvimento (Claude Code, skills) — não fazem parte do sistema
+.claude
+.agents
+.impeccable
+skills-lock.json
+
+# Variáveis de ambiente com segredos (nunca versionar)
+.env.local
+.env.*.local
+
+# Convex gerado
+convex/_generated
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs
+*.log
+
+# Editor / SO
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db

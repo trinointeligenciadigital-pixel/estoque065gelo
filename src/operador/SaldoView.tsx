@@ -1,0 +1,57 @@
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Kg, Tela } from "./ui.tsx";
+
+/*
+  Ver saldo (RF43–RF45). Somente leitura: saldo por formato e peso total por
+  produto, da câmara da sessão. Não gera movimentação nenhuma.
+*/
+export function SaldoView({
+  token,
+  camaraNome,
+  onVoltar,
+}: {
+  token: string;
+  camaraNome: string;
+  onVoltar: () => void;
+}) {
+  const saldos = useQuery(api.operador.consulta.saldos, { token });
+
+  return (
+    <Tela titulo="Saldo da câmara" camaraNome={camaraNome} onVoltar={onVoltar}>
+      {saldos === undefined ? (
+        <p className="text-base text-texto-suave">Carregando…</p>
+      ) : saldos.length === 0 ? (
+        <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {saldos.map((p) => (
+            <div key={p._id} className="rounded-xl border border-borda bg-superficie p-4">
+              <div className="mb-2 flex items-baseline justify-between">
+                <span className="text-base font-semibold text-texto">{p.nome}</span>
+                <span className="text-sm text-texto-suave">
+                  total <Kg valor={p.pesoTotalKg} />
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {p.formatos.length === 0 ? (
+                  <span className="text-sm text-texto-suave">Sem formatos ativos.</span>
+                ) : (
+                  p.formatos.map((f) => (
+                    <div key={f._id} className="flex items-center justify-between text-base">
+                      <span className="text-texto-suave">{f.nome}</span>
+                      <span className="font-mono text-texto">
+                        {f.saldo}{" "}
+                        <span className="text-texto-suave">{f.pesoVariavel ? "un" : "pct"}</span>
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Tela>
+  );
+}

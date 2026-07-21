@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/*
+  Estoque 065 — Design system (docs/04-kickoff seção 3, RNF08).
+  Tokens derivados do produto: o gelo, não o interior da câmara.
+  Tailwind v4 é configurado por CSS: estas variáveis viram utilitários
+  (bg-fundo, text-acento, font-mono, etc.).
+*/
+@theme {
+  /* Cores — paleta "câmara fria": clara, precisa, instrumento. */
+  --color-fundo: #eef3f4;
+  --color-superficie: #ffffff;
+  --color-superficie-fria: #e6edef; /* painéis recuados, linhas de gauge */
+  --color-superficie-fria-2: #dce6e8; /* item de menu ativo */
+  --color-acento: #0e7c9c; /* ciano-petróleo — ações primárias, dados-chave */
+  --color-acento-escuro: #0b647f; /* estado :active/hover do acento */
+  --color-texto: #16232a; /* cinza-azulado escuro, não preto puro */
+  --color-texto-suave: #55666d;
+  --color-texto-fraco: #6b757c; /* rótulos, legendas — AA 4.5:1 sobre branco */
+  --color-borda: #d7e1e4;
+  --color-borda-forte: #bfcdd1;
+
+  --color-gelo: #54b7d2; /* réguas de nível (frost) */
+  --color-gelo-trilho: #cfdde0; /* trilho das réguas */
+
+  --color-entrada: #2f7d52; /* verde discreto — produção, retorno */
+  --color-saida: #b23a32; /* venda, patrocínio, perda */
+  --color-aviso: #a9761e; /* âmbar — atenção (perto do mínimo) */
+  --color-alerta: #b23a32; /* estoque abaixo do mínimo e divergência */
+
+  /* Tipografia — Inter (texto), IBM Plex Mono (TODO número, RNF08),
+     Poppins (títulos). Todas embutidas via @fontsource no main.tsx. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", "Menlo",
+    "Consolas", monospace;
+  --font-titulo: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Movimento — reforço tátil quando o PIN erra. */
+  --animate-tremor: tremor 0.4s ease;
+}
+
+/* Tremor curto das bolinhas do PIN ao errar (RNF: acessibilidade — respeita
+   quem pede menos movimento; vira nada nesse caso). */
+@keyframes tremor {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tremor {
+    animation: none;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-fundo);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
