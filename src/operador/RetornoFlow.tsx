@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { data } from "../lib/data.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
-import { AvisoOperador, BotaoGrande, primeiroNome, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
 function formatarQtd(n: number, pesoVariavel: boolean): string {
   return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
@@ -145,7 +145,7 @@ export function RetornoFlow({
       {abertos === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
       ) : abertos.length === 0 ? (
-        <p className="text-base text-texto-suave">Nenhum patrocínio em aberto nesta câmara.</p>
+        <EstadoVazio mensagem="Nenhum patrocínio em aberto nesta câmara." onVoltar={onVoltar} />
       ) : (
         <div className="flex flex-col gap-3">
           {abertos.map((p) => (

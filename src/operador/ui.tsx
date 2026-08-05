@@ -115,7 +115,10 @@ export function Tela({
           </div>
         ) : null}
       </header>
-      <main className="flex-1 p-4">{children}</main>
+      {/* Sem rodapé, é o próprio `<main>` que fica colado no fim da tela — a
+          barra do Safari cobre o último cartão sem essa folga (tarefa 7). Com
+          rodapé, é ele quem já reserva o safe-area; aqui basta o padding normal. */}
+      <main className={`flex-1 p-4 ${rodape ? "" : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]"}`}>{children}</main>
       {rodape ? (
         <footer className="border-t border-borda bg-superficie px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {rodape}
@@ -150,28 +153,48 @@ export function BotaoGrande({
 }
 
 // Item grande de escolha (produto, formato, tipo), com rótulo e detalhe.
+// `disabled` (tarefa 7): opção existe mas não se aplica agora — ex. "Retorno de
+// patrocínio" sem nada em aberto. O `detalhe` costuma carregar a legenda nesse caso.
 export function OpcaoGrande({
   titulo,
   detalhe,
   selecionado,
+  disabled,
   onClick,
 }: {
   titulo: string;
   detalhe?: string;
   selecionado?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={selecionado}
-      className={`flex min-h-[56px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 ${
+      className={`flex min-h-[56px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 disabled:active:brightness-100 ${
         selecionado ? "border-acento bg-acento/5" : "border-borda bg-superficie"
       }`}
     >
       <span className="text-base font-medium text-texto">{titulo}</span>
       {detalhe ? <span className="font-mono text-sm text-texto-suave">{detalhe}</span> : null}
     </button>
+  );
+}
+
+// Estado vazio dentro de um wizard (tarefa 7): nunca prende o operador só na
+// seta pequena do cabeçalho — todo "não há nada aqui" ganha um botão grande.
+export function EstadoVazio({ mensagem, onVoltar }: { mensagem: string; onVoltar?: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-4 py-2 text-center">
+      <p className="text-base text-texto-suave">{mensagem}</p>
+      {onVoltar ? (
+        <BotaoGrande variante="neutro" onClick={onVoltar} className="max-w-xs">
+          Voltar ao início
+        </BotaoGrande>
+      ) : null}
+    </div>
   );
 }
 

@@ -6,6 +6,7 @@ import { PinScreen } from "./PinScreen.tsx";
 import { SessaoOperador } from "./SessaoOperador.tsx";
 import { instalarVoltarHardware } from "./voltarHardware.ts";
 import { useOciosidade } from "./ociosidade.ts";
+import { ConvitePwaIOS } from "./instalarPWA.tsx";
 
 /*
   App do colaborador. A câmara vem do QR (:qrToken). A sessão fica no
@@ -52,11 +53,11 @@ export function OperadorApp() {
     aoSair();
   });
 
+  let conteudo: ReactNode;
   if (camara === undefined) {
-    return <Centro>Carregando…</Centro>;
-  }
-  if (camara === null) {
-    return (
+    conteudo = <Centro>Carregando…</Centro>;
+  } else if (camara === null) {
+    conteudo = (
       <Centro>
         <div className="max-w-xs text-center">
           <h1 className="font-titulo text-xl font-semibold tracking-[0.02em] text-texto uppercase">Câmara não encontrada</h1>
@@ -66,21 +67,27 @@ export function OperadorApp() {
         </div>
       </Centro>
     );
-  }
-
-  // Sem token, ou token existente ainda validando/já inválido.
-  if (!token) {
-    return <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
-  }
-  if (sessao === undefined) {
-    return <Centro>Carregando…</Centro>;
-  }
-  if (sessao === null) {
+  } else if (!token) {
+    // Sem token, ou token existente ainda validando/já inválido.
+    conteudo = <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
+  } else if (sessao === undefined) {
+    conteudo = <Centro>Carregando…</Centro>;
+  } else if (sessao === null) {
     // Efeito acima vai limpar; enquanto isso, mostra o PIN.
-    return <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
+    conteudo = <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
+  } else {
+    conteudo = <SessaoOperador token={token} sessao={sessao} aoSair={aoSair} />;
   }
 
-  return <SessaoOperador token={token} sessao={sessao} aoSair={aoSair} />;
+  // Convite de instalação (tarefa 7) fica por cima de qualquer tela — a
+  // primeira visita ao app pode cair tanto no PIN quanto, se a sessão ainda
+  // for válida, direto numa tela de trabalho.
+  return (
+    <>
+      {conteudo}
+      <ConvitePwaIOS />
+    </>
+  );
 }
 
 function Centro({ children }: { children: ReactNode }) {

@@ -37,18 +37,27 @@ export function SaidaFlow({
 }) {
   const [modo, setModo] = useState<Tipo | "retorno" | null>(null);
   const nome = primeiroNome(operadorNome);
+  // Sabe de antemão se há patrocínio em aberto pra desabilitar a opção no menu
+  // em vez de deixar o operador entrar num fluxo sem nada pra fazer (tarefa 7).
+  const patrociniosAbertos = useQuery(api.operador.consulta.patrociniosAbertos, { token });
 
   if (modo === "retorno") {
     return <RetornoFlow token={token} camaraNome={camaraNome} operadorNome={operadorNome} onVoltar={() => setModo(null)} />;
   }
   if (modo === null) {
+    const semPatrocinio = patrociniosAbertos !== undefined && patrociniosAbertos.length === 0;
     return (
       <Tela titulo="Saída / retorno" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
         <div className="flex flex-col gap-3">
           <OpcaoGrande titulo="Venda" onClick={() => setModo("venda")} />
           <OpcaoGrande titulo="Patrocínio" onClick={() => setModo("patrocinio")} />
           <OpcaoGrande titulo="Perda" onClick={() => setModo("perda")} />
-          <OpcaoGrande titulo="Retorno de patrocínio" onClick={() => setModo("retorno")} />
+          <OpcaoGrande
+            titulo="Retorno de patrocínio"
+            detalhe={semPatrocinio ? "nenhum em aberto" : undefined}
+            disabled={semPatrocinio}
+            onClick={() => setModo("retorno")}
+          />
         </div>
       </Tela>
     );
@@ -390,7 +399,12 @@ function SaidaCarregamento({
         operadorNome={nome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
       >
-        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProdutoNoCarrinho} />
+        <ListaProdutos
+          produtos={produtos}
+          frequentesIds={frequentes}
+          onEscolher={escolherProdutoNoCarrinho}
+          onVoltar={onVoltar}
+        />
       </Tela>
     );
   }
@@ -402,6 +416,7 @@ function SaidaCarregamento({
         <ListaFormatos
           produto={produto}
           onEscolher={(f) => { setFormato(f); setValor(""); setPasso("quantidade"); }}
+          onVoltar={onVoltar}
         />
       </Tela>
     );
@@ -773,7 +788,7 @@ function SaidaPerda({
   if (passo === "produto") {
     return (
       <Tela titulo="Perda — produto" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar} etapa={1} totalEtapas={5}>
-        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
+        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} onVoltar={onVoltar} />
       </Tela>
     );
   }
@@ -781,7 +796,7 @@ function SaidaPerda({
   if (passo === "formato" && produto) {
     return (
       <Tela titulo="Perda — formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={5}>
-        <ListaFormatos produto={produto} onEscolher={escolherFormato} />
+        <ListaFormatos produto={produto} onEscolher={escolherFormato} onVoltar={onVoltar} />
       </Tela>
     );
   }

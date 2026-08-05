@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, EstadoVazio, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer } from "./desfazer.tsx";
@@ -173,7 +173,7 @@ export function ProducaoFlow({
   if (passo === "produto") {
     return (
       <Tela titulo="Produção — produto" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar} etapa={1} totalEtapas={4}>
-        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
+        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} onVoltar={onVoltar} />
       </Tela>
     );
   }
@@ -181,7 +181,7 @@ export function ProducaoFlow({
   if (passo === "formato" && produto) {
     return (
       <Tela titulo="Produção — formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={4}>
-        <ListaFormatos produto={produto} onEscolher={escolherFormato} />
+        <ListaFormatos produto={produto} onEscolher={escolherFormato} onVoltar={onVoltar} />
       </Tela>
     );
   }
@@ -270,10 +270,14 @@ export function ListaProdutos({
   produtos,
   frequentesIds,
   onEscolher,
+  onVoltar,
 }: {
   produtos: ProdutoGrid[] | undefined;
   frequentesIds?: Id<"produtos">[];
   onEscolher: (p: ProdutoGrid) => void;
+  // Estado vazio nunca prende o operador (tarefa 7) — botão grande além da
+  // seta do cabeçalho.
+  onVoltar?: () => void;
 }) {
   const [busca, setBusca] = useState("");
 
@@ -286,7 +290,7 @@ export function ListaProdutos({
       </div>
     );
   }
-  if (produtos.length === 0) return <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>;
+  if (produtos.length === 0) return <EstadoVazio mensagem="Nenhum produto nesta câmara." onVoltar={onVoltar} />;
 
   const buscando = normalizarBusca(busca) !== "";
   const filtrados = buscando
@@ -371,12 +375,16 @@ function LinhaProduto({ produto, onClick }: { produto: ProdutoGrid; onClick: () 
 export function ListaFormatos({
   produto,
   onEscolher,
+  onVoltar,
 }: {
   produto: ProdutoGrid;
   onEscolher: (f: FormatoGrid) => void;
+  // Estado vazio nunca prende o operador (tarefa 7) — botão grande além da
+  // seta do cabeçalho.
+  onVoltar?: () => void;
 }) {
   if (produto.formatos.length === 0) {
-    return <p className="text-base text-texto-suave">Este produto não tem formato ativo.</p>;
+    return <EstadoVazio mensagem="Este produto não tem formato ativo." onVoltar={onVoltar} />;
   }
   return (
     <div className="flex flex-col gap-3">

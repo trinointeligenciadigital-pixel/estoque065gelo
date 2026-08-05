@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
-import { AvisoOperador, BotaoGrande, primeiroNome, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
 /*
   Contagem física do colaborador (RF46–RF50). ÀS CEGAS: a tela nunca mostra o saldo
@@ -206,7 +206,7 @@ function Preenchimento({
       {grid === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
       ) : grid.length === 0 ? (
-        <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>
+        <EstadoVazio mensagem="Nenhum produto nesta câmara." onVoltar={onVoltar} />
       ) : (
         <div className="flex flex-col gap-5">
           {grid.map((p) => (
