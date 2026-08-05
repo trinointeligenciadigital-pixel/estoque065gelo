@@ -40,7 +40,13 @@ export const itensParaContagem = query({
           nome: p.nome,
           formatos: formatos
             .filter((f) => f.ativo)
-            .map((f) => ({ _id: f._id, nome: f.nome, pesoVariavel: f.pesoVariavel })),
+            .map((f) => ({
+              _id: f._id,
+              nome: f.nome,
+              pesoKg: f.pesoKg,
+              pesoVariavel: f.pesoVariavel,
+              unidadesPorPacote: f.unidadesPorPacote ?? null,
+            })),
         };
       }),
     );
@@ -270,6 +276,8 @@ export const detalhe = query({
           _id: it._id,
           produtoNome: produto?.nome ?? "—",
           formatoNome: formato?.nome ?? "—",
+          formatoPesoKg: formato?.pesoKg ?? 0,
+          formatoUnidadesPorPacote: formato?.unidadesPorPacote ?? null,
           pesoVariavel: formato?.pesoVariavel ?? false,
           saldoSistema: it.saldoSistema,
           saldoContado: it.saldoContado,

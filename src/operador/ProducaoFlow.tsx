@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
-import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, EstadoVazio, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
@@ -143,7 +143,7 @@ export function ProducaoFlow({
               quantidadePacotes={formato.pesoVariavel ? null : num}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
-                { rotulo: "Formato", valor: formato.nome },
+                { rotulo: "Formato", valor: rotuloFormato(formato) },
               ]}
             />
           </div>
@@ -191,7 +191,7 @@ export function ProducaoFlow({
     return (
       <Tela
         titulo="Produção — quantidade"
-        camaraNome={`${produto.nome} · ${formato.nome}`}
+        camaraNome={`${produto.nome} · ${rotuloFormato(formato)}`}
         operadorNome={nome}
         onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
         etapa={pulouFormato ? 2 : 3}
@@ -250,7 +250,7 @@ export function ProducaoFlow({
           linhas={[
             { rotulo: "Tipo", valor: "Produção (entrada)" },
             { rotulo: "Produto", valor: produto.nome },
-            { rotulo: "Formato", valor: formato.nome },
+            { rotulo: "Formato", valor: rotuloFormato(formato) },
             { rotulo: "Câmara", valor: camaraNome },
           ]}
         />
@@ -391,8 +391,8 @@ export function ListaFormatos({
       {produto.formatos.map((f) => (
         <OpcaoGrande
           key={f._id}
-          titulo={f.nome}
-          detalhe={f.pesoVariavel ? "peso variável" : formatarPeso(f.pesoKg)}
+          titulo={rotuloFormato(f)}
+          detalhe={f.pesoVariavel ? "peso variável" : undefined}
           onClick={() => onEscolher(f)}
         />
       ))}

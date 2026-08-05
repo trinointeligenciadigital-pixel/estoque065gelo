@@ -117,8 +117,11 @@ export const resumo = query({
                 : await saldoDoFormato(ctx, p._id, p.camaraId, f._id);
               const minimo = f.estoqueMinimo ?? 0;
               return {
+                _id: f._id,
                 nome: f.nome,
+                pesoKg: f.pesoKg,
                 pesoVariavel: f.pesoVariavel,
+                unidadesPorPacote: f.unidadesPorPacote ?? null,
                 saldo,
                 estoqueMinimo: minimo,
                 abaixoMinimo: minimo > 0 && saldo < minimo,
@@ -169,7 +172,7 @@ export const resumo = query({
 
     const nomeProduto = new Map(produtos.map((p) => [p._id, p.nome]));
     const formatosAll = await ctx.db.query("formatos").collect();
-    const nomeFormato = new Map(formatosAll.map((f) => [f._id, f.nome]));
+    const formatoPorId = new Map(formatosAll.map((f) => [f._id, f]));
     const operadoresAll = await ctx.db.query("operadores").collect();
     const nomeOperador = new Map(operadoresAll.map((o) => [o._id, o.nome]));
     const veiculosAll = await ctx.db.query("veiculos").collect();
@@ -196,7 +199,10 @@ export const resumo = query({
       .slice(0, 8)
       .map((m) => ({
         produtoNome: nomeProduto.get(m.produtoId) ?? "—",
-        formatoNome: nomeFormato.get(m.formatoId) ?? "—",
+        formatoNome: formatoPorId.get(m.formatoId)?.nome ?? "—",
+        formatoPesoKg: formatoPorId.get(m.formatoId)?.pesoKg ?? 0,
+        formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
+        formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
         autor: autorDe(m),
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,
@@ -211,7 +217,10 @@ export const resumo = query({
         clienteNome: m.clienteNome ?? null,
         motivoPerda: m.motivoPerda ?? null,
         produtoNome: nomeProduto.get(m.produtoId) ?? "—",
-        formatoNome: nomeFormato.get(m.formatoId) ?? "—",
+        formatoNome: formatoPorId.get(m.formatoId)?.nome ?? "—",
+        formatoPesoKg: formatoPorId.get(m.formatoId)?.pesoKg ?? 0,
+        formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
+        formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
         veiculo: m.veiculoId
           ? placaVeiculo.get(m.veiculoId) ?? "—"
           : m.veiculoTerceiro

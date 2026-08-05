@@ -14,6 +14,7 @@ export type FormatoGrid = {
   nome: string;
   pesoKg: number;
   pesoVariavel: boolean;
+  unidadesPorPacote?: number | null;
 };
 // Saldo do produto pra lista (tarefa 3): `pacotes` só existe quando o produto
 // tem UM formato ativo, não peso-variável — é a única situação em que "N

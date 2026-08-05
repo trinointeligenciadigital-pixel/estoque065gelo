@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatarPacotes, formatarPeso } from "./formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "./formato.ts";
 
 describe("formatarPacotes", () => {
   it("usa singular só para exatamente 1", () => {
@@ -28,5 +28,21 @@ describe("formatarPeso", () => {
 
   it("preserva o sinal negativo", () => {
     expect(formatarPeso(-250.4)).toBe("-250,4 kg");
+  });
+});
+
+describe("rotuloFormato", () => {
+  it("monta peso e unidades no mesmo rótulo, exatamente como no adendo", () => {
+    expect(rotuloFormato({ nome: "Pacote", pesoKg: 5.7, pesoVariavel: false, unidadesPorPacote: 30 })).toBe(
+      "Pacote 5,7 kg · 30 un",
+    );
+  });
+
+  it("sem unidadesPorPacote, mostra só nome e peso", () => {
+    expect(rotuloFormato({ nome: "Pacote", pesoKg: 20, pesoVariavel: false })).toBe("Pacote 20,0 kg");
+  });
+
+  it("peso variável usa o nome sozinho como rótulo (não há peso fixo pra mostrar)", () => {
+    expect(rotuloFormato({ nome: "Granel", pesoKg: 0, pesoVariavel: true, unidadesPorPacote: 30 })).toBe("Granel");
   });
 });

@@ -4,11 +4,20 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { data } from "../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
 function formatarQtd(n: number, pesoVariavel: boolean): string {
   return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
+}
+
+function rotuloFormatoPatrocinio(p: Patrocinio): string {
+  return rotuloFormato({
+    nome: p.formatoNome,
+    pesoKg: p.formatoPesoKg,
+    pesoVariavel: p.formatoPesoVariavel,
+    unidadesPorPacote: p.formatoUnidadesPorPacote,
+  });
 }
 
 /*
@@ -22,6 +31,8 @@ type Patrocinio = {
   registradoEm: number;
   produtoNome: string;
   formatoNome: string;
+  formatoPesoKg: number;
+  formatoUnidadesPorPacote: number | null;
   formatoPesoVariavel: boolean;
   clienteNome: string;
   saido: number;
@@ -87,7 +98,7 @@ export function RetornoFlow({
         <AvisoOperador tom="ok">
           Retorno registrado:{" "}
           <span className="font-mono">{formatarQtd(num, alvo?.formatoPesoVariavel ?? false)}</span>
-          {alvo ? ` · ${alvo.produtoNome} · ${alvo.formatoNome}` : ""}.
+          {alvo ? ` · ${alvo.produtoNome} · ${rotuloFormatoPatrocinio(alvo)}` : ""}.
         </AvisoOperador>
         <div className="mt-6">
           <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar</BotaoGrande>
@@ -102,7 +113,7 @@ export function RetornoFlow({
     return (
       <Tela
         titulo="Retorno — quantidade"
-        camaraNome={`${alvo.produtoNome} · ${alvo.formatoNome}`}
+        camaraNome={`${alvo.produtoNome} · ${rotuloFormatoPatrocinio(alvo)}`}
         operadorNome={nome}
         onVoltar={() => setAlvo(null)}
         etapa={2}
@@ -156,7 +167,7 @@ export function RetornoFlow({
             >
               <span className="text-base font-medium text-texto">{p.clienteNome || "Sem cliente"}</span>
               <span className="text-sm text-texto-suave">
-                {p.produtoNome} · {p.formatoNome} · {data(p.registradoEm)}
+                {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
               </span>
               <span className="font-mono text-sm text-acento">
                 em aberto: {formatarQtd(p.aberto, p.formatoPesoVariavel)}

@@ -81,9 +81,19 @@ export default defineSchema({
   // Formato unifica saborizado e cubo/escamado num só caminho.
   formatos: defineTable({
     produtoId: v.id("produtos"),
-    nome: v.string(), // "Pacote 30 pedras", "Saco 2kg", "Granel"
+    // Nome BASE do recipiente ("Pacote", "Saco", "Granel") — nunca embute peso
+    // nem contagem de unidades. O rótulo completo mostrado ao usuário é montado
+    // em código (rotuloFormato, src/lib/formato.ts): "{nome} {peso} kg · {un} un".
+    // Isso evita a mesma embalagem aparecer com grafias diferentes em telas
+    // diferentes (adendo PWA, tarefa 2) — antes, um formato podia ter "30 unid"
+    // embutido no nome só na tela do PWA e o peso embutido só no Admin.
+    nome: v.string(),
     pesoKg: v.number(), // 5.7 | 2 | 4 | 10 ; ignorado se pesoVariavel
     pesoVariavel: v.boolean(), // true = usuário digita o kg no lançamento
+    // Quantas unidades físicas (pedras, potes) cabem num pacote deste formato —
+    // só faz sentido pra formato de peso fixo. Ausente = o formato não tem uma
+    // contagem de unidades que valha a pena mostrar (ex.: saco de escama por kg).
+    unidadesPorPacote: v.optional(v.number()),
     // Estoque mínimo DESTE formato, na unidade natural dele: nº de pacotes no
     // formato normal, kg no de peso variável. 0 (ou ausente) = sem alerta.
     estoqueMinimo: v.optional(v.number()),

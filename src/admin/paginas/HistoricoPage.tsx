@@ -7,7 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import {
   linhasComprovante,
@@ -46,7 +46,9 @@ type MovRow = {
   sinal: 1 | -1;
   produtoNome: string;
   formatoNome: string;
+  formatoPesoKg: number;
   formatoPesoVariavel: boolean;
+  formatoUnidadesPorPacote: number | null;
   camaraNome: string;
   quantidade: number;
   pesoKg: number;
@@ -170,7 +172,12 @@ export function HistoricoPage() {
         : [m];
     const itens = irmas.map((x) => ({
       produtoNome: x.produtoNome,
-      formatoNome: x.formatoNome,
+      formatoNome: rotuloFormato({
+        nome: x.formatoNome,
+        pesoKg: x.formatoPesoKg,
+        pesoVariavel: x.formatoPesoVariavel,
+        unidadesPorPacote: x.formatoUnidadesPorPacote,
+      }),
       quantidadeLabel: x.formatoPesoVariavel ? "" : formatarPacotes(x.quantidade),
       pesoKg: x.pesoKg,
     }));
@@ -342,7 +349,7 @@ function LinhaMov({
           </span>
         ) : null}
       </td>
-      <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {m.formatoNome}</span></td>
+      <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
       <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
       <td className="px-3 py-2.5 text-right font-mono text-texto">
         {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
@@ -487,7 +494,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
           <>
             <div className="rounded-lg border border-borda bg-superficie-fria/40 p-3">
               <p className="text-sm text-texto">
-                {preview.produtoNome} <span className="text-texto-suave">/ {preview.formatoNome}</span>
+                {preview.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: preview.formatoNome, pesoKg: preview.formatoPesoKg, pesoVariavel: preview.pesoVariavel, unidadesPorPacote: preview.formatoUnidadesPorPacote })}</span>
                 <span className="text-texto-suave"> · {preview.camaraNome}</span>
               </p>
               <p className="mt-1 font-mono text-sm text-texto">

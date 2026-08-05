@@ -26,9 +26,10 @@ export const criar = mutation({
     nome: v.string(),
     pesoKg: v.number(),
     pesoVariavel: v.boolean(),
+    unidadesPorPacote: v.optional(v.number()),
     estoqueMinimo: v.optional(v.number()),
   },
-  handler: async (ctx, { produtoId, nome, pesoKg, pesoVariavel, estoqueMinimo }) => {
+  handler: async (ctx, { produtoId, nome, pesoKg, pesoVariavel, unidadesPorPacote, estoqueMinimo }) => {
     await exigirAdmin(ctx);
 
     const produto = await ctx.db.get(produtoId);
@@ -41,12 +42,17 @@ export const criar = mutation({
     if (estoqueMinimo !== undefined && estoqueMinimo < 0) {
       throw new ConvexError("Estoque mínimo não pode ser negativo.");
     }
+    if (unidadesPorPacote !== undefined && unidadesPorPacote <= 0) {
+      throw new ConvexError("Unidades por pacote deve ser maior que zero.");
+    }
 
     return await ctx.db.insert("formatos", {
       produtoId,
       nome,
       pesoKg: pesoVariavel ? 0 : pesoKg,
       pesoVariavel,
+      // Peso variável não tem contagem de unidades por pacote (não há "pacote").
+      unidadesPorPacote: pesoVariavel ? undefined : unidadesPorPacote,
       estoqueMinimo: estoqueMinimo ?? 0,
       ativo: true,
     });
@@ -59,10 +65,11 @@ export const atualizar = mutation({
     nome: v.string(),
     pesoKg: v.number(),
     pesoVariavel: v.boolean(),
+    unidadesPorPacote: v.optional(v.number()),
     estoqueMinimo: v.optional(v.number()),
     ativo: v.boolean(),
   },
-  handler: async (ctx, { id, nome, pesoKg, pesoVariavel, estoqueMinimo, ativo }) => {
+  handler: async (ctx, { id, nome, pesoKg, pesoVariavel, unidadesPorPacote, estoqueMinimo, ativo }) => {
     await exigirAdmin(ctx);
     if (!pesoVariavel && pesoKg <= 0) {
       throw new ConvexError("Peso em kg deve ser maior que zero.");
@@ -70,10 +77,14 @@ export const atualizar = mutation({
     if (estoqueMinimo !== undefined && estoqueMinimo < 0) {
       throw new ConvexError("Estoque mínimo não pode ser negativo.");
     }
+    if (unidadesPorPacote !== undefined && unidadesPorPacote <= 0) {
+      throw new ConvexError("Unidades por pacote deve ser maior que zero.");
+    }
     await ctx.db.patch(id, {
       nome,
       pesoKg: pesoVariavel ? 0 : pesoKg,
       pesoVariavel,
+      unidadesPorPacote: pesoVariavel ? undefined : unidadesPorPacote,
       estoqueMinimo: estoqueMinimo ?? 0,
       ativo,
     });

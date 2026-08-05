@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
+import { rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
 /*
@@ -219,7 +220,7 @@ function Preenchimento({
                   p.formatos.map((f) => (
                     <label key={f._id} className="flex items-center justify-between gap-3">
                       <span className="text-base text-texto">
-                        {f.nome}
+                        {rotuloFormato(f)}
                         <span className="ml-1 text-sm text-texto-suave">
                           ({f.pesoVariavel ? "kg" : "pacotes"})
                         </span>

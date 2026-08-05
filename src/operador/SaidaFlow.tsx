@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
-import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
@@ -293,7 +293,7 @@ function SaidaCarregamento({
       cliente: cliente.trim(),
       itens: itens.map((it) => ({
         produtoNome: it.produto.nome,
-        formatoNome: it.formato.nome,
+        formatoNome: rotuloFormato(it.formato),
         quantidadeLabel: labelQtdItem(it),
         pesoKg: pesoDoItem(it),
       })),
@@ -371,7 +371,7 @@ function SaidaCarregamento({
                   <LinhaItem
                     key={it.chave}
                     titulo={it.produto.nome}
-                    detalhe={`${it.formato.nome}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`}
+                    detalhe={`${rotuloFormato(it.formato)}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`}
                     peso={pesoDoItem(it)}
                     onEditar={() => editarItem(i)}
                     onRemover={() => removerItem(i)}
@@ -452,7 +452,7 @@ function SaidaCarregamento({
     return (
       <Tela
         titulo={editando ? `${rotulo} — editar item` : `${rotulo} — quantidade`}
-        camaraNome={`${produto.nome} · ${formato.nome}`}
+        camaraNome={`${produto.nome} · ${rotuloFormato(formato)}`}
         operadorNome={nome}
         onVoltar={
           editando
@@ -548,7 +548,7 @@ function SaidaCarregamento({
     const linhas: LinhaResumo[] = [
       { rotulo: "Tipo", valor: `${rotulo} (saída)` },
       ...itens.map((it) => ({
-        rotulo: `${it.produto.nome} · ${it.formato.nome}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`,
+        rotulo: `${it.produto.nome} · ${rotuloFormato(it.formato)}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`,
         valor: formatarPeso(pesoDoItem(it)),
         mono: true,
       })),
@@ -757,7 +757,7 @@ function SaidaPerda({
               quantidadePacotes={formato.pesoVariavel ? null : num}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
-                { rotulo: "Formato", valor: formato.nome },
+                { rotulo: "Formato", valor: rotuloFormato(formato) },
                 { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
               ]}
             />
@@ -813,7 +813,7 @@ function SaidaPerda({
     return (
       <Tela
         titulo="Perda — quantidade"
-        camaraNome={`${produto.nome} · ${formato.nome}`}
+        camaraNome={`${produto.nome} · ${rotuloFormato(formato)}`}
         operadorNome={nome}
         onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
         etapa={pulouFormato ? 2 : 3}
@@ -879,7 +879,7 @@ function SaidaPerda({
     const linhas: LinhaResumo[] = [
       { rotulo: "Tipo", valor: "Perda (saída)" },
       { rotulo: "Produto", valor: produto.nome },
-      { rotulo: "Formato", valor: formato.nome },
+      { rotulo: "Formato", valor: rotuloFormato(formato) },
       { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
       ...(motivo === "outro" ? [{ rotulo: "Descrição", valor: observacao.trim() }] : []),
       { rotulo: "Câmara", valor: camaraNome },

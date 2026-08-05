@@ -2,7 +2,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { LinhaMensagem, LinhaTabela, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { data } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 
 /*
   Consulta de patrocínio (RF42). Para cada patrocínio: quanto saiu, quanto voltou
@@ -39,7 +39,9 @@ export function PatrociniosPage() {
             <LinhaTabela key={p._id}>
               <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{data(p.registradoEm)}</td>
               <td className="px-3 py-2.5 font-medium text-texto">{p.clienteNome || "—"}</td>
-              <td className="px-3 py-2.5 text-texto-suave">{p.produtoNome} / {p.formatoNome}</td>
+              <td className="px-3 py-2.5 text-texto-suave">
+                {p.produtoNome} / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.unidade === "kg", unidadesPorPacote: p.formatoUnidadesPorPacote })}
+              </td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.saiu, p.unidade)}</td>
               <td className="px-3 py-2.5 text-right font-mono text-entrada">{formatarQtd(p.retornado, p.unidade)}</td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.consumido, p.unidade)}</td>

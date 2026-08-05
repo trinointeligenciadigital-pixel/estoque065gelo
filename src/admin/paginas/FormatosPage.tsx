@@ -5,13 +5,14 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 
 type Formato = {
   _id: Id<"formatos">;
   nome: string;
   pesoKg: number;
   pesoVariavel: boolean;
+  unidadesPorPacote?: number;
   estoqueMinimo?: number;
   ativo: boolean;
 };
@@ -38,7 +39,7 @@ export function FormatosPage() {
 
       <Tabela
         colunas={[
-          "Nome",
+          "Formato",
           { rotulo: "Peso (kg)", dir: true },
           { rotulo: "Est. mín.", dir: true },
           "Status",
@@ -52,7 +53,9 @@ export function FormatosPage() {
         ) : (
           formatos.map((f) => (
             <LinhaTabela key={f._id}>
-              <td className="px-3 py-2.5 font-medium text-texto">{f.nome}</td>
+              {/* Rótulo canônico (tarefa 2 do adendo) — o mesmo texto que o
+                  colaborador vê no PWA e o cliente vê no comprovante. */}
+              <td className="px-3 py-2.5 font-medium text-texto">{rotuloFormato(f)}</td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">
                 {f.pesoVariavel ? <span className="text-texto-suave">variável</span> : formatarPeso(f.pesoKg)}
               </td>
@@ -97,6 +100,7 @@ function FormFormato({
   const [nome, setNome] = useState(inicial?.nome ?? "");
   const [pesoKg, setPesoKg] = useState(String(inicial?.pesoKg ?? ""));
   const [pesoVariavel, setPesoVariavel] = useState(inicial?.pesoVariavel ?? false);
+  const [unidadesPorPacote, setUnidadesPorPacote] = useState(String(inicial?.unidadesPorPacote ?? ""));
   const [estoqueMinimo, setEstoqueMinimo] = useState(String(inicial?.estoqueMinimo ?? 0));
   const [ativo, setAtivo] = useState(inicial?.ativo ?? true);
   const [erro, setErro] = useState("");
@@ -104,16 +108,26 @@ function FormFormato({
 
   const novo = inicial === null;
 
+  // Pré-visualização do rótulo canônico (tarefa 2) — o admin vê, ao digitar,
+  // exatamente o texto que vai aparecer pro colaborador e no comprovante.
+  const previa = rotuloFormato({
+    nome: nome.trim() || "—",
+    pesoKg: Number(pesoKg) || 0,
+    pesoVariavel,
+    unidadesPorPacote: Number(unidadesPorPacote) || undefined,
+  });
+
   async function salvar() {
     setErro("");
     setSalvando(true);
     try {
       const peso = pesoVariavel ? 0 : Number(pesoKg);
       const minimo = Number(estoqueMinimo) || 0;
+      const unidades = pesoVariavel || unidadesPorPacote.trim() === "" ? undefined : Number(unidadesPorPacote);
       if (novo) {
-        await criar({ produtoId, nome, pesoKg: peso, pesoVariavel, estoqueMinimo: minimo });
+        await criar({ produtoId, nome, pesoKg: peso, pesoVariavel, unidadesPorPacote: unidades, estoqueMinimo: minimo });
       } else {
-        await atualizar({ id: inicial._id, nome, pesoKg: peso, pesoVariavel, estoqueMinimo: minimo, ativo });
+        await atualizar({ id: inicial._id, nome, pesoKg: peso, pesoVariavel, unidadesPorPacote: unidades, estoqueMinimo: minimo, ativo });
       }
       onFechar();
     } catch (e) {
@@ -125,7 +139,12 @@ function FormFormato({
   return (
     <Modal titulo={novo ? "Novo formato" : "Editar formato"} onFechar={onFechar}>
       <div className="flex flex-col gap-3">
-        <Campo label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Saco 2kg" />
+        <Campo
+          label="Nome base (sem peso nem quantidade)"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          placeholder="Pacote"
+        />
         <Campo
           label="Peso em kg"
           type="number"
@@ -138,6 +157,22 @@ function FormFormato({
           placeholder={pesoVariavel ? "digitado no lançamento" : "2"}
         />
         <Marca label="Peso variável (granel — kg digitado no lançamento)" marcado={pesoVariavel} onToggle={() => setPesoVariavel(!pesoVariavel)} />
+        {!pesoVariavel ? (
+          <Campo
+            label="Unidades por pacote (opcional — ex.: pedras)"
+            type="number"
+            min={1}
+            step="1"
+            mono
+            value={unidadesPorPacote}
+            onChange={(e) => setUnidadesPorPacote(e.target.value)}
+            placeholder="30"
+          />
+        ) : null}
+        <p className="text-xs text-texto-suave">
+          Rótulo que vai aparecer pro colaborador, no comprovante e no histórico:{" "}
+          <span className="font-medium text-texto">{previa}</span>
+        </p>
         <Campo
           label={`Estoque mínimo em ${pesoVariavel ? "kg" : "pacotes"} (0 = sem alerta)`}
           type="number"

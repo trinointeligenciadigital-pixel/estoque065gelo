@@ -73,7 +73,13 @@ export const gridProdutos = query({
           nome: p.nome,
           categoria: p.categoria,
           unidadeBase: p.unidadeBase,
-          formatos: formatosAtivos.map((f) => ({ _id: f._id, nome: f.nome, pesoKg: f.pesoKg, pesoVariavel: f.pesoVariavel })),
+          formatos: formatosAtivos.map((f) => ({
+            _id: f._id,
+            nome: f.nome,
+            pesoKg: f.pesoKg,
+            pesoVariavel: f.pesoVariavel,
+            unidadesPorPacote: f.unidadesPorPacote ?? null,
+          })),
           saldo,
         };
       }),
@@ -136,7 +142,9 @@ export const saldos = query({
             .map(async (f) => ({
               _id: f._id,
               nome: f.nome,
+              pesoKg: f.pesoKg,
               pesoVariavel: f.pesoVariavel,
+              unidadesPorPacote: f.unidadesPorPacote ?? null,
               // Fixo: saldo em pacotes. Variável: o estoque real é o peso líquido
               // (kg), pois "quantidade" ali é sempre 1 e não representa o estoque.
               saldo: await saldoDoFormato(ctx, p._id, camara._id, f._id),
@@ -189,6 +197,8 @@ export const patrociniosAbertos = query({
         registradoEm: p.registradoEm,
         produtoNome: produto.nome,
         formatoNome: formato.nome,
+        formatoPesoKg: formato.pesoKg,
+        formatoUnidadesPorPacote: formato.unidadesPorPacote ?? null,
         formatoPesoVariavel: porPeso,
         clienteNome: p.clienteNome ?? "",
         saido,

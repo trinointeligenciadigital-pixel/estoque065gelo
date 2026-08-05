@@ -22,3 +22,24 @@ export function formatarPeso(kg: number): string {
   });
   return `${texto} kg`;
 }
+
+/*
+  Rótulo canônico de um formato (adendo PWA, tarefa 2) — uma grafia só, usada em
+  painel, PWA, comprovante e histórico. Antes, o mesmo formato aparecia como
+  "Pacote 5,7kg" num lugar e "Pacote 30 unid" noutro: dois jeitos de escrever a
+  MESMA embalagem porque cada tela lia campos diferentes. `nome` no banco agora é
+  só a base ("Pacote", "Granel") — peso e unidades são sempre montados aqui.
+  Peso variável não tem peso fixo pra mostrar: o nome sozinho já é o rótulo
+  ("Granel").
+*/
+export type FormatoRotulo = {
+  nome: string;
+  pesoKg: number;
+  pesoVariavel: boolean;
+  unidadesPorPacote?: number | null;
+};
+export function rotuloFormato(f: FormatoRotulo): string {
+  if (f.pesoVariavel) return f.nome;
+  const unidades = f.unidadesPorPacote ? ` · ${f.unidadesPorPacote} un` : "";
+  return `${f.nome} ${formatarPeso(f.pesoKg)}${unidades}`;
+}

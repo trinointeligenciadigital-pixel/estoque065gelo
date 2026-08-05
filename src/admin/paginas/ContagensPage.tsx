@@ -6,7 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 
 /*
   Contagens (RF51–RF56). O Admin vê as pendentes, confere a divergência item a
@@ -256,7 +256,9 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
           return (
             <tr key={it._id} className={`border-b border-borda/60 last:border-0 ${div !== 0 ? "bg-alerta/5" : ""}`}>
               <td className="px-3 py-2.5 font-medium text-texto">{it.produtoNome}</td>
-              <td className="px-3 py-2.5 text-texto-suave">{it.formatoNome}</td>
+              <td className="px-3 py-2.5 text-texto-suave">
+                {rotuloFormato({ nome: it.formatoNome, pesoKg: it.formatoPesoKg, pesoVariavel: it.pesoVariavel, unidadesPorPacote: it.formatoUnidadesPorPacote })}
+              </td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel)}</td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel)}</td>
               <td className={`px-3 py-2.5 text-right font-mono ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
@@ -433,7 +435,7 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
                     {p.formatos.map((f) => (
                       <label key={f._id} className="flex items-center justify-between gap-2">
                         <span className="text-sm text-texto">
-                          {f.nome} <span className="text-texto-suave">({f.pesoVariavel ? "kg" : "pacotes"})</span>
+                          {rotuloFormato(f)} <span className="text-texto-suave">({f.pesoVariavel ? "kg" : "pacotes"})</span>
                         </span>
                         <input
                           inputMode="decimal"

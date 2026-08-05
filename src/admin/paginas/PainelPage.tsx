@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 
 /*
@@ -152,7 +152,7 @@ function PainelConteudo() {
                 {r.producaoHoje.map((m, i) => (
                   <tr key={i} className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
                     <td className="py-2.5 pr-3 text-texto">
-                      {m.produtoNome} <span className="text-texto-fraco">· {m.formatoNome}</span>
+                      {m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span>
                     </td>
                     <td className="py-2.5 pr-3 text-texto-suave">{m.autor}</td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
@@ -195,9 +195,9 @@ function PainelConteudo() {
                     <div className="mt-2.5 flex flex-col gap-1.5">
                       {p.formatos.map((f) =>
                         f.estoqueMinimo > 0 ? (
-                          <div key={f.nome}>
+                          <div key={f._id}>
                             <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                              <span className={f.abaixoMinimo ? "font-medium text-alerta" : "text-texto-suave"}>{f.nome}</span>
+                              <span className={f.abaixoMinimo ? "font-medium text-alerta" : "text-texto-suave"}>{rotuloFormato(f)}</span>
                               <span className={`font-mono ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
                                 {formatarQtd(f.saldo, f.pesoVariavel)} / mín {formatarQtd(f.estoqueMinimo, f.pesoVariavel)}
                                 {f.abaixoMinimo ? " ↓" : ""}
@@ -206,8 +206,8 @@ function PainelConteudo() {
                             <BulletMinimo saldo={f.saldo} minimo={f.estoqueMinimo} abaixo={f.abaixoMinimo} />
                           </div>
                         ) : (
-                          <div key={f.nome} className="flex items-baseline justify-between gap-2 text-[11px]">
-                            <span className="text-texto-fraco">{f.nome}</span>
+                          <div key={f._id} className="flex items-baseline justify-between gap-2 text-[11px]">
+                            <span className="text-texto-fraco">{rotuloFormato(f)}</span>
                             <span className="font-mono text-texto-fraco">
                               {formatarQtd(f.saldo, f.pesoVariavel)}
                             </span>
@@ -238,7 +238,7 @@ function PainelConteudo() {
               {r.saidasRecentes.map((m, i) => (
                 <tr key={i} className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
                   <td className="py-2.5 pr-3 text-texto">{m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}</td>
-                  <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {m.formatoNome}</span></td>
+                  <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.veiculo}</td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
                   <td className="py-2.5 pr-3 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>

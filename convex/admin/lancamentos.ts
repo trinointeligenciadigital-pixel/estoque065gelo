@@ -52,7 +52,13 @@ export const produtosParaLancamento = query({
           camaraNome: nomeCamara.get(p.camaraId) ?? "—",
           formatos: formatos
             .filter((f) => f.ativo)
-            .map((f) => ({ _id: f._id, nome: f.nome, pesoKg: f.pesoKg, pesoVariavel: f.pesoVariavel })),
+            .map((f) => ({
+              _id: f._id,
+              nome: f.nome,
+              pesoKg: f.pesoKg,
+              pesoVariavel: f.pesoVariavel,
+              unidadesPorPacote: f.unidadesPorPacote ?? null,
+            })),
         };
       }),
     );

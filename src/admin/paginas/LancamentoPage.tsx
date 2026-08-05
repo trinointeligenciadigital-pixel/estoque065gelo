@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 
 /*
@@ -116,7 +116,7 @@ export function LancamentoPage() {
       produtoId: produto._id,
       formatoId: formato._id,
       produtoNome: produto.nome,
-      formatoNome: formato.nome,
+      formatoNome: rotuloFormato(formato),
       pesoVariavel: formato.pesoVariavel,
       valor,
       pesoKg: formato.pesoVariavel ? numVal : numVal * formato.pesoKg,
@@ -270,7 +270,7 @@ export function LancamentoPage() {
             <Selecao label="Formato" value={formatoId} onChange={(e) => setFormatoId(e.target.value as Id<"formatos">)} disabled={!produto}>
               <option value="">— escolha —</option>
               {(produto?.formatos ?? []).map((f) => (
-                <option key={f._id} value={f._id}>{f.nome}{f.pesoVariavel ? " (kg)" : ` · ${formatarPeso(f.pesoKg)}`}</option>
+                <option key={f._id} value={f._id}>{rotuloFormato(f)}</option>
               ))}
             </Selecao>
           </div>

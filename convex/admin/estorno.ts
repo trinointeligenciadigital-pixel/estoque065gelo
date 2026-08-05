@@ -41,6 +41,8 @@ export const preview = query({
     return {
       produtoNome: produto?.nome ?? "—",
       formatoNome: formato?.nome ?? "—",
+      formatoPesoKg: formato?.pesoKg ?? 0,
+      formatoUnidadesPorPacote: formato?.unidadesPorPacote ?? null,
       camaraNome: camara?.nome ?? "—",
       pesoVariavel,
       impactoQuantidade,
