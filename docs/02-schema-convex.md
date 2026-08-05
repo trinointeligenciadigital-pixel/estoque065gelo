@@ -132,6 +132,7 @@ export default defineSchema({
       v.literal("retornoPatrocinio"),  // entrada
       v.literal("perda"),              // saída
       v.literal("ajuste"),             // entrada ou saída — só via contagem aprovada
+      v.literal("estorno"),            // contra-lançamento que desfaz um erro — sinal invertido
     ),
     sinal: v.union(v.literal(1), v.literal(-1)),
 
@@ -184,6 +185,12 @@ export default defineSchema({
     loteInferido: v.optional(v.boolean()),                 // mesma aprovação de contagem
                                                            // (loteInferido=true nos lotes
                                                            // reconstruídos por migração)
+    estornoDe: v.optional(v.id("movimentacoes")),          // no CONTRA-lançamento → original.
+                                                           // Não existe "estornadoPor" no
+                                                           // original — regra 2 proíbe patch
+                                                           // em movimentacoes; "já foi
+                                                           // estornado?" é derivado via
+                                                           // by_estorno_de em tempo de leitura.
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -204,6 +211,7 @@ export default defineSchema({
     .index("by_carregamento", ["carregamentoId"])
     .index("by_contagem", ["contagemId"])
     .index("by_lote", ["loteId"])
+    .index("by_estorno_de", ["estornoDe"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------
@@ -287,6 +295,16 @@ Precisam virar código nas functions:
     um item por vez. Saldo continua somado por formato — nada é agregado no carregamento.
 
 13. **Geração de PIN invalida sessões existentes.** A mutation `gerarPinOperador` deve, na mesma transação: gerar o PIN, salvar o hash, e deletar todas as linhas de `sessoesOperador` daquele `operadorId` (via `by_operador_id`). O PIN em texto puro é retornado uma única vez, só para quem chamou a mutation (Admin autenticado); nunca é persistido em texto puro.
+
+14. **Estorno corrige sem patch no original (regra 10 continua valendo, sem exceção).**
+    `estornarLancamento` (só Admin) grava um NOVO lançamento `tipo: "estorno"`, mesmo
+    produto/formato/quantidade do original, sinal invertido, `estornoDe` apontando pro
+    original — nunca `ctx.db.patch` no original. "Este lançamento já foi estornado?" é
+    sempre uma leitura pelo índice `by_estorno_de` (existe uma movimentação com
+    `estornoDe === este._id`?), nunca um campo cacheado. Bloqueios: não estornar
+    lançamento anterior à contagem aprovada mais recente daquela câmara (o saldo já foi
+    reconciliado — RF55 continua sendo a única origem de ajuste), não estornar um
+    estorno, não estornar um ajuste (a correção de ajuste é rejeitar a contagem).
 
 ---
 

@@ -114,6 +114,7 @@ export default defineSchema({
       v.literal("retornoPatrocinio"), // entrada
       v.literal("perda"), // saída
       v.literal("ajuste"), // entrada ou saída — só via contagem aprovada
+      v.literal("estorno"), // contra-lançamento que desfaz um erro — sinal invertido do original
     ),
     sinal: v.union(v.literal(1), v.literal(-1)),
 
@@ -167,6 +168,13 @@ export default defineSchema({
     // contagemId — não dá pra provar o vínculo de um lote legado).
     loteId: v.optional(v.string()),
     loteInferido: v.optional(v.boolean()),
+    // Estorno (tarefa 6): só existe no CONTRA-lançamento, apontando pro
+    // original. DECISÃO: não existe campo "estornadoPor" no original — regra
+    // arquitetural 2 proíbe patch em `movimentacoes`, sem exceção ("nenhum
+    // ponto, nenhum perfil, nem admin"). "Este lançamento já foi estornado?"
+    // é derivado em tempo de leitura pelo índice by_estorno_de (mesma lógica
+    // de nunca cachear o que dá pra calcular — regra arquitetural 1).
+    estornoDe: v.optional(v.id("movimentacoes")),
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -187,6 +195,7 @@ export default defineSchema({
     .index("by_carregamento", ["carregamentoId"])
     .index("by_contagem", ["contagemId"])
     .index("by_lote", ["loteId"])
+    .index("by_estorno_de", ["estornoDe"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------

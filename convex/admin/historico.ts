@@ -23,6 +23,7 @@ export const listar = query({
         v.literal("retornoPatrocinio"),
         v.literal("perda"),
         v.literal("ajuste"),
+        v.literal("estorno"),
       ),
     ),
     operadorId: v.optional(v.id("operadores")),
@@ -58,6 +59,19 @@ export const listar = query({
       .sort((a, b) => b.registradoEm - a.registradoEm)
       .slice(0, LIMITE);
 
+    // "Este lançamento já foi estornado?" nunca é um campo cacheado (regra
+    // arquitetural 1/2 — movimentacoes é append-only, sem patch) — é sempre
+    // esta leitura: existe algum estorno com estornoDe === este _id? Varre
+    // TODOS os estornos (não só os desta página), porque o estorno pode estar
+    // fora do filtro atual mesmo que o original esteja dentro.
+    const todosEstornos = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_tipo", (q) => q.eq("tipo", "estorno"))
+      .collect();
+    const idsEstornados = new Set(
+      todosEstornos.map((e) => e.estornoDe).filter((id) => id !== undefined),
+    );
+
     return await Promise.all(
       filtradas.map(async (m) => {
         const produto = await ctx.db.get(m.produtoId);
@@ -69,6 +83,10 @@ export const listar = query({
         const veiculo = veiculoProprio
           ? `${veiculoProprio.placa}${veiculoProprio.modelo ? ` · ${veiculoProprio.modelo}` : ""}`
           : m.veiculoTerceiro ?? null;
+        // Se ESTA linha é um estorno, busca o protocolo do original pra
+        // referenciar ("Estorno de ABCD1234") — o estorno em si não tem
+        // motivoPerda/clienteNome, então o Detalhe mostra isto no lugar.
+        const original = m.estornoDe ? await ctx.db.get(m.estornoDe) : null;
         return {
           _id: m._id,
           tipo: m.tipo,
@@ -102,6 +120,10 @@ export const listar = query({
           loteId: m.loteId ?? null,
           loteInferido: m.loteInferido ?? false,
           contagemId: m.contagemId ?? null,
+          // Estorno (tarefa 6): `estornado` é derivado (ver acima), nunca lido de
+          // um campo — não existe "estornadoPor" gravado em lugar nenhum.
+          estornado: idsEstornados.has(m._id),
+          estornoDeProtocolo: original ? original.chaveIdempotencia.slice(0, 8).toUpperCase() : null,
           // Protocolo do comprovante: 8 chars da chave de idempotência (UUID do
           // cliente), nunca o _id interno (RNF13). Num carregamento, o front usa
           // os 8 chars do carregamentoId para todas as linhas do grupo.

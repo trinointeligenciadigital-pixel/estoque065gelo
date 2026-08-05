@@ -402,3 +402,180 @@ describe("Migração — migrarLoteAjusteLegado (tarefa 5)", () => {
     expect(deNovo.totalSemLote).toBe(0);
   });
 });
+
+describe("Tarefa 6 — estorno de lançamento", () => {
+  test("estorna um lançamento normal: contra-lançamento com sinal invertido, saldo zera", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { produtoId, formatoId } = await cadastroBase(admin);
+
+    const { movimentacaoId } = await admin.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 1130,
+    });
+
+    const previewAntes = await admin.query(api.admin.estorno.preview, { lancamentoId: movimentacaoId });
+    expect(previewAntes.bloqueio).toBeNull();
+    expect(previewAntes.impactoQuantidade).toBe(-1130);
+    expect(previewAntes.impactoPesoKg).toBe(-2260); // 1130 × 2kg
+    expect(previewAntes.saldoDepois).toBe(0);
+
+    const { estornoId } = await admin.mutation(api.admin.estorno.estornar, {
+      lancamentoId: movimentacaoId,
+      motivoTexto: "digitei 1130 em vez de 113",
+    });
+
+    const estorno = await t.run((ctx) => ctx.db.get(estornoId));
+    expect(estorno?.tipo).toBe("estorno");
+    expect(estorno?.sinal).toBe(-1);
+    expect(estorno?.quantidade).toBe(1130);
+    expect(estorno?.estornoDe).toBe(movimentacaoId);
+    expect(estorno?.autorNome).toBe("Alisson Sousa");
+
+    const original = await t.run((ctx) => ctx.db.get(movimentacaoId));
+    expect(original?.sinal).toBe(1); // original NUNCA muda (append-only)
+
+    const historico = await admin.query(api.admin.historico.listar, {});
+    const linhaOriginal = historico.find((m) => m._id === movimentacaoId)!;
+    expect(linhaOriginal.estornado).toBe(true); // derivado, não um campo gravado
+  });
+
+  test("bloqueia: motivo com menos de 5 caracteres", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { produtoId, formatoId } = await cadastroBase(admin);
+    const { movimentacaoId } = await admin.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    await expect(
+      admin.mutation(api.admin.estorno.estornar, { lancamentoId: movimentacaoId, motivoTexto: "oi" }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: não estorna um estorno, nem estorna duas vezes o mesmo original", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { produtoId, formatoId } = await cadastroBase(admin);
+    const { movimentacaoId } = await admin.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    const { estornoId } = await admin.mutation(api.admin.estorno.estornar, {
+      lancamentoId: movimentacaoId,
+      motivoTexto: "correção de teste",
+    });
+
+    // Estornar de novo o mesmo original.
+    await expect(
+      admin.mutation(api.admin.estorno.estornar, {
+        lancamentoId: movimentacaoId,
+        motivoTexto: "tentando de novo",
+      }),
+    ).rejects.toThrow();
+
+    // Estornar o próprio estorno.
+    await expect(
+      admin.mutation(api.admin.estorno.estornar, { lancamentoId: estornoId, motivoTexto: "estorna o estorno" }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: ajuste de contagem não é estornado por aqui", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [{ produtoId, formatoId, saldoContado: 4 }],
+    });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    const ajustes = await t.run((ctx) =>
+      ctx.db.query("movimentacoes").withIndex("by_tipo", (q) => q.eq("tipo", "ajuste")).collect(),
+    );
+
+    await expect(
+      adminA.mutation(api.admin.estorno.estornar, {
+        lancamentoId: ajustes[0]._id,
+        motivoTexto: "não deveria funcionar",
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: lançamento anterior à última contagem aprovada daquela câmara", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+
+    const { movimentacaoId } = await adminA.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    // Uma contagem é aberta, fechada e aprovada DEPOIS do lançamento — reconcilia o saldo.
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [{ produtoId, formatoId, saldoContado: 5 }], // bate com o sistema, sem divergência
+    });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    const preview = await adminA.query(api.admin.estorno.preview, { lancamentoId: movimentacaoId });
+    expect(preview.bloqueio).toContain("contagem aprovada");
+
+    await expect(
+      adminA.mutation(api.admin.estorno.estornar, { lancamentoId: movimentacaoId, motivoTexto: "tarde demais" }),
+    ).rejects.toThrow();
+  });
+
+  test("lançamento DEPOIS da contagem aprovada continua estornável normalmente", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, { contagemId, itens: [{ produtoId, formatoId, saldoContado: 0 }] });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    const { movimentacaoId } = await adminA.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    const preview = await adminA.query(api.admin.estorno.preview, { lancamentoId: movimentacaoId });
+    expect(preview.bloqueio).toBeNull();
+  });
+
+  test("sem Admin autenticado, estornar é rejeitado", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { produtoId, formatoId } = await cadastroBase(admin);
+    const { movimentacaoId } = await admin.mutation(api.admin.lancamentos.lancarProducao, {
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    await expect(
+      t.mutation(api.admin.estorno.estornar, { lancamentoId: movimentacaoId, motivoTexto: "sem login" }),
+    ).rejects.toThrow();
+  });
+});

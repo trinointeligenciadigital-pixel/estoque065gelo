@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Check, ChevronRight, MessageCircle } from "lucide-react";
-import { useQuery } from "convex/react";
+import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
@@ -20,7 +21,7 @@ import {
   excluir — nem existe endpoint para isso. Filtros por câmara, produto, tipo,
   período e autor.
 */
-type Tipo = "producao" | "venda" | "patrocinio" | "retornoPatrocinio" | "perda" | "ajuste";
+type Tipo = "producao" | "venda" | "patrocinio" | "retornoPatrocinio" | "perda" | "ajuste" | "estorno";
 const rotuloTipo: Record<Tipo, string> = {
   producao: "Produção",
   venda: "Venda",
@@ -28,6 +29,7 @@ const rotuloTipo: Record<Tipo, string> = {
   retornoPatrocinio: "Retorno",
   perda: "Perda",
   ajuste: "Ajuste",
+  estorno: "Estorno",
 };
 const rotuloMotivoAjuste: Record<string, string> = {
   contagem: "Contagem",
@@ -69,6 +71,8 @@ type MovRow = {
   loteId: string | null;
   loteInferido: boolean;
   contagemId: Id<"contagens"> | null;
+  estornado: boolean;
+  estornoDeProtocolo: string | null;
   protocolo: string;
 };
 
@@ -120,6 +124,7 @@ export function HistoricoPage() {
   const [ate, setAte] = useState(() => params.get("ate") ?? "");
   const [contagemId] = useState<Id<"contagens"> | "">(() => (params.get("contagemId") as Id<"contagens">) || "");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
+  const [estornando, setEstornando] = useState<MovRow | null>(null);
 
   const movs = useQuery(api.admin.historico.listar, {
     camaraId: camaraId || undefined,
@@ -271,12 +276,18 @@ export function HistoricoPage() {
         ) : (
           linhas.map((l) =>
             l.tipo === "individual" ? (
-              <LinhaMov key={l.mov._id} m={l.mov} onComprovante={() => setComprovante(montarComprovante(l.mov))} />
+              <LinhaMov
+                key={l.mov._id}
+                m={l.mov}
+                onComprovante={() => setComprovante(montarComprovante(l.mov))}
+                onEstornar={() => setEstornando(l.mov)}
+              />
             ) : (
               <LinhaGrupo
                 key={l.loteId}
                 itens={l.itens}
                 onComprovante={(m) => setComprovante(montarComprovante(m))}
+                onEstornar={(m) => setEstornando(m)}
               />
             ),
           )
@@ -286,6 +297,9 @@ export function HistoricoPage() {
       {comprovante ? (
         <ComprovanteModal dados={comprovante} onFechar={() => setComprovante(null)} />
       ) : null}
+      {estornando ? (
+        <ModalEstorno m={estornando} onFechar={() => setEstornando(null)} />
+      ) : null}
     </>
   );
 }
@@ -293,17 +307,27 @@ export function HistoricoPage() {
 // Uma linha de movimentação — usada tanto solta quanto dentro de um grupo
 // expandido (`indentado` dá o recuo visual que mostra que ela pertence a um
 // lote).
+// Estornável: não é ajuste (a correção de ajuste é rejeitar a contagem), não é
+// um estorno (não se estorna um estorno) e ainda não foi estornado. O servidor
+// revalida tudo de novo (inclusive o bloqueio de contagem já reconciliada, que
+// a UI não checa aqui) — isto só decide se o botão aparece.
+function podeEstornar(m: MovRow): boolean {
+  return m.tipo !== "ajuste" && m.tipo !== "estorno" && !m.estornado;
+}
+
 function LinhaMov({
   m,
   onComprovante,
+  onEstornar,
   indentado = false,
 }: {
   m: MovRow;
   onComprovante: () => void;
+  onEstornar: () => void;
   indentado?: boolean;
 }) {
   return (
-    <LinhaTabela className={indentado ? "bg-superficie-fria/40" : ""}>
+    <LinhaTabela className={`${indentado ? "bg-superficie-fria/40" : ""} ${m.estornado ? "opacity-60" : ""}`}>
       <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">
         {indentado ? <span className="mr-1 text-texto-fraco">↳</span> : null}
         {dataHora(m.registradoEm)}
@@ -312,6 +336,11 @@ function LinhaMov({
         <span className={m.sinal > 0 ? "text-entrada" : "text-saida"}>
           {m.sinal > 0 ? "+" : "−"} {rotuloTipo[m.tipo] ?? m.tipo}
         </span>
+        {m.estornado ? (
+          <span className="ml-1.5 rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+            estornado
+          </span>
+        ) : null}
       </td>
       <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {m.formatoNome}</span></td>
       <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
@@ -329,6 +358,11 @@ function LinhaMov({
               {m.motivoCategoria === "outro" && m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
             </>
           )
+        ) : m.tipo === "estorno" ? (
+          <>
+            {m.estornoDeProtocolo ? `Estorno de ${m.estornoDeProtocolo}` : "Estorno"}
+            {m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
+          </>
         ) : (
           <>
             {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
@@ -343,9 +377,16 @@ function LinhaMov({
         </span>
       </td>
       <td className="px-3 py-2.5 text-right">
-        {m.tipo === "venda" || m.tipo === "patrocinio" ? (
-          <Botao variante="neutro" onClick={onComprovante}>Comprovante</Botao>
-        ) : null}
+        <div className="flex justify-end gap-2">
+          {m.tipo === "venda" || m.tipo === "patrocinio" ? (
+            <Botao variante="neutro" onClick={onComprovante}>Comprovante</Botao>
+          ) : null}
+          {podeEstornar(m) ? (
+            <Botao variante="neutro" onClick={onEstornar}>
+              <Undo2 size={14} aria-hidden="true" /> Estornar
+            </Botao>
+          ) : null}
+        </div>
       </td>
     </LinhaTabela>
   );
@@ -358,9 +399,11 @@ function LinhaMov({
 function LinhaGrupo({
   itens,
   onComprovante,
+  onEstornar,
 }: {
   itens: MovRow[];
   onComprovante: (m: MovRow) => void;
+  onEstornar: (m: MovRow) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const primeiro = itens[0];
@@ -396,8 +439,96 @@ function LinhaGrupo({
           ) : null}
         </td>
       </tr>
-      {aberto ? itens.map((m) => <LinhaMov key={m._id} m={m} onComprovante={() => onComprovante(m)} indentado />) : null}
+      {aberto
+        ? itens.map((m) => (
+            <LinhaMov
+              key={m._id}
+              m={m}
+              onComprovante={() => onComprovante(m)}
+              onEstornar={() => onEstornar(m)}
+              indentado
+            />
+          ))
+        : null}
     </>
+  );
+}
+
+// Modal de estorno (tarefa 6): mostra o impacto ANTES de confirmar — o
+// servidor revalida tudo de novo (bloqueios, mínimo de 5 caracteres), este
+// preview só evita o Admin descobrir um bloqueio depois de digitar o motivo.
+function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
+  const preview = useQuery(api.admin.estorno.preview, { lancamentoId: m._id });
+  const estornar = useMutation(api.admin.estorno.estornar);
+  const [motivoTexto, setMotivoTexto] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function confirmar() {
+    setErro("");
+    setEnviando(true);
+    try {
+      await estornar({ lancamentoId: m._id, motivoTexto });
+      onFechar();
+    } catch (e) {
+      setErro(mensagemErro(e));
+      setEnviando(false);
+    }
+  }
+
+  const motivoValido = motivoTexto.trim().length >= 5;
+
+  return (
+    <Modal titulo="Estornar lançamento" onFechar={onFechar}>
+      <div className="flex flex-col gap-3">
+        {preview === undefined ? (
+          <p className="text-sm text-texto-suave">Carregando…</p>
+        ) : (
+          <>
+            <div className="rounded-lg border border-borda bg-superficie-fria/40 p-3">
+              <p className="text-sm text-texto">
+                {preview.produtoNome} <span className="text-texto-suave">/ {preview.formatoNome}</span>
+                <span className="text-texto-suave"> · {preview.camaraNome}</span>
+              </p>
+              <p className="mt-1 font-mono text-sm text-texto">
+                {!preview.pesoVariavel ? <>{formatarPacotes(preview.impactoQuantidade)} · </> : null}
+                {formatarPeso(preview.impactoPesoKg)}
+              </p>
+              <p className="mt-2 text-xs text-texto-suave">
+                Saldo depois do estorno:{" "}
+                <span className="font-mono font-medium text-texto">
+                  {preview.pesoVariavel ? formatarPeso(preview.saldoDepois) : formatarPacotes(preview.saldoDepois)}
+                </span>
+              </p>
+            </div>
+
+            {preview.bloqueio ? (
+              <Aviso>{preview.bloqueio}</Aviso>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-texto-suave">Motivo do estorno (obrigatório)</span>
+                <textarea
+                  value={motivoTexto}
+                  onChange={(e) => setMotivoTexto(e.target.value)}
+                  rows={3}
+                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
+                  placeholder="ex.: digitei 1.130 pacotes em vez de 113"
+                />
+              </label>
+            )}
+            {erro ? <Aviso>{erro}</Aviso> : null}
+            <div className="flex justify-end gap-2">
+              <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+              {!preview.bloqueio ? (
+                <Botao variante="perigo" onClick={confirmar} disabled={!motivoValido || enviando}>
+                  {enviando ? "Estornando…" : "Confirmar estorno"}
+                </Botao>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
 
