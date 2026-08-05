@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { normalizarBusca } from "../lib/busca.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 
@@ -23,6 +25,7 @@ export function ProducaoFlow({
   onVoltar: () => void;
 }) {
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
+  const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarProducao);
 
   const [passo, setPasso] = useState<Passo>("produto");
@@ -122,7 +125,7 @@ export function ProducaoFlow({
   if (passo === "produto") {
     return (
       <Tela titulo="Produção — produto" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={4}>
-        <ListaProdutos produtos={produtos} onEscolher={escolherProduto} />
+        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
       </Tela>
     );
   }
@@ -191,29 +194,109 @@ export function ProducaoFlow({
   return null;
 }
 
+// Lista de produtos com busca e atalho de "Frequentes" (tarefa 3 do sprint
+// PWA). 19 produtos numa câmara e cinco rolagens pra achar o último era o
+// problema real — busca sem acento e os mais usados no topo resolvem sem
+// precisar rolar quase nunca.
 export function ListaProdutos({
   produtos,
+  frequentesIds,
   onEscolher,
 }: {
   produtos: ProdutoGrid[] | undefined;
+  frequentesIds?: Id<"produtos">[];
   onEscolher: (p: ProdutoGrid) => void;
 }) {
+  const [busca, setBusca] = useState("");
+
   if (produtos === undefined) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Carregando produtos">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="flex flex-col gap-2.5" aria-busy="true" aria-label="Carregando produtos">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="min-h-[56px] animate-pulse rounded-xl border border-borda bg-superficie-fria" />
         ))}
       </div>
     );
   }
   if (produtos.length === 0) return <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>;
+
+  const buscando = normalizarBusca(busca) !== "";
+  const filtrados = buscando
+    ? produtos.filter((p) => normalizarBusca(p.nome).includes(normalizarBusca(busca)))
+    : produtos;
+
+  // Sem autofoco: o teclado cobriria o bloco de frequentes assim que a tela
+  // abre. Some enquanto o operador está buscando — nesse momento ele já sabe
+  // o que quer, o atalho vira ruído.
+  const frequentes = buscando
+    ? []
+    : (frequentesIds ?? [])
+        .map((id) => produtos.find((p) => p._id === id))
+        .filter((p): p is ProdutoGrid => p !== undefined);
+
   return (
-    <div className="flex flex-col gap-3">
-      {produtos.map((p) => (
-        <OpcaoGrande key={p._id} titulo={p.nome} detalhe={p.categoria} onClick={() => onEscolher(p)} />
-      ))}
+    <div className="flex flex-col gap-4">
+      <input
+        type="search"
+        inputMode="search"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        placeholder="Buscar produto…"
+        aria-label="Buscar produto"
+        className="min-h-[56px] w-full rounded-xl border border-borda bg-superficie px-4 text-base text-texto outline-none focus:border-acento"
+      />
+
+      {frequentes.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+            Frequentes
+          </span>
+          <div className="flex flex-col gap-2">
+            {frequentes.map((p) => (
+              <LinhaProduto key={p._id} produto={p} onClick={() => onEscolher(p)} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        {frequentes.length > 0 ? (
+          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+            Todos
+          </span>
+        ) : null}
+        {filtrados.length === 0 ? (
+          <p className="text-base text-texto-suave">Nenhum produto encontrado para "{busca}".</p>
+        ) : (
+          filtrados.map((p) => <LinhaProduto key={p._id} produto={p} onClick={() => onEscolher(p)} />)
+        )}
+      </div>
     </div>
+  );
+}
+
+// Linha densa (~72px, toque ≥56px) — a mudança visual autorizada deste
+// sprint (skill de design da Trino: "operador treinado, uso diário" pede
+// denso). Saldo à direita: pacotes em destaque quando há só um formato (a
+// única situação em que "N pacotes" é honesto); peso nos demais casos.
+function LinhaProduto({ produto, onClick }: { produto: ProdutoGrid; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-borda bg-superficie px-4 py-2.5 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+    >
+      <span className="min-w-0 flex-1 truncate text-base font-medium text-texto">{produto.nome}</span>
+      {produto.saldo ? (
+        <span className="shrink-0 text-right leading-tight">
+          <span className="block font-mono text-base font-semibold text-texto">
+            {produto.saldo.pacotes !== null ? formatarPacotes(produto.saldo.pacotes) : formatarPeso(produto.saldo.pesoKg)}
+          </span>
+          {produto.saldo.pacotes !== null ? (
+            <span className="block font-mono text-xs text-texto-suave">{formatarPeso(produto.saldo.pesoKg)}</span>
+          ) : null}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

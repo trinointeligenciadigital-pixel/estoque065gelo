@@ -141,3 +141,94 @@ describe("Tarefa 1 — contagem cega", () => {
     expect(await t.query(api.operador.consulta.saldos, { token: maria.token })).not.toBeNull();
   });
 });
+
+describe("Tarefa 3 — lista de produtos utilizável", () => {
+  test("gridProdutos: saldo em pacotes com 1 formato; em peso com vários; null durante contagem aberta", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    // Segundo formato pro mesmo produto — passa a ter 2 formatos ativos.
+    const formatoId2 = await admin.mutation(api.admin.formatos.criar, {
+      produtoId,
+      nome: "Saco 5kg",
+      pesoKg: 5,
+      pesoVariavel: false,
+    });
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 10, // 10 × 2kg = 20kg
+    });
+
+    // Com 2 formatos ativos: saldo em peso, sem pacotes (não dá pra somar
+    // pacotes de tamanhos diferentes).
+    let grid = await t.query(api.operador.consulta.gridProdutos, { token: joao.token });
+    let produto = grid.find((p) => p._id === produtoId)!;
+    expect(produto.saldo).toEqual({ pacotes: null, pesoKg: 20 });
+
+    // Desativa o segundo formato: volta a ter 1 só — saldo em pacotes.
+    await admin.mutation(api.admin.formatos.atualizar, {
+      id: formatoId2,
+      nome: "Saco 5kg",
+      pesoKg: 5,
+      pesoVariavel: false,
+      ativo: false,
+    });
+    grid = await t.query(api.operador.consulta.gridProdutos, { token: joao.token });
+    produto = grid.find((p) => p._id === produtoId)!;
+    expect(produto.saldo).toEqual({ pacotes: 10, pesoKg: 20 });
+
+    // Contagem aberta: saldo escondido, mesma regra da tarefa 1.
+    await t.mutation(api.operador.contagem.abrir, { token: joao.token });
+    grid = await t.query(api.operador.consulta.gridProdutos, { token: joao.token });
+    produto = grid.find((p) => p._id === produtoId)!;
+    expect(produto.saldo).toBeNull();
+  });
+
+  test("produtosFrequentes: vazio com menos de 3 lançamentos; top 5 por contagem quando há", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const camaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Saborizado" });
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+    const maria = await operadorLogado(t, admin, camaraId, "Maria");
+
+    const produtoA = await admin.mutation(api.admin.produtos.criar, {
+      nome: "Morango", categoria: "saborizado", camaraId, unidadeBase: "pacote",
+    });
+    const formatoA = await admin.mutation(api.admin.formatos.criar, {
+      produtoId: produtoA, nome: "Saco 2kg", pesoKg: 2, pesoVariavel: false,
+    });
+    const produtoB = await admin.mutation(api.admin.produtos.criar, {
+      nome: "Uva", categoria: "saborizado", camaraId, unidadeBase: "pacote",
+    });
+    const formatoB = await admin.mutation(api.admin.formatos.criar, {
+      produtoId: produtoB, nome: "Saco 2kg", pesoKg: 2, pesoVariavel: false,
+    });
+
+    // Só 2 lançamentos ainda — abaixo do mínimo de 3.
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token, chaveIdempotencia: crypto.randomUUID(), produtoId: produtoA, formatoId: formatoA, quantidade: 1,
+    });
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token, chaveIdempotencia: crypto.randomUUID(), produtoId: produtoA, formatoId: formatoA, quantidade: 1,
+    });
+    expect(await t.query(api.operador.consulta.produtosFrequentes, { token: joao.token })).toEqual([]);
+
+    // 3º lançamento (produto B) — passa do mínimo. A (2x) vem antes de B (1x).
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token, chaveIdempotencia: crypto.randomUUID(), produtoId: produtoB, formatoId: formatoB, quantidade: 1,
+    });
+    expect(await t.query(api.operador.consulta.produtosFrequentes, { token: joao.token })).toEqual([
+      produtoA,
+      produtoB,
+    ]);
+
+    // Maria não lançou nada — lista vazia, não vê os lançamentos do João.
+    expect(await t.query(api.operador.consulta.produtosFrequentes, { token: maria.token })).toEqual([]);
+  });
+});

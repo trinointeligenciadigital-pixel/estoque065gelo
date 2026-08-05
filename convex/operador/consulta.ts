@@ -30,11 +30,16 @@ async function contagemMinhaAberta(
 */
 
 // Grid de produtos ativos da câmara + formatos ativos, para os lançamentos
-// (RF27). SEM saldo — o saldo só aparece na tela "Ver saldo".
+// (RF27). Inclui o saldo do produto (tarefa 3 do sprint PWA) — em pacotes
+// quando há um único formato ativo (a unidade que a lista pode mostrar sem
+// ambiguidade); em peso quando há mais de um formato, porque somar "pacotes"
+// de tamanhos diferentes violaria a regra de agregação por peso (regra 6).
+// `saldo: null` durante contagem cega (tarefa 1) — mesma proteção de sempre.
 export const gridProdutos = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    const { camara } = await exigirSessaoOperador(ctx, token);
+    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const esconderSaldo = await contagemMinhaAberta(ctx, camara._id, operador._id);
 
     const produtos = await ctx.db
       .query("produtos")
@@ -44,21 +49,61 @@ export const gridProdutos = query({
     const ativos = produtos.filter((p) => p.ativo);
     return await Promise.all(
       ativos.map(async (p) => {
-        const formatos = await ctx.db
+        const todosFormatos = await ctx.db
           .query("formatos")
           .withIndex("by_produto", (q) => q.eq("produtoId", p._id))
           .collect();
+        const formatosAtivos = todosFormatos.filter((f) => f.ativo);
+
+        let saldo: { pacotes: number | null; pesoKg: number } | null = null;
+        if (!esconderSaldo) {
+          if (formatosAtivos.length === 1) {
+            const f = formatosAtivos[0];
+            const pacotes = f.pesoVariavel ? null : await saldoDoFormato(ctx, p._id, camara._id, f._id);
+            const pesoKg = await pesoLiquidoDoFormato(ctx, p._id, camara._id, f._id);
+            saldo = { pacotes, pesoKg };
+          } else if (formatosAtivos.length > 1) {
+            saldo = { pacotes: null, pesoKg: await pesoTotalDoProduto(ctx, p._id, camara._id) };
+          }
+        }
+
         return {
           _id: p._id,
           nome: p.nome,
           categoria: p.categoria,
           unidadeBase: p.unidadeBase,
-          formatos: formatos
-            .filter((f) => f.ativo)
-            .map((f) => ({ _id: f._id, nome: f.nome, pesoKg: f.pesoKg, pesoVariavel: f.pesoVariavel })),
+          formatos: formatosAtivos.map((f) => ({ _id: f._id, nome: f.nome, pesoKg: f.pesoKg, pesoVariavel: f.pesoVariavel })),
+          saldo,
         };
       }),
     );
+  },
+});
+
+// Os 5 produtos que ESTE colaborador mais lançou NESTA câmara nos últimos 7
+// dias (tarefa 3) — bloco "Frequentes" no topo da lista. Exige pelo menos 3
+// lançamentos no período; com menos que isso o padrão é ruído, não hábito.
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+export const produtosFrequentes = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const desde = Date.now() - SETE_DIAS_MS;
+
+    const movs = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_camara", (q) => q.eq("camaraId", camara._id))
+      .collect();
+    const minhas = movs.filter((m) => m.operadorId === operador._id && m.registradoEm >= desde);
+    if (minhas.length < 3) return [];
+
+    const contagem = new Map<Id<"produtos">, number>();
+    for (const m of minhas) contagem.set(m.produtoId, (contagem.get(m.produtoId) ?? 0) + 1);
+
+    return [...contagem.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([produtoId]) => produtoId);
   },
 });
 

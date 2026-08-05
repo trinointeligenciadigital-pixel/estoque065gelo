@@ -15,12 +15,19 @@ export type FormatoGrid = {
   pesoKg: number;
   pesoVariavel: boolean;
 };
+// Saldo do produto pra lista (tarefa 3): `pacotes` só existe quando o produto
+// tem UM formato ativo, não peso-variável — é a única situação em que "N
+// pacotes" é uma unidade honesta. Em qualquer outro caso (vários formatos,
+// ou peso variável) só o peso é mostrado. `null` = saldo escondido
+// (contagem cega, tarefa 1) ou produto sem formato ativo.
+export type SaldoProdutoGrid = { pacotes: number | null; pesoKg: number } | null;
 export type ProdutoGrid = {
   _id: Id<"produtos">;
   nome: string;
   categoria: string;
   unidadeBase: string;
   formatos: FormatoGrid[];
+  saldo: SaldoProdutoGrid;
 };
 
 // Peso em kg em tempo real (RF31). Peso fixo: quantidade × pesoKg. Peso

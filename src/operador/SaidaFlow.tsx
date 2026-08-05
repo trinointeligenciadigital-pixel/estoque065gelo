@@ -100,6 +100,7 @@ function SaidaCarregamento({
   onVoltar: () => void;
 }) {
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
+  const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const veiculos = useQuery(api.operador.consulta.veiculos, { token });
   const saldos = useQuery(api.operador.consulta.saldos, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarSaidaMultipla);
@@ -365,7 +366,7 @@ function SaidaCarregamento({
         camaraNome={camaraNome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
       >
-        <ListaProdutos produtos={produtos} onEscolher={escolherProdutoNoCarrinho} />
+        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProdutoNoCarrinho} />
       </Tela>
     );
   }
@@ -570,6 +571,7 @@ function SaidaPerda({
   onVoltar: () => void;
 }) {
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
+  const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarSaida);
 
   const [passo, setPasso] = useState<PassoPerda>("produto");
@@ -660,7 +662,7 @@ function SaidaPerda({
   if (passo === "produto") {
     return (
       <Tela titulo="Perda — produto" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={5}>
-        <ListaProdutos produtos={produtos} onEscolher={escolherProduto} />
+        <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
       </Tela>
     );
   }
