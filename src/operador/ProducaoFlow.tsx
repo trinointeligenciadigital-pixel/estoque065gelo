@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { mensagemErro } from "../lib/erros.ts";
+import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
+import { BotaoDesfazer } from "./desfazer.tsx";
 
 /*
   Lançar produção (RF26, RF31–RF34). Passos: produto → formato → quantidade →
@@ -35,15 +36,24 @@ export function ProducaoFlow({
   const [valor, setValor] = useState("");
   const [chave, setChave] = useState("");
   const [erro, setErro] = useState("");
+  const [erroDeRede, setErroDeRede] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // Do último lançamento bem-sucedido — pra "Lançar outro do mesmo produto" e
+  // pro botão Desfazer (tarefa 5).
+  const [ultimoId, setUltimoId] = useState<Id<"movimentacoes"> | null>(null);
+  const [quandoMs, setQuandoMs] = useState<number | null>(null);
+  const [desfeito, setDesfeito] = useState(false);
 
-  function reiniciar() {
-    setProduto(null);
-    setFormato(null);
+  // Mantém produto e formato, só troca a quantidade — pro atalho "Lançar
+  // outro do mesmo produto" na tela de sucesso.
+  function lancarDeNovoMesmoProduto() {
     setValor("");
-    setChave("");
+    setChave(crypto.randomUUID());
     setErro("");
-    setPasso("produto");
+    setUltimoId(null);
+    setQuandoMs(null);
+    setDesfeito(false);
+    setPasso("quantidade");
   }
 
   // Formato único: nem mostra a lista de um item só — seleciona sozinho e já
@@ -51,21 +61,25 @@ export function ProducaoFlow({
   // no subtítulo da tela seguinte e na conferência; só o TOQUE some.
   function escolherProduto(p: ProdutoGrid) {
     setProduto(p);
-    if (p.formatos.length === 1) {
-      setFormato(p.formatos[0]);
-      setValor("");
-      setChave(crypto.randomUUID());
-      setPasso("quantidade");
-    } else {
-      setPasso("formato");
-    }
+    setValor("");
+    setPasso(p.formatos.length === 1 ? "quantidade" : "formato");
+    if (p.formatos.length === 1) setFormato(p.formatos[0]);
   }
 
   function escolherFormato(f: FormatoGrid) {
     setFormato(f);
     setValor("");
-    setChave(crypto.randomUUID()); // uma chave por lançamento
     setPasso("quantidade");
+  }
+
+  // Chave de idempotência gerada ao ENTRAR na conferência (tarefa 5), não ao
+  // tocar no botão — assim duplo-toque em "Confirmar" reenvia a MESMA chave e
+  // o servidor não duplica. Gerar aqui (não antes) também garante que, se o
+  // operador voltar e mudar o número, a chave é outra — nunca reaproveita a
+  // idempotência de um valor diferente do que está sendo confirmado agora.
+  function irParaConferencia() {
+    setChave(crypto.randomUUID());
+    setPasso("revisar");
   }
 
   // Só sabemos se o passo de formato foi pulado depois que o produto é
@@ -89,10 +103,10 @@ export function ProducaoFlow({
   async function confirmar() {
     if (!produto || !formato) return;
     setErro("");
+    setErroDeRede(false);
     setEnviando(true);
     try {
-      const num = Number(valor);
-      await lancar({
+      const r = await lancar({
         token,
         chaveIdempotencia: chave,
         produtoId: produto._id,
@@ -100,9 +114,13 @@ export function ProducaoFlow({
         quantidade: formato.pesoVariavel ? undefined : num,
         pesoKgVariavel: formato.pesoVariavel ? num : undefined,
       });
+      setUltimoId(r.movimentacaoId);
+      setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
-      setErro(mensagemErro(e));
+      const rede = ehFalhaDeRede(e);
+      setErroDeRede(rede);
+      setErro(rede ? "Não foi possível enviar. Seu lançamento não foi perdido." : mensagemErro(e));
     } finally {
       setEnviando(false);
     }
@@ -111,8 +129,8 @@ export function ProducaoFlow({
   if (passo === "sucesso") {
     return (
       <Tela titulo="Produção lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
-        <AvisoOperador tom="ok">Registrado com sucesso.</AvisoOperador>
-        {produto && formato ? (
+        <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
+        {produto && formato && !desfeito ? (
           <div className="mt-4">
             <ResumoLancamento
               pesoKg={kgDe(formato, num, num)}
@@ -125,8 +143,22 @@ export function ProducaoFlow({
           </div>
         ) : null}
         <div className="mt-6 flex flex-col gap-3">
-          <BotaoGrande variante="entrada" onClick={reiniciar}>Lançar outra produção</BotaoGrande>
-          <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar ao menu</BotaoGrande>
+          {!desfeito ? (
+            <>
+              <BotaoGrande variante="entrada" onClick={lancarDeNovoMesmoProduto}>
+                Lançar outro do mesmo produto
+              </BotaoGrande>
+              {ultimoId && quandoMs ? (
+                <BotaoDesfazer
+                  token={token}
+                  lancamentoId={ultimoId}
+                  quandoMs={quandoMs}
+                  onDesfeito={() => setDesfeito(true)}
+                />
+              ) : null}
+            </>
+          ) : null}
+          <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar ao início</BotaoGrande>
         </div>
       </Tela>
     );
@@ -158,7 +190,7 @@ export function ProducaoFlow({
         etapa={pulouFormato ? 2 : 3}
         totalEtapas={totalEtapas}
         rodape={
-          <BotaoGrande variante="entrada" onClick={() => setPasso("revisar")} disabled={!valido}>
+          <BotaoGrande variante="entrada" onClick={irParaConferencia} disabled={!valido}>
             Continuar
           </BotaoGrande>
         }
@@ -184,7 +216,9 @@ export function ProducaoFlow({
       <Tela
         titulo="Produção — confira"
         camaraNome={camaraNome}
-        onVoltar={() => setPasso("quantidade")}
+        // Sem voltar enquanto envia (tarefa 5) — evita sair no meio de um
+        // envio em curso.
+        onVoltar={enviando ? undefined : () => setPasso("quantidade")}
         etapa={pulouFormato ? 3 : 4}
         totalEtapas={totalEtapas}
         rodape={
@@ -197,7 +231,7 @@ export function ProducaoFlow({
             </div>
           ) : (
             <BotaoGrande variante="entrada" onClick={confirmar} disabled={enviando}>
-              {enviando ? "Enviando…" : "Confirmar produção"}
+              {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : "Confirmar produção"}
             </BotaoGrande>
           )
         }

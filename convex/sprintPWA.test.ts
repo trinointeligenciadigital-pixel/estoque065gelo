@@ -342,3 +342,169 @@ describe("Tarefa 4 — checarPlausibilidade", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("Tarefa 5 — desfazerMeuLancamento", () => {
+  test("desfaz o próprio lançamento dentro da janela: contra-lançamento com sinal invertido", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    const { movimentacaoId } = await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 10,
+    });
+
+    const { estornoId } = await t.mutation(api.operador.desfazer.desfazerMeuLancamento, {
+      token: joao.token,
+      lancamentoId: movimentacaoId,
+    });
+
+    const estorno = await t.run((ctx) => ctx.db.get(estornoId));
+    expect(estorno?.tipo).toBe("estorno");
+    expect(estorno?.sinal).toBe(-1);
+    expect(estorno?.estornoDe).toBe(movimentacaoId);
+    expect(estorno?.motivoTexto).toBe("desfeito pelo colaborador");
+    expect(estorno?.autorNome).toBe("João");
+    expect(estorno?.registradoPorTipo).toBe("operador");
+
+    const saldo = await t.run((ctx) =>
+      ctx.db
+        .query("movimentacoes")
+        .withIndex("by_produto_camara_formato", (q) =>
+          q.eq("produtoId", produtoId).eq("camaraId", camaraId).eq("formatoId", formatoId),
+        )
+        .collect(),
+    );
+    expect(saldo.reduce((acc, m) => acc + m.sinal * m.quantidade, 0)).toBe(0);
+  });
+
+  test("bloqueia: só quem lançou pode desfazer", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+    const maria = await operadorLogado(t, admin, camaraId, "Maria");
+
+    const { movimentacaoId } = await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 10,
+    });
+
+    await expect(
+      t.mutation(api.operador.desfazer.desfazerMeuLancamento, {
+        token: maria.token,
+        lancamentoId: movimentacaoId,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: fora da janela de 5 minutos", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    // Lançamento simulado como se fosse de 6 minutos atrás.
+    const seisMinAtras = Date.now() - 6 * 60 * 1000;
+    const movimentacaoId = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "producao",
+        sinal: 1,
+        produtoId,
+        camaraId,
+        formatoId,
+        quantidade: 10,
+        pesoKg: 20,
+        registradoPorTipo: "operador",
+        operadorId: joao.operadorId,
+        registradoEm: seisMinAtras,
+      }),
+    );
+
+    await expect(
+      t.mutation(api.operador.desfazer.desfazerMeuLancamento, {
+        token: joao.token,
+        lancamentoId: movimentacaoId,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: lançamento de outra câmara (a sessão do colaborador é de uma câmara só)", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const outraCamaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Cubo" });
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+    // João também tem acesso à outra câmara — mas a SESSÃO dele é presa à primeira.
+    await admin.mutation(api.admin.operadores.atualizar, {
+      id: joao.operadorId,
+      nome: "João",
+      camarasPermitidas: [camaraId, outraCamaraId],
+      podeLancarProducao: true,
+      podeLancarSaida: true,
+      podeContar: true,
+      ativo: true,
+    });
+
+    const movimentacaoId = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "producao",
+        sinal: 1,
+        produtoId,
+        camaraId: outraCamaraId,
+        formatoId,
+        quantidade: 10,
+        pesoKg: 20,
+        registradoPorTipo: "operador",
+        operadorId: joao.operadorId,
+        registradoEm: Date.now(),
+      }),
+    );
+
+    await expect(
+      t.mutation(api.operador.desfazer.desfazerMeuLancamento, {
+        token: joao.token,
+        lancamentoId: movimentacaoId,
+      }),
+    ).rejects.toThrow();
+  });
+
+  test("bloqueia: mesma regra de contagem aprovada do estorno do Admin", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const outroAdmin = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    const { movimentacaoId } = await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 10,
+    });
+
+    const { contagemId } = await admin.mutation(api.admin.contagens.abrir, { camaraId });
+    await admin.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [{ produtoId, formatoId, saldoContado: 10 }],
+    });
+    await outroAdmin.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    await expect(
+      t.mutation(api.operador.desfazer.desfazerMeuLancamento, {
+        token: joao.token,
+        lancamentoId: movimentacaoId,
+      }),
+    ).rejects.toThrow();
+  });
+});

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { mensagemErro } from "../lib/erros.ts";
+import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
+import { BotaoDesfazer } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
 import { dataHora } from "../lib/data.ts";
@@ -127,6 +128,7 @@ function SaidaCarregamento({
   const [motorista, setMotorista] = useState("");
 
   const [erro, setErro] = useState("");
+  const [erroDeRede, setErroDeRede] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [quandoMs, setQuandoMs] = useState(0);
 
@@ -240,6 +242,7 @@ function SaidaCarregamento({
   async function confirmar() {
     if (itens.length === 0) return;
     setErro("");
+    setErroDeRede(false);
     setEnviando(true);
     try {
       await lancar({
@@ -261,7 +264,9 @@ function SaidaCarregamento({
       setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
-      setErro(mensagemErro(e));
+      const rede = ehFalhaDeRede(e);
+      setErroDeRede(rede);
+      setErro(rede ? "Não foi possível enviar. Seu lançamento não foi perdido." : mensagemErro(e));
     } finally {
       setEnviando(false);
     }
@@ -533,12 +538,12 @@ function SaidaCarregamento({
       <Tela
         titulo={`${rotulo} — confira`}
         camaraNome={camaraNome}
-        onVoltar={() => setPasso("contexto")}
+        onVoltar={enviando ? undefined : () => setPasso("contexto")}
         etapa={2}
         totalEtapas={2}
         rodape={
           <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
-            {enviando ? "Enviando…" : `Confirmar ${rotulo.toLowerCase()}`}
+            {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : `Confirmar ${rotulo.toLowerCase()}`}
           </BotaoGrande>
         }
       >
@@ -616,7 +621,13 @@ function SaidaPerda({
   const [motivo, setMotivo] = useState<MotivoPerda | "">("");
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState("");
+  const [erroDeRede, setErroDeRede] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  // Do último lançamento bem-sucedido — pra "Lançar outro do mesmo produto" e
+  // pro botão Desfazer (tarefa 5).
+  const [ultimoId, setUltimoId] = useState<Id<"movimentacoes"> | null>(null);
+  const [quandoMs, setQuandoMs] = useState<number | null>(null);
+  const [desfeito, setDesfeito] = useState(false);
 
   // Saldo do formato na câmara (do servidor). Fixo → pacotes; variável → kg.
   function saldoDoFormatoPerda(formatoId: Id<"formatos">) {
@@ -631,21 +642,29 @@ function SaidaPerda({
   function escolherFormato(f: FormatoGrid) {
     setFormato(f);
     setValor("");
-    setChave(crypto.randomUUID());
     setPasso("quantidade");
   }
 
   // Formato único: seleciona sozinho e pula direto pra quantidade (tarefa 2).
   function escolherProduto(p: ProdutoGrid) {
     setProduto(p);
-    if (p.formatos.length === 1) {
-      setFormato(p.formatos[0]);
-      setValor("");
-      setChave(crypto.randomUUID());
-      setPasso("quantidade");
-    } else {
-      setPasso("formato");
-    }
+    setValor("");
+    setPasso(p.formatos.length === 1 ? "quantidade" : "formato");
+    if (p.formatos.length === 1) setFormato(p.formatos[0]);
+  }
+
+  // Mantém produto e formato, pede motivo de novo (cada perda tem o seu
+  // próprio motivo) — atalho "Lançar outro do mesmo produto" na tela de sucesso.
+  function lancarDeNovoMesmoProduto() {
+    setValor("");
+    setMotivo("");
+    setObservacao("");
+    setChave("");
+    setErro("");
+    setUltimoId(null);
+    setQuandoMs(null);
+    setDesfeito(false);
+    setPasso("quantidade");
   }
 
   const pulouFormato = produto !== null && produto.formatos.length === 1;
@@ -661,12 +680,21 @@ function SaidaPerda({
     quantidade: num,
   });
 
+  // Chave de idempotência gerada ao ENTRAR na conferência (tarefa 5), não
+  // antes — assim mudar a quantidade ou o motivo depois de voltar sempre gera
+  // uma chave nova, nunca reaproveita a idempotência de um valor diferente.
+  function irParaConferencia() {
+    setChave(crypto.randomUUID());
+    setPasso("revisar");
+  }
+
   async function confirmar() {
     if (!produto || !formato) return;
     setErro("");
+    setErroDeRede(false);
     setEnviando(true);
     try {
-      await lancar({
+      const r = await lancar({
         token,
         chaveIdempotencia: chave,
         tipo: "perda",
@@ -677,9 +705,13 @@ function SaidaPerda({
         motivoPerda: (motivo || undefined) as MotivoPerda | undefined,
         observacao: observacao.trim() || undefined,
       });
+      setUltimoId(r.movimentacaoId);
+      setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
-      setErro(mensagemErro(e));
+      const rede = ehFalhaDeRede(e);
+      setErroDeRede(rede);
+      setErro(rede ? "Não foi possível enviar. Seu lançamento não foi perdido." : mensagemErro(e));
     } finally {
       setEnviando(false);
     }
@@ -689,8 +721,8 @@ function SaidaPerda({
     const pesoKg = produto && formato ? kgDe(formato, num, num) : 0;
     return (
       <Tela titulo="Perda lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
-        <AvisoOperador tom="ok">Registrado com sucesso.</AvisoOperador>
-        {produto && formato ? (
+        <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
+        {produto && formato && !desfeito ? (
           <div className="mt-4">
             <ResumoLancamento
               pesoKg={pesoKg}
@@ -703,8 +735,23 @@ function SaidaPerda({
             />
           </div>
         ) : null}
-        <div className="mt-6">
-          <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar</BotaoGrande>
+        <div className="mt-6 flex flex-col gap-3">
+          {!desfeito ? (
+            <>
+              <BotaoGrande variante="saida" onClick={lancarDeNovoMesmoProduto}>
+                Lançar outro do mesmo produto
+              </BotaoGrande>
+              {ultimoId && quandoMs ? (
+                <BotaoDesfazer
+                  token={token}
+                  lancamentoId={ultimoId}
+                  quandoMs={quandoMs}
+                  onDesfeito={() => setDesfeito(true)}
+                />
+              ) : null}
+            </>
+          ) : null}
+          <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar ao início</BotaoGrande>
         </div>
       </Tela>
     );
@@ -778,7 +825,7 @@ function SaidaPerda({
         etapa={pulouFormato ? 3 : 4}
         totalEtapas={totalEtapasPerda}
         rodape={
-          <BotaoGrande variante="saida" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
+          <BotaoGrande variante="saida" onClick={irParaConferencia} disabled={!podeConfirmar}>
             Continuar
           </BotaoGrande>
         }
@@ -822,7 +869,7 @@ function SaidaPerda({
       <Tela
         titulo="Perda — confira"
         camaraNome={camaraNome}
-        onVoltar={() => setPasso("contexto")}
+        onVoltar={enviando ? undefined : () => setPasso("contexto")}
         etapa={pulouFormato ? 4 : 5}
         totalEtapas={totalEtapasPerda}
         rodape={
@@ -835,7 +882,7 @@ function SaidaPerda({
             </div>
           ) : (
             <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
-              {enviando ? "Enviando…" : "Confirmar perda"}
+              {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : "Confirmar perda"}
             </BotaoGrande>
           )
         }
