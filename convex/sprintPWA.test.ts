@@ -232,3 +232,113 @@ describe("Tarefa 3 — lista de produtos utilizável", () => {
     expect(await t.query(api.operador.consulta.produtosFrequentes, { token: maria.token })).toEqual([]);
   });
 });
+
+describe("Tarefa 4 — checarPlausibilidade", () => {
+  test("sem 30 dias de histórico: pula a checagem de média, só o saldo (5×) vale", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 10, // saldo = 10
+    });
+
+    // 60 pacotes: bem mais que 3× qualquer média recente, mas SEM histórico de
+    // 30+ dias a checagem de média não entra — só sobra saldo×5 = 50.
+    const abaixoDoSaldo = await t.query(api.operador.consulta.checarPlausibilidade, {
+      token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 40,
+    });
+    expect(abaixoDoSaldo).toEqual({ saldoAtual: 10, mediaDiaria: null, precisaConfirmar: false });
+
+    const acimaDoSaldo = await t.query(api.operador.consulta.checarPlausibilidade, {
+      token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 60,
+    });
+    expect(acimaDoSaldo).toEqual({ saldoAtual: 10, mediaDiaria: null, precisaConfirmar: true });
+  });
+
+  test("com 30+ dias de histórico: quantidade > 3× a média diária pede confirmação", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    // Lançamento de 31 dias atrás — prova que há histórico de 30+ dias.
+    const trintaEUmDias = 31 * 24 * 60 * 60 * 1000;
+    await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "producao",
+        sinal: 1,
+        produtoId,
+        camaraId,
+        formatoId,
+        quantidade: 60,
+        pesoKg: 120,
+        registradoPorTipo: "operador",
+        registradoEm: Date.now() - trintaEUmDias,
+      }),
+    );
+    // Mais 59 pacotes dentro dos últimos 30 dias: total 60 → média diária = 2.
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 59,
+    });
+
+    // Só os 59 pacotes de agora contam pra média — o lançamento de 31 dias
+    // atrás fica fora da janela de 30 dias. Média = 59/30 ≈ 1,97/dia.
+    const media = 59 / 30;
+
+    // 5 pacotes é menos que 3× a média (≈5,9) — não pede confirmação.
+    const normal = await t.query(api.operador.consulta.checarPlausibilidade, {
+      token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 5,
+    });
+    expect(normal.mediaDiaria).toBeCloseTo(media, 5);
+    expect(normal.precisaConfirmar).toBe(false);
+
+    // 7 pacotes é mais que 3× a média (≈5,9) — pede confirmação, mesmo dentro do saldo.
+    const implausivel = await t.query(api.operador.consulta.checarPlausibilidade, {
+      token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 7,
+    });
+    expect(implausivel.precisaConfirmar).toBe(true);
+  });
+
+  test("durante contagem aberta, devolve null — mesma proteção da tarefa 1", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    await t.mutation(api.operador.contagem.abrir, { token: joao.token });
+
+    const check = await t.query(api.operador.consulta.checarPlausibilidade, {
+      token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 1000,
+    });
+    expect(check).toBeNull();
+  });
+
+  test("rejeita produtoId de outra câmara (RF07)", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    const outraCamaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Cubo" });
+    const outroProdutoId = await admin.mutation(api.admin.produtos.criar, {
+      nome: "Cubo", categoria: "cubo", camaraId: outraCamaraId, unidadeBase: "pacote",
+    });
+
+    await expect(
+      t.query(api.operador.consulta.checarPlausibilidade, {
+        token: joao.token, produtoId: outroProdutoId, formatoId, tipo: "producao", quantidade: 10,
+      }),
+    ).rejects.toThrow();
+  });
+});

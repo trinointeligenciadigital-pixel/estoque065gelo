@@ -7,6 +7,7 @@ import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
+import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 
 /*
   Lançar produção (RF26, RF31–RF34). Passos: produto → formato → quantidade →
@@ -73,6 +74,18 @@ export function ProducaoFlow({
   const pulouFormato = produto !== null && produto.formatos.length === 1;
   const totalEtapas = pulouFormato ? 3 : 4;
 
+  // Hook no topo do componente (regra dos hooks — não pode ficar dentro do
+  // `if (passo === "revisar")`). A query só ativa quando há produto+formato+
+  // quantidade > 0, então não pesa nos outros passos.
+  const num = Number(valor);
+  const plaus = usePlausibilidade({
+    token,
+    produtoId: produto?._id ?? null,
+    formatoId: formato?._id ?? null,
+    tipo: "producao",
+    quantidade: num,
+  });
+
   async function confirmar() {
     if (!produto || !formato) return;
     setErro("");
@@ -96,7 +109,6 @@ export function ProducaoFlow({
   }
 
   if (passo === "sucesso") {
-    const num = Number(valor);
     return (
       <Tela titulo="Produção lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">Registrado com sucesso.</AvisoOperador>
@@ -104,12 +116,10 @@ export function ProducaoFlow({
           <div className="mt-4">
             <ResumoLancamento
               pesoKg={kgDe(formato, num, num)}
+              quantidadePacotes={formato.pesoVariavel ? null : num}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: formato.nome },
-                ...(formato.pesoVariavel
-                  ? []
-                  : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
               ]}
             />
           </div>
@@ -139,7 +149,6 @@ export function ProducaoFlow({
   }
 
   if (passo === "quantidade" && produto && formato) {
-    const num = Number(valor);
     const valido = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
     return (
       <Tela
@@ -160,7 +169,17 @@ export function ProducaoFlow({
   }
 
   if (passo === "revisar" && produto && formato) {
-    const num = Number(valor);
+    const pesoKg = kgDe(formato, num, num);
+    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const mensagemAviso = plaus.precisaConfirmar
+      ? mensagemPlausibilidade({
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoKg)}.`,
+          produtoNome: produto.nome,
+          mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
+          saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
+        })
+      : null;
+
     return (
       <Tela
         titulo="Produção — confira"
@@ -169,20 +188,27 @@ export function ProducaoFlow({
         etapa={pulouFormato ? 3 : 4}
         totalEtapas={totalEtapas}
         rodape={
-          <BotaoGrande variante="entrada" onClick={confirmar} disabled={enviando}>
-            {enviando ? "Enviando…" : "Confirmar produção"}
-          </BotaoGrande>
+          mensagemAviso ? (
+            <div className="flex flex-col gap-3">
+              <AvisoOperador>{mensagemAviso}</AvisoOperador>
+              <BotaoGrande variante="neutro" onClick={() => plaus.setConfirmouAviso(true)}>
+                Confirmar mesmo assim
+              </BotaoGrande>
+            </div>
+          ) : (
+            <BotaoGrande variante="entrada" onClick={confirmar} disabled={enviando}>
+              {enviando ? "Enviando…" : "Confirmar produção"}
+            </BotaoGrande>
+          )
         }
       >
         <ResumoLancamento
-          pesoKg={kgDe(formato, num, num)}
+          pesoKg={pesoKg}
+          quantidadePacotes={formato.pesoVariavel ? null : num}
           linhas={[
             { rotulo: "Tipo", valor: "Produção (entrada)" },
             { rotulo: "Produto", valor: produto.nome },
             { rotulo: "Formato", valor: formato.nome },
-            ...(formato.pesoVariavel
-              ? []
-              : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
             { rotulo: "Câmara", valor: camaraNome },
           ]}
         />

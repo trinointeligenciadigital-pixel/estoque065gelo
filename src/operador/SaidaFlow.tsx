@@ -7,6 +7,7 @@ import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
+import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
 import { dataHora } from "../lib/data.ts";
@@ -130,6 +131,17 @@ function SaidaCarregamento({
   const [quandoMs, setQuandoMs] = useState(0);
 
   const pesoTotal = itens.reduce((acc, it) => acc + pesoDoItem(it), 0);
+
+  // Hook no topo (regra dos hooks) — a query só ativa com produto+formato+
+  // quantidade > 0, então não pesa nos outros passos do carrinho.
+  const num = Number(valor);
+  const plaus = usePlausibilidade({
+    token,
+    produtoId: produto?._id ?? null,
+    formatoId: formato?._id ?? null,
+    tipo,
+    quantidade: num,
+  });
 
   function escolherVeiculo(sel: string) {
     setVeiculoSel(sel);
@@ -385,7 +397,6 @@ function SaidaCarregamento({
 
   // -------- Adicionar/editar item: quantidade --------
   if (passo === "quantidade" && produto && formato) {
-    const num = Number(valor);
     const validoBasico = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
     const editando = editIdx !== null;
     const pulouFormato = produto.formatos.length === 1;
@@ -398,6 +409,19 @@ function SaidaCarregamento({
     const excede = disponivel !== null && num > disponivel;
     const valido = validoBasico && !excede;
 
+    // Fora do saldo, a quantidade é grande demais pro padrão (tarefa 4):
+    // segunda confirmação nomeando o número, em vez de deixar passar direto.
+    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const pesoDigitado = kgDe(formato, num, num);
+    const mensagemAviso = valido && plaus.precisaConfirmar
+      ? mensagemPlausibilidade({
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoDigitado)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoDigitado)}.`,
+          produtoNome: produto.nome,
+          mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
+          saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
+        })
+      : null;
+
     return (
       <Tela
         titulo={editando ? `${rotulo} — editar item` : `${rotulo} — quantidade`}
@@ -408,9 +432,18 @@ function SaidaCarregamento({
             : () => setPasso(pulouFormato ? "produto" : "formato")
         }
         rodape={
-          <BotaoGrande variante="saida" onClick={salvarItem} disabled={!valido}>
-            {editando ? "Salvar alteração" : "Adicionar ao carregamento"}
-          </BotaoGrande>
+          mensagemAviso ? (
+            <div className="flex flex-col gap-3">
+              <AvisoOperador>{mensagemAviso}</AvisoOperador>
+              <BotaoGrande variante="neutro" onClick={() => plaus.setConfirmouAviso(true)}>
+                Confirmar mesmo assim
+              </BotaoGrande>
+            </div>
+          ) : (
+            <BotaoGrande variante="saida" onClick={salvarItem} disabled={!valido}>
+              {editando ? "Salvar alteração" : "Adicionar ao carregamento"}
+            </BotaoGrande>
+          )
         }
       >
         <CampoQuantidade formato={formato} valor={valor} onChange={setValor} />
@@ -572,6 +605,7 @@ function SaidaPerda({
 }) {
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
   const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
+  const saldos = useQuery(api.operador.consulta.saldos, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarSaida);
 
   const [passo, setPasso] = useState<PassoPerda>("produto");
@@ -583,6 +617,16 @@ function SaidaPerda({
   const [observacao, setObservacao] = useState("");
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  // Saldo do formato na câmara (do servidor). Fixo → pacotes; variável → kg.
+  function saldoDoFormatoPerda(formatoId: Id<"formatos">) {
+    if (!saldos) return undefined;
+    for (const p of saldos) {
+      const f = p.formatos.find((x) => x._id === formatoId);
+      if (f) return f;
+    }
+    return undefined;
+  }
 
   function escolherFormato(f: FormatoGrid) {
     setFormato(f);
@@ -607,12 +651,21 @@ function SaidaPerda({
   const pulouFormato = produto !== null && produto.formatos.length === 1;
   const totalEtapasPerda = pulouFormato ? 4 : 5;
 
+  // Hooks no topo (regra dos hooks).
+  const num = Number(valor);
+  const plaus = usePlausibilidade({
+    token,
+    produtoId: produto?._id ?? null,
+    formatoId: formato?._id ?? null,
+    tipo: "perda",
+    quantidade: num,
+  });
+
   async function confirmar() {
     if (!produto || !formato) return;
     setErro("");
     setEnviando(true);
     try {
-      const num = Number(valor);
       await lancar({
         token,
         chaveIdempotencia: chave,
@@ -633,9 +686,7 @@ function SaidaPerda({
   }
 
   if (passo === "sucesso") {
-    const num = Number(valor);
     const pesoKg = produto && formato ? kgDe(formato, num, num) : 0;
-    const quantidadeLabel = formato?.pesoVariavel ? "" : formatarPacotes(num);
     return (
       <Tela titulo="Perda lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">Registrado com sucesso.</AvisoOperador>
@@ -643,10 +694,10 @@ function SaidaPerda({
           <div className="mt-4">
             <ResumoLancamento
               pesoKg={pesoKg}
+              quantidadePacotes={formato.pesoVariavel ? null : num}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: formato.nome },
-                ...(quantidadeLabel ? [{ rotulo: "Quantidade", valor: quantidadeLabel, mono: true }] : []),
                 { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
               ]}
             />
@@ -676,8 +727,14 @@ function SaidaPerda({
   }
 
   if (passo === "quantidade" && produto && formato) {
-    const num = Number(valor);
-    const valido = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
+    const validoBasico = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
+
+    // Saldo disponível (tarefa 4): saída maior que o saldo BLOQUEIA, não avisa.
+    const info = saldoDoFormatoPerda(formato._id);
+    const disponivel = info ? (formato.pesoVariavel ? info.pesoLiquidoKg : info.saldo) : null;
+    const excede = disponivel !== null && num > disponivel;
+    const valido = validoBasico && !excede;
+
     return (
       <Tela
         titulo="Perda — quantidade"
@@ -692,6 +749,21 @@ function SaidaPerda({
         }
       >
         <CampoQuantidade formato={formato} valor={valor} onChange={setValor} />
+        {disponivel !== null ? (
+          <p className="mt-3 text-center text-base text-texto-suave">
+            Disponível nesta câmara:{" "}
+            <span className="font-mono text-texto">
+              {formato.pesoVariavel ? formatarPeso(disponivel) : formatarPacotes(disponivel)}
+            </span>
+          </p>
+        ) : null}
+        {excede ? (
+          <div className="mt-4">
+            <AvisoOperador>
+              Só há {formato.pesoVariavel ? formatarPeso(disponivel!) : formatarPacotes(disponivel!)} deste formato nesta câmara.
+            </AvisoOperador>
+          </div>
+        ) : null}
       </Tela>
     );
   }
@@ -726,16 +798,26 @@ function SaidaPerda({
   }
 
   if (passo === "revisar" && produto && formato) {
-    const num = Number(valor);
+    const pesoKg = kgDe(formato, num, num);
     const linhas: LinhaResumo[] = [
       { rotulo: "Tipo", valor: "Perda (saída)" },
       { rotulo: "Produto", valor: produto.nome },
       { rotulo: "Formato", valor: formato.nome },
-      ...(formato.pesoVariavel ? [] : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
       { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
       ...(motivo === "outro" ? [{ rotulo: "Descrição", valor: observacao.trim() }] : []),
       { rotulo: "Câmara", valor: camaraNome },
     ];
+
+    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const mensagemAviso = plaus.precisaConfirmar
+      ? mensagemPlausibilidade({
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoKg)}.`,
+          produtoNome: produto.nome,
+          mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
+          saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
+        })
+      : null;
+
     return (
       <Tela
         titulo="Perda — confira"
@@ -744,12 +826,21 @@ function SaidaPerda({
         etapa={pulouFormato ? 4 : 5}
         totalEtapas={totalEtapasPerda}
         rodape={
-          <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
-            {enviando ? "Enviando…" : "Confirmar perda"}
-          </BotaoGrande>
+          mensagemAviso ? (
+            <div className="flex flex-col gap-3">
+              <AvisoOperador>{mensagemAviso}</AvisoOperador>
+              <BotaoGrande variante="neutro" onClick={() => plaus.setConfirmouAviso(true)}>
+                Confirmar mesmo assim
+              </BotaoGrande>
+            </div>
+          ) : (
+            <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
+              {enviando ? "Enviando…" : "Confirmar perda"}
+            </BotaoGrande>
+          )
         }
       >
-        <ResumoLancamento pesoKg={kgDe(formato, num, num)} linhas={linhas} />
+        <ResumoLancamento pesoKg={pesoKg} quantidadePacotes={formato.pesoVariavel ? null : num} linhas={linhas} />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>
     );

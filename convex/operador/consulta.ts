@@ -1,8 +1,9 @@
 import { v } from "convex/values";
+import { ConvexError } from "convex/values";
 import { query } from "../_generated/server";
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { exigirSessaoOperador } from "../lib/auth";
+import { exigirSessaoOperador, exigirCamaraDoProduto } from "../lib/auth";
 import { saldoDoFormato, pesoTotalDoProduto, pesoLiquidoDoFormato } from "../lib/saldo";
 import { contagemAtivaDaCamara } from "../lib/contagem";
 
@@ -198,6 +199,72 @@ export const patrociniosAbertos = query({
     }
     resultado.sort((a, b) => b.registradoEm - a.registradoEm);
     return resultado;
+  },
+});
+
+// Checagem de plausibilidade (tarefa 3 do sprint PWA): a quantidade digitada
+// é grande demais pra ser digitação normal? Compara com a média diária dos
+// últimos 30 dias DESTE tipo+produto+formato, e com o saldo atual. O cliente
+// nunca calcula esses números sozinho — a mensagem de confirmação cita um
+// valor real, vindo do servidor, nunca inventado. `null` durante contagem
+// cega (mesma proteção da tarefa 1: não vaza saldo nem média nesse período).
+const TRINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
+export const checarPlausibilidade = query({
+  args: {
+    token: v.string(),
+    produtoId: v.id("produtos"),
+    formatoId: v.id("formatos"),
+    tipo: v.union(v.literal("producao"), v.literal("venda"), v.literal("patrocinio"), v.literal("perda")),
+    quantidade: v.number(), // pacotes, ou kg se o formato for de peso variável
+  },
+  handler: async (ctx, { token, produtoId, formatoId, tipo, quantidade }) => {
+    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    if (await contagemMinhaAberta(ctx, camara._id, operador._id)) return null;
+
+    await exigirCamaraDoProduto(ctx, produtoId, camara._id);
+    const formato = await ctx.db.get(formatoId);
+    if (formato === null || formato.produtoId !== produtoId) {
+      throw new ConvexError("Formato inválido para este produto.");
+    }
+
+    const saldoAtual = formato.pesoVariavel
+      ? await pesoLiquidoDoFormato(ctx, produtoId, camara._id, formatoId)
+      : await saldoDoFormato(ctx, produtoId, camara._id, formatoId);
+
+    const desde = Date.now() - TRINTA_DIAS_MS;
+    const doFormato = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_produto_camara_formato", (q) =>
+        q.eq("produtoId", produtoId).eq("camaraId", camara._id).eq("formatoId", formatoId),
+      )
+      .collect();
+    const doTipo = doFormato.filter((m) => m.tipo === tipo);
+
+    // Só confia na média se já existe lançamento deste tipo de 30+ dias atrás
+    // — senão a janela estaria parcialmente vazia e a média sairia baixa
+    // demais artificialmente, sinalizando "implausível" o que é só recente.
+    const maisAntigo = doTipo.reduce(
+      (menor, m) => (menor === null || m.registradoEm < menor ? m.registradoEm : menor),
+      null as number | null,
+    );
+    const temHistorico = maisAntigo !== null && maisAntigo <= desde;
+
+    let mediaDiaria: number | null = null;
+    if (temHistorico) {
+      const totalRecente = doTipo
+        .filter((m) => m.registradoEm >= desde)
+        .reduce((acc, m) => acc + (formato.pesoVariavel ? m.pesoKg : m.quantidade), 0);
+      mediaDiaria = totalRecente / 30;
+    }
+
+    const excedeMedia = mediaDiaria !== null && quantidade > mediaDiaria * 3;
+    const excedeSaldo = quantidade > saldoAtual * 5;
+
+    return {
+      saldoAtual,
+      mediaDiaria,
+      precisaConfirmar: excedeMedia || excedeSaldo,
+    };
   },
 });
 

@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { ChevronLeft } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
-import { formatarPeso } from "../lib/formato.ts";
+import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 
 /*
   Componentes das telas do colaborador — arejadas, para uso em pé, com uma mão,
@@ -178,26 +178,48 @@ export function Kg({ valor }: { valor: number }) {
 }
 
 // Resumo de confirmação antes de gravar (rede de segurança do ledger append-only,
-// RF34). O peso calculado é o destaque grande em mono — o número é o protagonista.
-// Cada linha é rótulo à esquerda, valor à direita; números em mono.
+// RF34). Cada linha é rótulo à esquerda, valor à direita; números em mono.
 export type LinhaResumo = { rotulo: string; valor: string; mono?: boolean };
 
+// O destaque grande é o que o operador CONTOU com as próprias mãos — pacotes,
+// não quilos derivados (tarefa 4 do sprint PWA: a tela existe pra pegar erro
+// de digitação, e ninguém confere um número contra a realidade física
+// olhando pro peso calculado). Peso variável não tem "pacotes": aí o peso
+// digitado É a contagem, e continua sendo o destaque, como sempre foi.
 export function ResumoLancamento({
   pesoKg,
+  quantidadePacotes,
   linhas,
 }: {
   pesoKg: number;
+  quantidadePacotes?: number | null;
   linhas: LinhaResumo[];
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
-      <div className="flex items-baseline justify-between gap-3 border-b border-borda px-4 py-3.5">
-        <span className="font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
-          Peso
-        </span>
-        <span className="font-mono text-3xl leading-none font-semibold text-texto">
-          {formatarPeso(pesoKg)}
-        </span>
+      <div className="flex flex-col gap-1 border-b border-borda px-4 py-3.5">
+        {quantidadePacotes != null ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
+                Quantidade
+              </span>
+              <span className="font-mono text-3xl leading-none font-semibold text-texto">
+                {formatarPacotes(quantidadePacotes)}
+              </span>
+            </div>
+            <div className="text-right font-mono text-sm text-texto-suave">= {formatarPeso(pesoKg)}</div>
+          </>
+        ) : (
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
+              Peso
+            </span>
+            <span className="font-mono text-3xl leading-none font-semibold text-texto">
+              {formatarPeso(pesoKg)}
+            </span>
+          </div>
+        )}
       </div>
       <dl>
         {linhas.map((l, i) => (
