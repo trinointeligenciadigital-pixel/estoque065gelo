@@ -64,6 +64,70 @@ describe("Produtos (RF22) — câmara é imutável após a criação", () => {
   });
 });
 
+describe("Produtos — nome duplicado (sprint P0, tarefa 2)", () => {
+  test("bloqueia nome repetido na MESMA câmara, mas permite em câmaras diferentes", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+
+    const camaraA = await admin.mutation(api.admin.camaras.criar, { nome: "Cubo/Escama" });
+    const camaraB = await admin.mutation(api.admin.camaras.criar, { nome: "Conteiner" });
+
+    await admin.mutation(api.admin.produtos.criar, {
+      nome: "Cubo",
+      categoria: "cubo",
+      camaraId: camaraA,
+      unidadeBase: "pacote",
+    });
+
+    // Mesma câmara, nome repetido (mesmo com espaços/caixa diferentes) — rejeitado.
+    await expect(
+      admin.mutation(api.admin.produtos.criar, {
+        nome: " cubo ",
+        categoria: "cubo",
+        camaraId: camaraA,
+        unidadeBase: "pacote",
+      }),
+    ).rejects.toThrow();
+
+    // Câmara diferente, mesmo nome — é o caso real da 065, permitido.
+    const idNaOutraCamara = await admin.mutation(api.admin.produtos.criar, {
+      nome: "Cubo",
+      categoria: "cubo",
+      camaraId: camaraB,
+      unidadeBase: "pacote",
+    });
+    expect(idNaOutraCamara).toBeDefined();
+  });
+
+  test("bloqueia renomear para um nome já usado na mesma câmara", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const camara = await admin.mutation(api.admin.camaras.criar, { nome: "Saborizado" });
+
+    await admin.mutation(api.admin.produtos.criar, {
+      nome: "Morango",
+      categoria: "saborizado",
+      camaraId: camara,
+      unidadeBase: "pacote",
+    });
+    const uva = await admin.mutation(api.admin.produtos.criar, {
+      nome: "Uva",
+      categoria: "saborizado",
+      camaraId: camara,
+      unidadeBase: "pacote",
+    });
+
+    await expect(
+      admin.mutation(api.admin.produtos.atualizar, {
+        id: uva,
+        nome: "Morango",
+        unidadeBase: "pacote",
+        ativo: true,
+      }),
+    ).rejects.toThrow();
+  });
+});
+
 describe("Operadores — PIN e sessões (RF12, RF13, RF14, RNF05)", () => {
   test("gerar PIN salva só o hash, devolve o PIN uma vez e derruba a sessão ativa", async () => {
     const t = convexTest(schema, modules);

@@ -6,6 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { rotuloProduto } from "../../lib/produto.ts";
 
 /*
   Lançamento manual pelo Admin (RF63). Mesmas validações do colaborador: saldo,
@@ -59,6 +60,20 @@ export function LancamentoPage() {
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  // Agrupado por câmara — produtos homônimos em câmaras diferentes (ex.: dois
+  // "Cubo") ficam em grupos separados, e o rótulo de cada opção leva a câmara
+  // junto (necessário porque um <select> fechado só mostra o texto da opção
+  // escolhida, não o rótulo do optgroup).
+  const produtosPorCamara = useMemo(() => {
+    const grupos = new Map<string, NonNullable<typeof produtos>>();
+    for (const p of produtos ?? []) {
+      const lista = grupos.get(p.camaraNome) ?? [];
+      lista.push(p);
+      grupos.set(p.camaraNome, lista);
+    }
+    return grupos;
+  }, [produtos]);
 
   const produto = produtos?.find((p) => p._id === produtoId);
   const formato = produto?.formatos.find((f) => f._id === formatoId);
@@ -244,8 +259,12 @@ export function LancamentoPage() {
           <div className="grid grid-cols-2 gap-3">
             <Selecao label="Produto" value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)}>
               <option value="">— escolha —</option>
-              {(produtos ?? []).map((p) => (
-                <option key={p._id} value={p._id}>{p.nome} · {p.camaraNome}</option>
+              {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
+                <optgroup key={camaraNome} label={camaraNome}>
+                  {lista.map((p) => (
+                    <option key={p._id} value={p._id}>{rotuloProduto(p.nome, p.camaraNome)}</option>
+                  ))}
+                </optgroup>
               ))}
             </Selecao>
             <Selecao label="Formato" value={formatoId} onChange={(e) => setFormatoId(e.target.value as Id<"formatos">)} disabled={!produto}>

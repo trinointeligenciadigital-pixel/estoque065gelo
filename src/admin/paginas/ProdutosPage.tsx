@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { rotuloProduto } from "../../lib/produto.ts";
 
 type Categoria = "saborizado" | "cubo" | "escamado";
 type Unidade = "pacote" | "kg";
@@ -79,6 +80,7 @@ export function ProdutosPage() {
         <FormProduto
           inicial={editando === "novo" ? null : editando}
           camaras={camaras}
+          produtos={produtos ?? []}
           nomeCamara={nomeCamara}
           onFechar={() => setEditando(null)}
         />
@@ -90,11 +92,13 @@ export function ProdutosPage() {
 function FormProduto({
   inicial,
   camaras,
+  produtos,
   nomeCamara,
   onFechar,
 }: {
   inicial: Produto | null;
   camaras: Camara[];
+  produtos: Produto[];
   nomeCamara: Map<string, string>;
   onFechar: () => void;
 }) {
@@ -113,6 +117,21 @@ function FormProduto({
   const [salvando, setSalvando] = useState(false);
 
   const novo = inicial === null;
+
+  // Aviso não-bloqueante: mesmo nome já existe em OUTRA câmara (permitido — é o
+  // caso real da 065). O bloqueio de verdade é na mesma câmara, e é o servidor
+  // que barra (existeNomeNaCamara em convex/admin/produtos.ts).
+  const avisoHomonimo = useMemo(() => {
+    if (!novo || nome.trim() === "" || camaraId === "") return null;
+    const alvo = nome.trim().toLowerCase();
+    const homonimo = produtos.find(
+      (p) => p.nome.trim().toLowerCase() === alvo && p.camaraId !== camaraId,
+    );
+    if (!homonimo) return null;
+    const camaraDoHomonimo = nomeCamara.get(homonimo.camaraId) ?? "—";
+    const camaraNova = nomeCamara.get(camaraId) ?? "—";
+    return `Já existe um produto "${homonimo.nome}" na câmara ${camaraDoHomonimo}. Para diferenciar, este aparecerá como "${rotuloProduto(nome.trim(), camaraNova)}" nas telas de lançamento.`;
+  }, [novo, nome, camaraId, produtos, nomeCamara]);
 
   function trocarCategoria(nova: Categoria) {
     setCategoria(nova);
@@ -185,6 +204,8 @@ function FormProduto({
         <p className="text-xs text-texto-suave">
           O estoque mínimo é definido em cada formato (por tamanho de pacote), na tela de Formatos.
         </p>
+
+        {avisoHomonimo ? <Aviso tom="info">{avisoHomonimo}</Aviso> : null}
 
         {!novo ? (
           <MarcaAtivo

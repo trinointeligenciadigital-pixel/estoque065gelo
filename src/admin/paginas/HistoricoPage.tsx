@@ -7,6 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { rotuloProduto } from "../../lib/produto.ts";
 import {
   linhasComprovante,
   linkWhatsappComprovante,
@@ -66,6 +67,17 @@ export function HistoricoPage() {
   // Produtos filtrados pela câmara escolhida (se houver).
   const produtos = (opcoes?.produtos ?? []).filter((p) => !camaraId || p.camaraId === camaraId);
 
+  // Mapa de câmara para o rótulo "nome · câmara" (dois produtos podem ter o
+  // mesmo nome em câmaras diferentes — o filtro tem que distingui-los).
+  const nomeCamara = new Map((opcoes?.camaras ?? []).map((c) => [c._id, c.nome]));
+  const produtosPorCamara = new Map<string, typeof produtos>();
+  for (const p of produtos) {
+    const camaraNome = nomeCamara.get(p.camaraId) ?? "—";
+    const lista = produtosPorCamara.get(camaraNome) ?? [];
+    lista.push(p);
+    produtosPorCamara.set(camaraNome, lista);
+  }
+
   // Monta o comprovante a partir de uma linha de saída (venda/patrocínio). Se a
   // linha faz parte de um carregamento (carregamentoId), agrupa TODAS as linhas
   // do mesmo carregamento presentes no resultado carregado — um comprovante só,
@@ -115,7 +127,13 @@ export function HistoricoPage() {
           <Filtro label="Produto">
             <select value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
               <option value="">Todos</option>
-              {produtos.map((p) => <option key={p._id} value={p._id}>{p.nome}</option>)}
+              {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
+                <optgroup key={camaraNome} label={camaraNome}>
+                  {lista.map((p) => (
+                    <option key={p._id} value={p._id}>{rotuloProduto(p.nome, camaraNome)}</option>
+                  ))}
+                </optgroup>
+              ))}
             </select>
           </Filtro>
           <Filtro label="Tipo">

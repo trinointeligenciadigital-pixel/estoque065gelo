@@ -6,6 +6,7 @@ import { Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
+import { rotuloProduto } from "../../lib/produto.ts";
 
 /*
   Painel do Admin (RF57–RF60) — "painel de instrumentos de câmara fria". KPIs em
@@ -179,7 +180,7 @@ function PainelConteudo() {
                 <div key={p._id} className={`rounded-lg p-3 ${p.abaixoMinimo ? "bg-alerta/5" : "bg-superficie-fria"}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-[13px] font-semibold text-texto">
-                      {p.nome}
+                      {rotuloProduto(p.nome, p.camaraNome)}
                       <span className="ml-1.5 font-mono text-[10px] tracking-wide text-texto-fraco uppercase">{p.categoria}</span>
                     </span>
                     <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(p.pesoTotalKg)}</span>
