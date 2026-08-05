@@ -65,6 +65,17 @@
   .animate-tremor {
     animation: none;
   }
+  /* Quem pede menos movimento: transições e animações viram instantâneas
+     (troca suave/instantânea), sem quebrar o layout. Vale para todo o app —
+     botões, skeletons de carregamento, realces. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 html,

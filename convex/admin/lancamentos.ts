@@ -6,7 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { exigirAdmin } from "../lib/auth";
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
-import { saldoDoFormato, pesoLiquidoDoFormato } from "../lib/saldo";
+import { saldoDoFormato, pesoLiquidoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 
 /*
   Lançamento manual pelo Admin (RF63). MESMAS regras do colaborador: saldo,
@@ -158,5 +158,89 @@ export const lancarSaida = mutation({
       registradoEm: Date.now(),
     });
     return { movimentacaoId, duplicado: false };
+  },
+});
+
+// Saída de venda/patrocínio com VÁRIOS produtos no mesmo carregamento (versão
+// Admin do lote). Mesmas garantias do operador — atômica, saldo por formato
+// somando o lote, sinal/pesoKg no servidor —, mas a câmara vem de cada produto
+// (o Admin enxerga todas). Perda/produção seguem no caminho single.
+export const lancarSaidaMultipla = mutation({
+  args: {
+    carregamentoId: v.string(),
+    tipo: v.union(v.literal("venda"), v.literal("patrocinio")),
+    itens: v.array(
+      v.object({
+        chaveIdempotencia: v.string(),
+        produtoId: v.id("produtos"),
+        formatoId: v.id("formatos"),
+        quantidade: v.optional(v.number()),
+        pesoKgVariavel: v.optional(v.number()),
+      }),
+    ),
+    clienteNome: v.string(),
+    veiculoId: v.optional(v.id("veiculos")),
+    veiculoTerceiro: v.optional(v.string()),
+    motorista: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const usuario = await exigirAdmin(ctx);
+
+    if (args.itens.length === 0) throw new ConvexError("Adicione ao menos um produto.");
+    if (args.clienteNome.trim() === "") throw new ConvexError("Informe o nome do cliente.");
+
+    const jaGravadas = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_carregamento", (q) => q.eq("carregamentoId", args.carregamentoId))
+      .collect();
+    if (jaGravadas.length > 0) {
+      return { movimentacaoIds: jaGravadas.map((m) => m._id), duplicado: true };
+    }
+
+    const linhas: LinhaLote[] = [];
+    for (const item of args.itens) {
+      const { produto, formato } = await produtoEFormato(ctx, item.produtoId, item.formatoId);
+      const { quantidade, pesoKg } = derivarQtdPeso(formato, item.quantidade, item.pesoKgVariavel);
+      linhas.push({
+        produtoId: item.produtoId,
+        camaraId: produto.camaraId,
+        formatoId: item.formatoId,
+        formato,
+        produtoNome: produto.nome,
+        quantidade,
+        pesoKg,
+      });
+    }
+
+    await validarSaldoLote(ctx, linhas);
+
+    const cliente = args.clienteNome.trim() || undefined;
+    const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
+    const motorista = args.motorista?.trim() || undefined;
+
+    const movimentacaoIds = [];
+    for (let i = 0; i < linhas.length; i++) {
+      const linha = linhas[i];
+      const id = await ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: args.itens[i].chaveIdempotencia,
+        carregamentoId: args.carregamentoId,
+        tipo: args.tipo,
+        sinal: -1,
+        produtoId: linha.produtoId,
+        camaraId: linha.camaraId,
+        formatoId: linha.formatoId,
+        quantidade: linha.quantidade,
+        pesoKg: linha.pesoKg,
+        clienteNome: cliente,
+        veiculoId: args.veiculoId,
+        veiculoTerceiro,
+        motorista,
+        registradoPorTipo: "admin",
+        clerkId: usuario.clerkId,
+        registradoEm: Date.now(),
+      });
+      movimentacaoIds.push(id);
+    }
+    return { movimentacaoIds, duplicado: false };
   },
 });

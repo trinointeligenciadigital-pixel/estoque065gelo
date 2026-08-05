@@ -68,23 +68,33 @@ export function HistoricoPage() {
   // Produtos filtrados pela câmara escolhida (se houver).
   const produtos = (opcoes?.produtos ?? []).filter((p) => !camaraId || p.camaraId === camaraId);
 
-  // Monta o comprovante a partir de uma linha de saída (venda/patrocínio).
+  // Monta o comprovante a partir de uma linha de saída (venda/patrocínio). Se a
+  // linha faz parte de um carregamento (carregamentoId), agrupa TODAS as linhas
+  // do mesmo carregamento presentes no resultado carregado — um comprovante só,
+  // com todos os produtos e o peso total. Linha avulsa vira comprovante de 1 item.
   function montarComprovante(m: NonNullable<typeof movs>[number]): DadosComprovante {
+    const irmas =
+      m.carregamentoId != null
+        ? (movs ?? []).filter((x) => x.carregamentoId === m.carregamentoId)
+        : [m];
+    const itens = irmas.map((x) => ({
+      produtoNome: x.produtoNome,
+      formatoNome: x.formatoNome,
+      quantidadeLabel: x.formatoPesoVariavel ? "" : `${x.quantidade} ${x.quantidade === 1 ? "pacote" : "pacotes"}`,
+      pesoKg: x.pesoKg,
+    }));
     return {
       rotulo: m.tipo === "venda" ? "Venda" : "Patrocínio",
       quandoMs: m.registradoEm,
       cliente: m.clienteNome ?? "",
-      produtoNome: m.produtoNome,
-      formatoNome: m.formatoNome,
-      quantidadeLabel: m.formatoPesoVariavel
-        ? ""
-        : `${m.quantidade} ${m.quantidade === 1 ? "pacote" : "pacotes"}`,
-      pesoKg: m.pesoKg,
+      itens,
+      pesoTotalKg: itens.reduce((acc, it) => acc + it.pesoKg, 0),
       veiculoLabel: m.veiculo ?? "sem veículo",
       motorista: m.motorista ?? "",
       camaraNome: m.camaraNome,
       operadorNome: m.autor,
-      protocolo: m.protocolo,
+      // Num carregamento, o protocolo é o do grupo (8 chars do carregamentoId).
+      protocolo: m.carregamentoId != null ? m.carregamentoId.slice(0, 8).toUpperCase() : m.protocolo,
     };
   }
 
@@ -233,15 +243,25 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
             <span className="font-mono text-xs text-texto-suave">{dataHora(dados.quandoMs)}</span>
           </div>
           <dl>
-            {linhas.map((l, i) => (
-              <div
-                key={i}
-                className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0"
-              >
-                <dt className="text-sm text-texto-suave">{l.rotulo}</dt>
-                <dd className={`text-right text-sm text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
-              </div>
-            ))}
+            {linhas.map((l, i) =>
+              l.forte ? (
+                <div
+                  key={i}
+                  className="flex items-baseline justify-between gap-3 border-y border-borda bg-superficie-fria/40 px-3 py-2"
+                >
+                  <dt className="text-sm font-medium text-texto">{l.rotulo}</dt>
+                  <dd className="text-right font-mono text-xl font-semibold text-texto">{l.valor}</dd>
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0"
+                >
+                  <dt className="min-w-0 flex-1 text-sm text-texto-suave">{l.rotulo}</dt>
+                  <dd className={`shrink-0 text-right text-sm text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+                </div>
+              ),
+            )}
           </dl>
           <div className="flex items-center justify-between border-t border-borda px-3 py-1.5">
             <span className="font-mono text-[10px] font-medium tracking-[0.1em] text-texto-fraco uppercase">

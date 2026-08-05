@@ -141,6 +141,9 @@ export default defineSchema({
     // Vínculos
     patrocinioOrigemId: v.optional(v.id("movimentacoes")), // retorno → patrocínio
     contagemId: v.optional(v.id("contagens")), // ajuste → contagem aprovada
+    carregamentoId: v.optional(v.string()), // agrupa as linhas de uma mesma saída
+    // (venda/patrocínio) num carregamento. UUID do cliente. NÃO é agregação: cada
+    // produto+formato segue sendo uma linha; o carregamento só as vincula.
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -154,6 +157,7 @@ export default defineSchema({
     .index("by_camara", ["camaraId"])
     .index("by_tipo", ["tipo"])
     .index("by_patrocinio_origem", ["patrocinioOrigemId"])
+    .index("by_carregamento", ["carregamentoId"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------

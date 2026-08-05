@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
@@ -7,8 +8,10 @@ import { mensagemErro } from "../../lib/erros.ts";
 
 /*
   Lançamento manual pelo Admin (RF63). Mesmas validações do colaborador: saldo,
-  idempotência, sinal/pesoKg no servidor. A chave de idempotência é gerada por
-  lançamento e renovada após cada sucesso, para evitar duplicação por duplo-clique.
+  idempotência, sinal/pesoKg no servidor. Venda/patrocínio usam o fluxo de
+  CARREGAMENTO: vários produtos numa mesma saída, gravados em lote (atômico).
+  Produção e perda seguem um item por vez. A chave/carregamento é renovada após
+  cada sucesso, para evitar duplicação por duplo-clique.
 */
 type Tipo = "producao" | "venda" | "patrocinio" | "perda";
 type MotivoPerda = "derreteu" | "danificado" | "descarte" | "outro";
@@ -20,11 +23,28 @@ const rotuloMotivo: Record<MotivoPerda, string> = {
   outro: "Outro",
 };
 
+// Um item já anexado ao carregamento (venda/patrocínio).
+type ItemCarregamento = {
+  chave: string;
+  produtoId: Id<"produtos">;
+  formatoId: Id<"formatos">;
+  produtoNome: string;
+  formatoNome: string;
+  pesoVariavel: boolean;
+  valor: string;
+  pesoKg: number;
+};
+
+function num(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
 export function LancamentoPage() {
   const produtos = useQuery(api.admin.lancamentos.produtosParaLancamento);
   const veiculos = useQuery(api.admin.veiculos.listar);
   const lancarProducao = useMutation(api.admin.lancamentos.lancarProducao);
   const lancarSaida = useMutation(api.admin.lancamentos.lancarSaida);
+  const lancarSaidaMultipla = useMutation(api.admin.lancamentos.lancarSaidaMultipla);
 
   const [tipo, setTipo] = useState<Tipo>("producao");
   const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">("");
@@ -36,16 +56,20 @@ export function LancamentoPage() {
   const [motorista, setMotorista] = useState("");
   const [motivo, setMotivo] = useState<MotivoPerda | "">("");
   const [observacao, setObservacao] = useState("");
+  const [itens, setItens] = useState<ItemCarregamento[]>([]);
   const [chave, setChave] = useState(() => crypto.randomUUID());
+  const [carregamentoId, setCarregamentoId] = useState(() => crypto.randomUUID());
   const [erro, setErro] = useState("");
   const [msg, setMsg] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   const produto = produtos?.find((p) => p._id === produtoId);
   const formato = produto?.formatos.find((f) => f._id === formatoId);
+  const ehCarregamento = tipo === "venda" || tipo === "patrocinio";
 
-  // Ao trocar de produto, limpa o formato.
+  // Ao trocar de produto, limpa o formato. Ao trocar de tipo, esvazia o carrinho.
   useEffect(() => { setFormatoId(""); }, [produtoId]);
+  useEffect(() => { setItens([]); }, [tipo]);
 
   const pesoPrevisto = useMemo(() => {
     if (!formato) return null;
@@ -61,59 +85,117 @@ export function LancamentoPage() {
     if (v?.motoristaPadrao && motorista === "") setMotorista(v.motoristaPadrao);
   }
 
-  const num = Number(valor);
-  const valorValido = formato ? (formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0) : false;
+  const numVal = Number(valor);
+  const valorValido = formato ? (formato.pesoVariavel ? numVal > 0 : Number.isInteger(numVal) && numVal > 0) : false;
+  const itemStaged = !!produto && !!formato && valorValido;
+
   const contextoValido =
     tipo === "producao"
       ? true
       : tipo === "perda"
         ? motivo !== "" && (motivo !== "outro" || observacao.trim() !== "")
         : cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
-  const podeEnviar = !!produto && !!formato && valorValido && contextoValido && !enviando;
+
+  // Itens que entram no carregamento: os já anexados + o em edição, se válido.
+  function itemDoStaged(): ItemCarregamento | null {
+    if (!produto || !formato || !valorValido) return null;
+    return {
+      chave: crypto.randomUUID(),
+      produtoId: produto._id,
+      formatoId: formato._id,
+      produtoNome: produto.nome,
+      formatoNome: formato.nome,
+      pesoVariavel: formato.pesoVariavel,
+      valor,
+      pesoKg: formato.pesoVariavel ? numVal : numVal * formato.pesoKg,
+    };
+  }
+
+  const itensParaEnviar = ehCarregamento
+    ? [...itens, ...(itemStaged ? [itemDoStaged()!] : [])]
+    : [];
+  const pesoTotal = itensParaEnviar.reduce((acc, it) => acc + it.pesoKg, 0);
+
+  const podeEnviar = ehCarregamento
+    ? itensParaEnviar.length > 0 && contextoValido && !enviando
+    : !!produto && !!formato && valorValido && contextoValido && !enviando;
+
+  function adicionarItem() {
+    const it = itemDoStaged();
+    if (!it) return;
+    setItens((xs) => [...xs, it]);
+    setProdutoId("");
+    setFormatoId("");
+    setValor("");
+  }
+
+  function removerItem(chaveItem: string) {
+    setItens((xs) => xs.filter((x) => x.chave !== chaveItem));
+  }
+
+  function limparTudo() {
+    setChave(crypto.randomUUID());
+    setCarregamentoId(crypto.randomUUID());
+    setProdutoId("");
+    setFormatoId("");
+    setValor("");
+    setCliente("");
+    setVeiculoSel("");
+    setVeiculoTerceiro("");
+    setMotorista("");
+    setMotivo("");
+    setObservacao("");
+    setItens([]);
+  }
 
   async function confirmar() {
-    if (!produto || !formato) return;
     setErro("");
     setMsg("");
     setEnviando(true);
     try {
+      if (ehCarregamento) {
+        if (itensParaEnviar.length === 0) return;
+        await lancarSaidaMultipla({
+          carregamentoId,
+          tipo,
+          itens: itensParaEnviar.map((it) => ({
+            chaveIdempotencia: it.chave,
+            produtoId: it.produtoId,
+            formatoId: it.formatoId,
+            quantidade: it.pesoVariavel ? undefined : Number(it.valor),
+            pesoKgVariavel: it.pesoVariavel ? Number(it.valor) : undefined,
+          })),
+          clienteNome: cliente.trim(),
+          veiculoId: veiculoSel && veiculoSel !== "terceiro" ? (veiculoSel as Id<"veiculos">) : undefined,
+          veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro.trim() || undefined : undefined,
+          motorista: motorista.trim() || undefined,
+        });
+        setMsg(`Carregamento registrado · ${itensParaEnviar.length} ${itensParaEnviar.length === 1 ? "produto" : "produtos"}.`);
+        limparTudo();
+        return;
+      }
+
+      if (!produto || !formato) return;
       const comum = {
         chaveIdempotencia: chave,
         produtoId: produto._id,
         formatoId: formato._id,
-        quantidade: formato.pesoVariavel ? undefined : num,
-        pesoKgVariavel: formato.pesoVariavel ? num : undefined,
+        quantidade: formato.pesoVariavel ? undefined : numVal,
+        pesoKgVariavel: formato.pesoVariavel ? numVal : undefined,
       } as const;
 
       if (tipo === "producao") {
         await lancarProducao(comum);
-      } else if (tipo === "perda") {
+      } else {
         await lancarSaida({
           ...comum,
           tipo: "perda",
           motivoPerda: (motivo || undefined) as MotivoPerda | undefined,
           observacao: observacao.trim() || undefined,
         });
-      } else {
-        await lancarSaida({
-          ...comum,
-          tipo,
-          clienteNome: cliente.trim(),
-          veiculoId: veiculoSel && veiculoSel !== "terceiro" ? (veiculoSel as Id<"veiculos">) : undefined,
-          veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro.trim() || undefined : undefined,
-          motorista: motorista.trim() || undefined,
-        });
       }
       setMsg("Lançamento registrado.");
-      // Renova a chave e limpa quantidade para o próximo lançamento.
-      setChave(crypto.randomUUID());
-      setValor("");
-      setCliente("");
-      setVeiculoSel("");
-      setVeiculoTerceiro("");
-      setMotorista("");
-      setMotivo("");
-      setObservacao("");
+      limparTudo();
     } catch (e) {
       setErro(mensagemErro(e));
     } finally {
@@ -133,6 +215,34 @@ export function LancamentoPage() {
             <option value="patrocinio">Patrocínio (saída)</option>
             <option value="perda">Perda (saída)</option>
           </Selecao>
+
+          {/* Itens já anexados ao carregamento (venda/patrocínio) */}
+          {ehCarregamento && itens.length > 0 ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-borda p-3">
+              <span className="text-xs font-medium text-texto-suave">Itens do carregamento</span>
+              {itens.map((it) => (
+                <div key={it.chave} className="flex items-center gap-3 rounded border border-borda bg-superficie px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-texto">{it.produtoNome} <span className="text-texto-suave">/ {it.formatoNome}</span></p>
+                  </div>
+                  <span className="shrink-0 font-mono text-sm text-texto">
+                    {it.pesoVariavel ? "" : `${num(Number(it.valor))} × `}{num(it.pesoKg)} kg
+                  </span>
+                  <button
+                    onClick={() => removerItem(it.chave)}
+                    aria-label={`Remover ${it.produtoNome}`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acento"
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-baseline justify-between border-t border-borda pt-2">
+                <span className="text-sm text-texto-suave">Peso total</span>
+                <span className="font-mono text-sm font-semibold text-texto">{num(pesoTotal)} kg</span>
+              </div>
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <Selecao label="Produto" value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)}>
@@ -164,9 +274,14 @@ export function LancamentoPage() {
             {pesoPrevisto !== null && !formato?.pesoVariavel ? (
               <span className="pb-1.5 font-mono text-sm text-texto-suave">= {pesoPrevisto} kg</span>
             ) : null}
+            {ehCarregamento ? (
+              <Botao variante="neutro" onClick={adicionarItem} disabled={!itemStaged} className="ml-auto">
+                + Adicionar item
+              </Botao>
+            ) : null}
           </div>
 
-          {(tipo === "venda" || tipo === "patrocinio") ? (
+          {ehCarregamento ? (
             <div className="flex flex-col gap-3">
               <Campo label="Cliente" value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Nome do cliente" />
               <Selecao label="Veículo" value={veiculoSel} onChange={(e) => escolherVeiculo(e.target.value)}>
@@ -202,7 +317,7 @@ export function LancamentoPage() {
 
           <div className="flex justify-end">
             <Botao onClick={confirmar} disabled={!podeEnviar}>
-              {enviando ? "Enviando…" : "Lançar"}
+              {enviando ? "Enviando…" : ehCarregamento ? "Lançar carregamento" : "Lançar"}
             </Botao>
           </div>
         </div>

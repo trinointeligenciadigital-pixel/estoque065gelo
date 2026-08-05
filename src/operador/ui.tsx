@@ -66,7 +66,7 @@ export function Tela({
           {onVoltar ? (
             <button
               onClick={onVoltar}
-              className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+              className="-ml-2 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
               aria-label="Voltar"
             >
               <ChevronLeft size={26} aria-hidden="true" />
@@ -208,8 +208,8 @@ export function ResumoLancamento({
             key={i}
             className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0"
           >
-            <dt className="text-base text-texto-suave">{l.rotulo}</dt>
-            <dd className={`text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+            <dt className="min-w-0 flex-1 text-base text-texto-suave">{l.rotulo}</dt>
+            <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
           </div>
         ))}
       </dl>
@@ -248,7 +248,7 @@ export function CampoQuantidade({
           value={valor}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
-          className="w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
+          className="min-h-[56px] w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
         />
       ) : (
         <div className="flex items-stretch gap-2">
@@ -261,7 +261,7 @@ export function CampoQuantidade({
             onChange={(e) => onChange(e.target.value)}
             placeholder="0"
             aria-label="Quantidade de pacotes"
-            className="min-w-0 flex-1 rounded-xl border border-borda bg-superficie px-2 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
+            className="min-h-[56px] min-w-0 flex-1 rounded-xl border border-borda bg-superficie px-2 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
           />
           <TeclaPasso onClick={() => ajustar(1)} aria-label="Aumentar um pacote">
             +
@@ -269,7 +269,7 @@ export function CampoQuantidade({
         </div>
       )}
       {!formato.pesoVariavel ? (
-        <p className="text-center text-base text-texto-suave">
+        <p className="text-center text-lg text-texto">
           = <Kg valor={kgDe(formato, num, num)} />
         </p>
       ) : null}
@@ -284,7 +284,7 @@ function TeclaPasso({
   return (
     <button
       type="button"
-      className="flex w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-mono text-3xl leading-none text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
+      className="flex min-h-[56px] w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-mono text-3xl leading-none text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
       {...props}
     >
       {children}

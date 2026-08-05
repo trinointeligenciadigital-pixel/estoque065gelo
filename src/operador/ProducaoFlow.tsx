@@ -181,7 +181,15 @@ export function ListaProdutos({
   produtos: ProdutoGrid[] | undefined;
   onEscolher: (p: ProdutoGrid) => void;
 }) {
-  if (produtos === undefined) return <p className="text-base text-texto-suave">Carregando…</p>;
+  if (produtos === undefined) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true" aria-label="Carregando produtos">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="min-h-[56px] animate-pulse rounded-xl border border-borda bg-superficie-fria" />
+        ))}
+      </div>
+    );
+  }
   if (produtos.length === 0) return <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>;
   return (
     <div className="flex flex-col gap-3">

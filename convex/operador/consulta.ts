@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { exigirSessaoOperador } from "../lib/auth";
-import { saldoDoFormato, pesoTotalDoProduto } from "../lib/saldo";
+import { saldoDoFormato, pesoTotalDoProduto, pesoLiquidoDoFormato } from "../lib/saldo";
 
 /*
   Consultas do colaborador — todas presas à câmara da sessão. O operador só
@@ -67,7 +67,10 @@ export const saldos = query({
               _id: f._id,
               nome: f.nome,
               pesoVariavel: f.pesoVariavel,
+              // Fixo: saldo em pacotes. Variável: o estoque real é o peso líquido
+              // (kg), pois "quantidade" ali é sempre 1 e não representa o estoque.
               saldo: await saldoDoFormato(ctx, p._id, camara._id, f._id),
+              pesoLiquidoKg: await pesoLiquidoDoFormato(ctx, p._id, camara._id, f._id),
             })),
         );
         return {

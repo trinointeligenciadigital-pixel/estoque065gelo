@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { mascaraTelefone, telefoneCompleto } from "../../lib/mascaras.ts";
 
 type Camara = { _id: Id<"camaras">; nome: string; ativo: boolean };
 type Operador = {
@@ -205,7 +206,7 @@ function FormOperador({
   const ativas = camaras.filter((c) => c.ativo || (inicial?.camarasPermitidas.includes(c._id) ?? false));
 
   const [nome, setNome] = useState(inicial?.nome ?? "");
-  const [whatsapp, setWhatsapp] = useState(inicial?.whatsapp ?? "");
+  const [whatsapp, setWhatsapp] = useState(mascaraTelefone(inicial?.whatsapp ?? ""));
   const [permitidas, setPermitidas] = useState<Id<"camaras">[]>(inicial?.camarasPermitidas ?? []);
   const [producao, setProducao] = useState(inicial?.podeLancarProducao ?? false);
   const [saida, setSaida] = useState(inicial?.podeLancarSaida ?? false);
@@ -261,9 +262,13 @@ function FormOperador({
           label="WhatsApp (opcional — para enviar o PIN)"
           mono
           value={whatsapp}
-          onChange={(e) => setWhatsapp(e.target.value)}
+          onChange={(e) => setWhatsapp(mascaraTelefone(e.target.value))}
           placeholder="(65) 99999-9999"
+          inputMode="tel"
         />
+        {whatsapp !== "" && !telefoneCompleto(whatsapp) ? (
+          <p className="text-xs text-alerta">Informe DDD + número (10 ou 11 dígitos), ou deixe em branco.</p>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-texto-suave">Câmaras permitidas</span>
@@ -297,7 +302,7 @@ function FormOperador({
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
           <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
-          <Botao onClick={salvar} disabled={salvando || nome.trim() === "" || permitidas.length === 0}>
+          <Botao onClick={salvar} disabled={salvando || nome.trim() === "" || permitidas.length === 0 || (whatsapp !== "" && !telefoneCompleto(whatsapp))}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>
         </div>

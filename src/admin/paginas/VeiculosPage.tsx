@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
 
 type Veiculo = {
   _id: Id<"veiculos">;
@@ -55,7 +56,7 @@ export function VeiculosPage() {
 function FormVeiculo({ inicial, onFechar }: { inicial: Veiculo | null; onFechar: () => void }) {
   const criar = useMutation(api.admin.veiculos.criar);
   const atualizar = useMutation(api.admin.veiculos.atualizar);
-  const [placa, setPlaca] = useState(inicial?.placa ?? "");
+  const [placa, setPlaca] = useState(mascaraPlaca(inicial?.placa ?? ""));
   const [modelo, setModelo] = useState(inicial?.modelo ?? "");
   const [motorista, setMotorista] = useState(inicial?.motoristaPadrao ?? "");
   const [ativo, setAtivo] = useState(inicial?.ativo ?? true);
@@ -85,7 +86,10 @@ function FormVeiculo({ inicial, onFechar }: { inicial: Veiculo | null; onFechar:
   return (
     <Modal titulo={novo ? "Novo veículo" : "Editar veículo"} onFechar={onFechar}>
       <div className="flex flex-col gap-3">
-        <Campo label="Placa" mono value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="ABC1D23" />
+        <Campo label="Placa" mono value={placa} onChange={(e) => setPlaca(mascaraPlaca(e.target.value))} placeholder="ABC1D23" maxLength={7} />
+        {placa !== "" && !placaCompleta(placa) ? (
+          <p className="text-xs text-alerta">A placa deve ter 7 caracteres (ex.: ABC1D23 ou ABC1234).</p>
+        ) : null}
         <Campo label="Modelo (opcional)" value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Baú refrigerado" />
         <Campo label="Motorista padrão (opcional)" value={motorista} onChange={(e) => setMotorista(e.target.value)} placeholder="Nome do motorista" />
         {!novo ? (
@@ -99,7 +103,7 @@ function FormVeiculo({ inicial, onFechar }: { inicial: Veiculo | null; onFechar:
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
           <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
-          <Botao onClick={salvar} disabled={salvando || placa.trim() === ""}>
+          <Botao onClick={salvar} disabled={salvando || !placaCompleta(placa)}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>
         </div>

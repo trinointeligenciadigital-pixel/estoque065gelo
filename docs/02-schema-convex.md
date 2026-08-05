@@ -159,6 +159,11 @@ export default defineSchema({
     // Vínculos
     patrocinioOrigemId: v.optional(v.id("movimentacoes")), // retorno → patrocínio
     contagemId: v.optional(v.id("contagens")),             // ajuste → contagem aprovada
+    carregamentoId: v.optional(v.string()),                // agrupa as linhas de uma
+                                                           // mesma saída (venda/patrocínio)
+                                                           // num carregamento. Vínculo, não
+                                                           // agregação — cada produto+formato
+                                                           // segue sendo uma linha do ledger.
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -172,6 +177,7 @@ export default defineSchema({
     .index("by_camara", ["camaraId"])
     .index("by_tipo", ["tipo"])
     .index("by_patrocinio_origem", ["patrocinioOrigemId"])
+    .index("by_carregamento", ["carregamentoId"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------
@@ -245,7 +251,16 @@ Precisam virar código nas functions:
 
 11. **Nunca `patch` em `produtos.camaraId` depois de criado.** Ver seção "Transferência de câmara — não implementada" abaixo. Se essa necessidade aparecer, é projeto próprio, não um edit de campo.
 
-12. **Geração de PIN invalida sessões existentes.** A mutation `gerarPinOperador` deve, na mesma transação: gerar o PIN, salvar o hash, e deletar todas as linhas de `sessoesOperador` daquele `operadorId` (via `by_operador_id`). O PIN em texto puro é retornado uma única vez, só para quem chamou a mutation (Admin autenticado); nunca é persistido em texto puro.
+12. **Carregamento é vínculo, nunca agregação.** Venda e patrocínio podem sair com
+    vários produtos num mesmo carregamento. Cada produto+formato continua sendo **uma
+    linha** do ledger; o `carregamentoId` (UUID gerado no cliente) só as vincula. A
+    mutation de lote (`lancarSaidaMultipla`) grava todas as linhas numa transação
+    (tudo ou nada), valida o saldo **por formato somando os pedidos repetidos** do mesmo
+    formato dentro do carregamento, e usa a existência de qualquer linha com aquele
+    `carregamentoId` como chave de idempotência do lote. Perda e retorno seguem
+    um item por vez. Saldo continua somado por formato — nada é agregado no carregamento.
+
+13. **Geração de PIN invalida sessões existentes.** A mutation `gerarPinOperador` deve, na mesma transação: gerar o PIN, salvar o hash, e deletar todas as linhas de `sessoesOperador` daquele `operadorId` (via `by_operador_id`). O PIN em texto puro é retornado uma única vez, só para quem chamou a mutation (Admin autenticado); nunca é persistido em texto puro.
 
 ---
 

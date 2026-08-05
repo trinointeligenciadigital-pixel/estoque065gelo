@@ -62,27 +62,46 @@ export function SessaoOperador({
     return <ContagemFlow token={token} camaraNome={sessao.camaraNome} onVoltar={() => setTela("menu")} />;
   }
 
+  // Ações visíveis do menu, conforme as permissões da sessão. "Ver saldo" é sempre
+  // permitida. Cada uma vira um azulejo quadrado na grade 2×2 (launcher da câmara).
+  const acoes: {
+    chave: Tela;
+    rotulo: string;
+    Icone: typeof PackagePlus;
+    variante: "entrada" | "saida" | "neutro";
+  }[] = [
+    ...(sessao.podeLancarProducao
+      ? [{ chave: "producao" as const, rotulo: "Produção", Icone: PackagePlus, variante: "entrada" as const }]
+      : []),
+    ...(sessao.podeLancarSaida
+      ? [{ chave: "saida" as const, rotulo: "Saída / retorno", Icone: Truck, variante: "saida" as const }]
+      : []),
+    { chave: "saldo" as const, rotulo: "Ver saldo", Icone: Gauge, variante: "neutro" as const },
+    ...(sessao.podeContar
+      ? [{ chave: "contagem" as const, rotulo: "Contar", Icone: ClipboardList, variante: "neutro" as const }]
+      : []),
+  ];
+  const impar = acoes.length % 2 === 1;
+
   return (
     <Tela titulo={`Olá, ${sessao.operadorNome}`} camaraNome={sessao.camaraNome}>
-      <div className="flex flex-col gap-3">
-        {sessao.podeLancarProducao ? (
-          <BotaoGrande variante="entrada" onClick={() => setTela("producao")}>
-            <PackagePlus size={20} aria-hidden="true" /> Lançar produção
-          </BotaoGrande>
-        ) : null}
-        {sessao.podeLancarSaida ? (
-          <BotaoGrande variante="saida" onClick={() => setTela("saida")}>
-            <Truck size={20} aria-hidden="true" /> Lançar saída / retorno
-          </BotaoGrande>
-        ) : null}
-        <BotaoGrande variante="neutro" onClick={() => setTela("saldo")}>
-          <Gauge size={20} aria-hidden="true" /> Ver saldo
-        </BotaoGrande>
-        {sessao.podeContar ? (
-          <BotaoGrande variante="neutro" onClick={() => setTela("contagem")}>
-            <ClipboardList size={20} aria-hidden="true" /> Contar
-          </BotaoGrande>
-        ) : null}
+      <div className="grid grid-cols-2 gap-3">
+        {acoes.map(({ chave, rotulo, Icone, variante }, i) => {
+          // Contagem ímpar: o último azulejo ocupa a linha inteira (bloco largo mais
+          // baixo), sem deixar uma célula vazia solta.
+          const ultimoImpar = impar && i === acoes.length - 1;
+          return (
+            <BotaoGrande
+              key={chave}
+              variante={variante}
+              onClick={() => setTela(chave)}
+              className={`flex-col gap-3 text-lg ${ultimoImpar ? "col-span-2 min-h-[7rem]" : "aspect-square"}`}
+            >
+              <Icone size={32} aria-hidden="true" />
+              <span className="text-balance leading-tight">{rotulo}</span>
+            </BotaoGrande>
+          );
+        })}
       </div>
 
       <div className="mt-10">

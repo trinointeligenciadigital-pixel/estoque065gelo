@@ -80,8 +80,12 @@ export const listar = query({
           autor: m.registradoPorTipo === "operador" ? operador?.nome ?? "—" : "Admin",
           autorTipo: m.registradoPorTipo,
           registradoEm: m.registradoEm,
+          // Agrupador do carregamento (venda/patrocínio multi-produto). Linhas
+          // antigas/avulsas vêm null e seguem como comprovante de 1 item.
+          carregamentoId: m.carregamentoId ?? null,
           // Protocolo do comprovante: 8 chars da chave de idempotência (UUID do
-          // cliente), nunca o _id interno (RNF13).
+          // cliente), nunca o _id interno (RNF13). Num carregamento, o front usa
+          // os 8 chars do carregamentoId para todas as linhas do grupo.
           protocolo: m.chaveIdempotencia.slice(0, 8).toUpperCase(),
         };
       }),

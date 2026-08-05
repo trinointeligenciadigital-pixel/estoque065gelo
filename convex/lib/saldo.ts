@@ -1,5 +1,6 @@
+import { ConvexError } from "convex/values";
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 
 /*
   Cálculo de saldo — fonte de verdade é sempre o ledger somado em tempo de
@@ -46,6 +47,44 @@ export async function pesoTotalDoProduto(
     .collect();
 
   return movs.reduce((acc, m) => acc + m.sinal * m.pesoKg, 0);
+}
+
+// Uma linha de um carregamento, já com qtd/peso derivados no servidor. Usada só
+// para validar o saldo do lote inteiro antes de gravar qualquer linha.
+export type LinhaLote = {
+  produtoId: Id<"produtos">;
+  camaraId: Id<"camaras">;
+  formatoId: Id<"formatos">;
+  formato: Doc<"formatos">;
+  produtoNome: string;
+  quantidade: number;
+  pesoKg: number;
+};
+
+// Valida o saldo de um carregamento (várias linhas de saída de uma vez), somando
+// os pedidos do MESMO formato antes de comparar com o disponível. Sem isso, duas
+// linhas do mesmo produto+formato passariam individualmente mas estourariam o
+// saldo juntas. Continua sendo sempre por formato (nunca agrega formatos). Não
+// grava nada; lança ConvexError na primeira insuficiência (transação aborta o lote).
+export async function validarSaldoLote(ctx: QueryCtx, linhas: LinhaLote[]): Promise<void> {
+  const porFormato = new Map<string, { linha: LinhaLote; pedido: number }>();
+  for (const l of linhas) {
+    const pedido = l.formato.pesoVariavel ? l.pesoKg : l.quantidade;
+    const atual = porFormato.get(l.formatoId);
+    if (atual) atual.pedido += pedido;
+    else porFormato.set(l.formatoId, { linha: l, pedido });
+  }
+
+  for (const { linha, pedido } of porFormato.values()) {
+    const disponivel = linha.formato.pesoVariavel
+      ? await pesoLiquidoDoFormato(ctx, linha.produtoId, linha.camaraId, linha.formatoId)
+      : await saldoDoFormato(ctx, linha.produtoId, linha.camaraId, linha.formatoId);
+    if (pedido > disponivel) {
+      throw new ConvexError(
+        `Saldo insuficiente de ${linha.produtoNome} (${linha.formato.nome}) nesta câmara — avise o Admin.`,
+      );
+    }
+  }
 }
 
 // Peso líquido de UM formato (soma de peso, por formato). Usado onde "quantidade"

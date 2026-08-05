@@ -6,7 +6,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { exigirSessaoOperador, exigirPermissao, exigirCamaraDoProduto } from "../lib/auth";
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
-import { saldoDoFormato } from "../lib/saldo";
+import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 
 /*
   Lançamentos do colaborador. Regras invioláveis aplicadas aqui:
@@ -162,6 +162,100 @@ export const lancarSaida = mutation({
       registradoEm: Date.now(),
     });
     return { movimentacaoId, duplicado: false };
+  },
+});
+
+// Saída de venda/patrocínio com VÁRIOS produtos no mesmo carregamento. Grava N
+// linhas de uma vez, todas com o mesmo `carregamentoId` e o mesmo contexto
+// (cliente/veículo/motorista). É atômica: ou o carregamento inteiro entra, ou
+// nada — nenhuma linha grava se qualquer item estourar o saldo. Mesmas garantias
+// do `lancarSaida` single, aplicadas a cada item. Perda não usa esta mutation.
+export const lancarSaidaMultipla = mutation({
+  args: {
+    token: v.string(),
+    carregamentoId: v.string(),
+    tipo: v.union(v.literal("venda"), v.literal("patrocinio")),
+    itens: v.array(
+      v.object({
+        chaveIdempotencia: v.string(),
+        produtoId: v.id("produtos"),
+        formatoId: v.id("formatos"),
+        quantidade: v.optional(v.number()),
+        pesoKgVariavel: v.optional(v.number()),
+      }),
+    ),
+    clienteNome: v.string(),
+    veiculoId: v.optional(v.id("veiculos")),
+    veiculoTerceiro: v.optional(v.string()),
+    motorista: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { operador, camara } = await exigirSessaoOperador(ctx, args.token);
+    exigirPermissao(operador, "saida");
+
+    if (args.itens.length === 0) throw new ConvexError("Adicione ao menos um produto.");
+    if (args.clienteNome.trim() === "") throw new ConvexError("Informe o nome do cliente.");
+
+    // Idempotência do lote: se já existe qualquer linha com este carregamentoId, o
+    // lote já rodou (a escrita é atômica) — devolve sem inserir de novo (RF34).
+    const jaGravadas = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_carregamento", (q) => q.eq("carregamentoId", args.carregamentoId))
+      .collect();
+    if (jaGravadas.length > 0) {
+      return { movimentacaoIds: jaGravadas.map((m) => m._id), duplicado: true };
+    }
+
+    // Valida cada item e deriva qtd/peso no servidor, sem gravar ainda.
+    const linhas: LinhaLote[] = [];
+    for (const item of args.itens) {
+      await exigirCamaraDoProduto(ctx, item.produtoId, camara._id);
+      const produto = await ctx.db.get(item.produtoId);
+      if (produto === null) throw new ConvexError("Produto não encontrado.");
+      const formato = await formatoDoProduto(ctx, item.formatoId, item.produtoId);
+      const { quantidade, pesoKg } = derivarQtdPeso(formato, item.quantidade, item.pesoKgVariavel);
+      linhas.push({
+        produtoId: item.produtoId,
+        camaraId: camara._id,
+        formatoId: item.formatoId,
+        formato,
+        produtoNome: produto.nome,
+        quantidade,
+        pesoKg,
+      });
+    }
+
+    // Saldo do lote inteiro, somando itens do mesmo formato (RF35).
+    await validarSaldoLote(ctx, linhas);
+
+    const cliente = args.clienteNome.trim() || undefined;
+    const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
+    const motorista = args.motorista?.trim() || undefined;
+
+    const movimentacaoIds = [];
+    for (let i = 0; i < linhas.length; i++) {
+      const linha = linhas[i];
+      const id = await ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: args.itens[i].chaveIdempotencia,
+        carregamentoId: args.carregamentoId,
+        tipo: args.tipo,
+        sinal: -1,
+        produtoId: linha.produtoId,
+        camaraId: linha.camaraId,
+        formatoId: linha.formatoId,
+        quantidade: linha.quantidade,
+        pesoKg: linha.pesoKg,
+        clienteNome: cliente,
+        veiculoId: args.veiculoId,
+        veiculoTerceiro,
+        motorista,
+        registradoPorTipo: "operador",
+        operadorId: operador._id,
+        registradoEm: Date.now(),
+      });
+      movimentacaoIds.push(id);
+    }
+    return { movimentacaoIds, duplicado: false };
   },
 });
 

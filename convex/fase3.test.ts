@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import schema from "./schema";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { saldoDoFormato } from "./lib/saldo";
 
 const modules = import.meta.glob(["./**/*.ts", "!./**/*.test.ts"]);
 
@@ -172,6 +173,123 @@ describe("Retorno de patrocínio (RF41)", () => {
     });
     const abertos = await t.query(api.operador.consulta.patrociniosAbertos, { token: s.token });
     expect(abertos.length).toBe(0); // nada mais em aberto
+  });
+});
+
+describe("Carregamento — saída de vários produtos (lancarSaidaMultipla)", () => {
+  // Cria um 2º produto+formato na MESMA câmara da sessão, para os testes de lote.
+  async function segundoFormato(s: Awaited<ReturnType<typeof setup>>) {
+    const produtoId = await s.admin.mutation(api.admin.produtos.criar, {
+      nome: "Uva", categoria: "saborizado", camaraId: s.camaraId, unidadeBase: "pacote",
+    });
+    const formatoId = await s.admin.mutation(api.admin.formatos.criar, {
+      produtoId, nome: "Saco 5kg", pesoKg: 5, pesoVariavel: false,
+    });
+    return { produtoId, formatoId };
+  }
+
+  test("grava todas as linhas com o mesmo carregamentoId e baixa o saldo de cada formato", async () => {
+    const t = convexTest(schema, modules);
+    const s = await setup(t);
+    const b = await segundoFormato(s);
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: s.token, chaveIdempotencia: "pa", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 5,
+    });
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: s.token, chaveIdempotencia: "pb", produtoId: b.produtoId, formatoId: b.formatoId, quantidade: 5,
+    });
+
+    const r = await t.mutation(api.operador.lancamentos.lancarSaidaMultipla, {
+      token: s.token, carregamentoId: "carr-1", tipo: "venda", clienteNome: "Bar do Zé",
+      itens: [
+        { chaveIdempotencia: "i1", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 2 },
+        { chaveIdempotencia: "i2", produtoId: b.produtoId, formatoId: b.formatoId, quantidade: 3 },
+      ],
+    });
+    expect(r.duplicado).toBe(false);
+    expect(r.movimentacaoIds.length).toBe(2);
+
+    const doCarregamento = await t.run((ctx) =>
+      ctx.db.query("movimentacoes").withIndex("by_carregamento", (q) => q.eq("carregamentoId", "carr-1")).collect(),
+    );
+    expect(doCarregamento.length).toBe(2);
+    expect(doCarregamento.every((m) => m.sinal === -1 && m.tipo === "venda")).toBe(true);
+
+    expect(await t.run((ctx) => saldoDoFormato(ctx, s.produtoId, s.camaraId, s.formatoId))).toBe(3); // 5 − 2
+    expect(await t.run((ctx) => saldoDoFormato(ctx, b.produtoId, s.camaraId, b.formatoId))).toBe(2); // 5 − 3
+  });
+
+  test("é atômico: se um item estoura o saldo, nenhuma linha entra", async () => {
+    const t = convexTest(schema, modules);
+    const s = await setup(t);
+    const b = await segundoFormato(s);
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: s.token, chaveIdempotencia: "pa", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 5,
+    });
+    // formato B fica com saldo 0 (sem produção)
+
+    await expect(
+      t.mutation(api.operador.lancamentos.lancarSaidaMultipla, {
+        token: s.token, carregamentoId: "carr-2", tipo: "venda", clienteNome: "Bar do Zé",
+        itens: [
+          { chaveIdempotencia: "i1", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 2 },
+          { chaveIdempotencia: "i2", produtoId: b.produtoId, formatoId: b.formatoId, quantidade: 1 },
+        ],
+      }),
+    ).rejects.toThrow(/[Ss]aldo insuficiente/);
+
+    const doCarregamento = await t.run((ctx) =>
+      ctx.db.query("movimentacoes").withIndex("by_carregamento", (q) => q.eq("carregamentoId", "carr-2")).collect(),
+    );
+    expect(doCarregamento.length).toBe(0); // nada gravado
+    expect(await t.run((ctx) => saldoDoFormato(ctx, s.produtoId, s.camaraId, s.formatoId))).toBe(5); // intacto
+  });
+
+  test("soma o pedido de linhas do MESMO formato antes de validar o saldo", async () => {
+    const t = convexTest(schema, modules);
+    const s = await setup(t);
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: s.token, chaveIdempotencia: "pa", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 5,
+    });
+
+    // Duas linhas do mesmo formato: 3 + 3 = 6 > 5 → bloqueado (cada uma sozinha passaria).
+    await expect(
+      t.mutation(api.operador.lancamentos.lancarSaidaMultipla, {
+        token: s.token, carregamentoId: "carr-3", tipo: "venda", clienteNome: "Bar do Zé",
+        itens: [
+          { chaveIdempotencia: "i1", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 3 },
+          { chaveIdempotencia: "i2", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 3 },
+        ],
+      }),
+    ).rejects.toThrow(/[Ss]aldo insuficiente/);
+  });
+
+  test("idempotência do lote: mesmo carregamentoId não duplica", async () => {
+    const t = convexTest(schema, modules);
+    const s = await setup(t);
+
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: s.token, chaveIdempotencia: "pa", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 5,
+    });
+
+    const args = {
+      token: s.token, carregamentoId: "carr-4", tipo: "venda" as const, clienteNome: "Bar do Zé",
+      itens: [{ chaveIdempotencia: "i1", produtoId: s.produtoId, formatoId: s.formatoId, quantidade: 2 }],
+    };
+    const r1 = await t.mutation(api.operador.lancamentos.lancarSaidaMultipla, args);
+    const r2 = await t.mutation(api.operador.lancamentos.lancarSaidaMultipla, args);
+
+    expect(r1.duplicado).toBe(false);
+    expect(r2.duplicado).toBe(true);
+
+    const doCarregamento = await t.run((ctx) =>
+      ctx.db.query("movimentacoes").withIndex("by_carregamento", (q) => q.eq("carregamentoId", "carr-4")).collect(),
+    );
+    expect(doCarregamento.length).toBe(1); // só o primeiro lote gravou
+    expect(await t.run((ctx) => saldoDoFormato(ctx, s.produtoId, s.camaraId, s.formatoId))).toBe(3); // baixou uma vez só
   });
 });
 
