@@ -8,7 +8,7 @@ import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeir
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
-import { BotaoDesfazer } from "./desfazer.tsx";
+import { BotaoDesfazer, BotaoDesfazerCarregamento } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
 import { dataHora } from "../lib/data.ts";
@@ -144,6 +144,11 @@ function SaidaCarregamento({
   const [erroDeRede, setErroDeRede] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [quandoMs, setQuandoMs] = useState(0);
+  const [protocolo, setProtocolo] = useState("");
+  // Desfazer do carregamento (tarefa 4 do adendo): fecha assim que o
+  // comprovante é enviado/copiado — ver ComprovanteSaida mais abaixo.
+  const [compartilhado, setCompartilhado] = useState(false);
+  const [desfeito, setDesfeito] = useState(false);
 
   const pesoTotal = itens.reduce((acc, it) => acc + pesoDoItem(it), 0);
 
@@ -258,7 +263,7 @@ function SaidaCarregamento({
     setErroDeRede(false);
     setEnviando(true);
     try {
-      await lancar({
+      const r = await lancar({
         token,
         carregamentoId,
         tipo,
@@ -274,6 +279,7 @@ function SaidaCarregamento({
         veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro.trim() || undefined : undefined,
         motorista: motorista.trim() || undefined,
       });
+      setProtocolo(r.protocolo);
       setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
@@ -302,17 +308,38 @@ function SaidaCarregamento({
       motorista: motorista.trim(),
       camaraNome,
       operadorNome,
-      protocolo: carregamentoId.slice(0, 8).toUpperCase() || "—",
+      protocolo: protocolo || "—",
     };
 
     return (
       <Tela titulo={`${rotulo} lançada`} camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">
-          Registrado com sucesso · {itens.length} {itens.length === 1 ? "produto" : "produtos"}.
+          {desfeito ? "Lançamento desfeito." : `Registrado com sucesso · ${itens.length} ${itens.length === 1 ? "produto" : "produtos"}.`}
         </AvisoOperador>
-        <div className="mt-4">
-          <ComprovanteSaida dados={dados} />
-        </div>
+        {!desfeito ? (
+          <>
+            <div className="mt-4">
+              <ComprovanteSaida
+                token={token}
+                carregamentoId={carregamentoId}
+                dados={dados}
+                onCompartilhado={() => setCompartilhado(true)}
+              />
+            </div>
+            {protocolo ? (
+              <div className="mt-4">
+                <BotaoDesfazerCarregamento
+                  token={token}
+                  carregamentoId={carregamentoId}
+                  protocolo={protocolo}
+                  quandoMs={quandoMs}
+                  compartilhado={compartilhado}
+                  onDesfeito={() => setDesfeito(true)}
+                />
+              </div>
+            ) : null}
+          </>
+        ) : null}
         <div className="mt-6">
           <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar</BotaoGrande>
         </div>
@@ -655,6 +682,7 @@ function SaidaPerda({
   // pro botão Desfazer (tarefa 5).
   const [ultimoId, setUltimoId] = useState<Id<"movimentacoes"> | null>(null);
   const [quandoMs, setQuandoMs] = useState<number | null>(null);
+  const [protocolo, setProtocolo] = useState("");
   const [desfeito, setDesfeito] = useState(false);
 
   // Saldo do formato na câmara (do servidor). Fixo → pacotes; variável → kg.
@@ -691,6 +719,7 @@ function SaidaPerda({
     setErro("");
     setUltimoId(null);
     setQuandoMs(null);
+    setProtocolo("");
     setDesfeito(false);
     setPasso("quantidade");
   }
@@ -734,6 +763,7 @@ function SaidaPerda({
         observacao: observacao.trim() || undefined,
       });
       setUltimoId(r.movimentacaoId);
+      setProtocolo(r.protocolo);
       setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
@@ -749,7 +779,10 @@ function SaidaPerda({
     const pesoKg = produto && formato ? kgDe(formato, num, num) : 0;
     return (
       <Tela titulo="Perda lançada" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
-        <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
+        <AvisoOperador tom="ok">
+          {desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}
+          {!desfeito && protocolo ? <span className="ml-1.5 font-mono text-sm">· {protocolo}</span> : null}
+        </AvisoOperador>
         {produto && formato && !desfeito ? (
           <div className="mt-4">
             <ResumoLancamento
@@ -957,15 +990,40 @@ function Texto({
 
 // Comprovante da saída (venda/patrocínio) na tela de sucesso do operador. Formato e
 // texto vêm de src/lib/comprovante.ts (compartilhado com o histórico do Admin).
-function ComprovanteSaida({ dados }: { dados: DadosComprovante }) {
+// Enviar ou copiar marca o carregamento como compartilhado (tarefa 4 do
+// adendo) — a partir daí o Desfazer fecha, porque o comprovante já pode estar
+// na mão do cliente.
+function ComprovanteSaida({
+  token,
+  carregamentoId,
+  dados,
+  onCompartilhado,
+}: {
+  token: string;
+  carregamentoId: string;
+  dados: DadosComprovante;
+  onCompartilhado: () => void;
+}) {
   const [copiado, setCopiado] = useState(false);
+  const marcarCompartilhado = useMutation(api.operador.desfazer.marcarComprovanteCompartilhado);
   const texto = textoComprovante(dados);
   const link = linkWhatsappComprovante(dados);
+
+  function avisarCompartilhado() {
+    onCompartilhado();
+    marcarCompartilhado({ token, carregamentoId }).catch(() => {});
+  }
+
+  function abrirWhatsapp() {
+    window.open(link, "_blank", "noopener");
+    avisarCompartilhado();
+  }
 
   async function copiar() {
     try {
       await navigator.clipboard.writeText(texto);
       setCopiado(true);
+      avisarCompartilhado();
       setTimeout(() => setCopiado(false), 2000);
     } catch {
       setCopiado(false);
@@ -1015,7 +1073,7 @@ function ComprovanteSaida({ dados }: { dados: DadosComprovante }) {
         </div>
       </div>
 
-      <BotaoGrande variante="primario" onClick={() => window.open(link, "_blank", "noopener")}>
+      <BotaoGrande variante="primario" onClick={abrirWhatsapp}>
         <MessageCircle size={20} aria-hidden="true" /> Enviar comprovante no WhatsApp
       </BotaoGrande>
       <BotaoGrande variante="neutro" onClick={copiar}>

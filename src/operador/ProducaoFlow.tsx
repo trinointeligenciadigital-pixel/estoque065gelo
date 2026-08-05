@@ -48,6 +48,7 @@ export function ProducaoFlow({
   // pro botão Desfazer (tarefa 5).
   const [ultimoId, setUltimoId] = useState<Id<"movimentacoes"> | null>(null);
   const [quandoMs, setQuandoMs] = useState<number | null>(null);
+  const [protocolo, setProtocolo] = useState("");
   const [desfeito, setDesfeito] = useState(false);
 
   // Mantém produto e formato, só troca a quantidade — pro atalho "Lançar
@@ -58,6 +59,7 @@ export function ProducaoFlow({
     setErro("");
     setUltimoId(null);
     setQuandoMs(null);
+    setProtocolo("");
     setDesfeito(false);
     setPasso("quantidade");
   }
@@ -121,6 +123,7 @@ export function ProducaoFlow({
         pesoKgVariavel: formato.pesoVariavel ? num : undefined,
       });
       setUltimoId(r.movimentacaoId);
+      setProtocolo(r.protocolo);
       setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
@@ -135,7 +138,10 @@ export function ProducaoFlow({
   if (passo === "sucesso") {
     return (
       <Tela titulo="Produção lançada" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
-        <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
+        <AvisoOperador tom="ok">
+          {desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}
+          {!desfeito && protocolo ? <span className="ml-1.5 font-mono text-sm">· {protocolo}</span> : null}
+        </AvisoOperador>
         {produto && formato && !desfeito ? (
           <div className="mt-4">
             <ResumoLancamento

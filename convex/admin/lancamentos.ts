@@ -7,6 +7,7 @@ import { exigirAdmin } from "../lib/auth";
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, pesoLiquidoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
+import { protocoloDe } from "../lib/protocolo";
 
 /*
   Lançamento manual pelo Admin (RF63). MESMAS regras do colaborador: saldo,
@@ -78,12 +79,16 @@ export const lancarProducao = mutation({
     const { produto, formato } = await produtoEFormato(ctx, args.produtoId, args.formatoId);
 
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
-    if (existente !== null) return { movimentacaoId: existente._id, duplicado: true };
+    if (existente !== null) {
+      return { movimentacaoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(args.chaveIdempotencia) };
+    }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const protocolo = protocoloDe(args.chaveIdempotencia);
 
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
+      protocolo,
       tipo: "producao",
       sinal: 1,
       produtoId: args.produtoId,
@@ -96,7 +101,7 @@ export const lancarProducao = mutation({
       autorNome: usuario.nome,
       registradoEm: Date.now(),
     });
-    return { movimentacaoId, duplicado: false };
+    return { movimentacaoId, duplicado: false, protocolo };
   },
 });
 
@@ -133,7 +138,9 @@ export const lancarSaida = mutation({
     }
 
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
-    if (existente !== null) return { movimentacaoId: existente._id, duplicado: true };
+    if (existente !== null) {
+      return { movimentacaoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(args.chaveIdempotencia) };
+    }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
 
@@ -145,8 +152,10 @@ export const lancarSaida = mutation({
       throw new ConvexError("Saldo insuficiente nesta câmara.");
     }
 
+    const protocolo = protocoloDe(args.chaveIdempotencia);
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
+      protocolo,
       tipo: args.tipo,
       sinal: -1,
       produtoId: args.produtoId,
@@ -165,7 +174,7 @@ export const lancarSaida = mutation({
       autorNome: usuario.nome,
       registradoEm: Date.now(),
     });
-    return { movimentacaoId, duplicado: false };
+    return { movimentacaoId, duplicado: false, protocolo };
   },
 });
 
@@ -202,7 +211,11 @@ export const lancarSaidaMultipla = mutation({
       .withIndex("by_carregamento", (q) => q.eq("carregamentoId", args.carregamentoId))
       .collect();
     if (jaGravadas.length > 0) {
-      return { movimentacaoIds: jaGravadas.map((m) => m._id), duplicado: true };
+      return {
+        movimentacaoIds: jaGravadas.map((m) => m._id),
+        duplicado: true,
+        protocolo: jaGravadas[0].protocolo ?? protocoloDe(args.carregamentoId),
+      };
     }
 
     const linhas: LinhaLote[] = [];
@@ -225,12 +238,14 @@ export const lancarSaidaMultipla = mutation({
     const cliente = args.clienteNome.trim() || undefined;
     const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
     const motorista = args.motorista?.trim() || undefined;
+    const protocolo = protocoloDe(args.carregamentoId);
 
     const movimentacaoIds = [];
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
       const id = await ctx.db.insert("movimentacoes", {
         chaveIdempotencia: args.itens[i].chaveIdempotencia,
+        protocolo,
         carregamentoId: args.carregamentoId,
         tipo: args.tipo,
         sinal: -1,
@@ -250,6 +265,6 @@ export const lancarSaidaMultipla = mutation({
       });
       movimentacaoIds.push(id);
     }
-    return { movimentacaoIds, duplicado: false };
+    return { movimentacaoIds, duplicado: false, protocolo };
   },
 });

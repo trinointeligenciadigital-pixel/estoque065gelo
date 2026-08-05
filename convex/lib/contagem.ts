@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { saldoDoFormato, pesoLiquidoDoFormato } from "./saldo";
+import { protocoloDe } from "./protocolo";
 
 /*
   Contagem física — lógica compartilhada entre o fluxo do operador e o do Admin.
@@ -103,6 +104,9 @@ export async function gerarAjustesDaContagem(
   // que uma contagem só passa por esta função uma única vez (exigirDecidivel
   // exige status "pendente", que vira "aprovada" na mesma chamada).
   const loteId = crypto.randomUUID();
+  // Um recibo só por lote de ajuste (adendo PWA, tarefa 4) — todos os ajustes
+  // desta aprovação compartilham o protocolo do grupo, igual ao carregamento.
+  const protocolo = protocoloDe(loteId);
 
   let gerados = 0;
   for (const it of itens) {
@@ -119,6 +123,7 @@ export async function gerarAjustesDaContagem(
 
     await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: `ajuste:${contagem._id}:${it._id}`,
+      protocolo,
       tipo: "ajuste",
       sinal,
       produtoId: it.produtoId,

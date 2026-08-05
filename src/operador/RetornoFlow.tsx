@@ -62,6 +62,7 @@ export function RetornoFlow({
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  const [protocolo, setProtocolo] = useState("");
 
   function escolher(p: Patrocinio) {
     setAlvo(p);
@@ -76,13 +77,14 @@ export function RetornoFlow({
     setEnviando(true);
     try {
       const num = Number(valor);
-      await lancar({
+      const r = await lancar({
         token,
         chaveIdempotencia: chave,
         patrocinioOrigemId: alvo.origemId,
         quantidade: alvo.formatoPesoVariavel ? undefined : num,
         pesoKgVariavel: alvo.formatoPesoVariavel ? num : undefined,
       });
+      setProtocolo(r.protocolo);
       setSucesso(true);
     } catch (e) {
       setErro(mensagemErro(e));
@@ -99,6 +101,7 @@ export function RetornoFlow({
           Retorno registrado:{" "}
           <span className="font-mono">{formatarQtd(num, alvo?.formatoPesoVariavel ?? false)}</span>
           {alvo ? ` · ${alvo.produtoNome} · ${rotuloFormatoPatrocinio(alvo)}` : ""}.
+          {protocolo ? <span className="ml-1.5 font-mono text-sm">· {protocolo}</span> : null}
         </AvisoOperador>
         <div className="mt-6">
           <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar</BotaoGrande>

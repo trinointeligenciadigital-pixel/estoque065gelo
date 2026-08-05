@@ -3,6 +3,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { movimentacaoExistente } from "./idempotencia";
 import { dataHoraCuiaba } from "./data";
+import { protocoloDe } from "./protocolo";
 
 /*
   Estorno — mecânica compartilhada entre o Admin (convex/admin/estorno.ts,
@@ -69,18 +70,25 @@ export async function inserirEstorno(
   original: Doc<"movimentacoes">,
   autor: AutorEstorno,
   motivoTexto: string,
-): Promise<{ estornoId: Id<"movimentacoes">; duplicado: boolean }> {
+): Promise<{ estornoId: Id<"movimentacoes">; duplicado: boolean; protocolo: string }> {
   const chaveIdempotencia = `estorno:${original._id}`;
   const existente = await movimentacaoExistente(ctx, chaveIdempotencia);
-  if (existente !== null) return { estornoId: existente._id, duplicado: true };
+  if (existente !== null) {
+    return { estornoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(crypto.randomUUID()) };
+  }
 
   const sinal = original.sinal === 1 ? (-1 as const) : (1 as const);
+
+  // Protocolo do estorno: NUNCA derivado de `chaveIdempotencia` aqui — ela é
+  // "estorno:<id do original>", nada legível. Semente própria e fresca.
+  const protocolo = protocoloDe(crypto.randomUUID());
 
   // "Recalcula o saldo": não há nada a fazer além deste insert — o saldo
   // nunca é cacheado (regra arquitetural 1), toda leitura soma o ledger
   // inteiro, então a reversão já é o recálculo.
   const estornoId = await ctx.db.insert("movimentacoes", {
     chaveIdempotencia,
+    protocolo,
     tipo: "estorno",
     sinal,
     produtoId: original.produtoId,
@@ -97,7 +105,7 @@ export async function inserirEstorno(
     registradoEm: Date.now(),
   });
 
-  return { estornoId, duplicado: false };
+  return { estornoId, duplicado: false, protocolo };
 }
 
 // Mínimo de 5 caracteres pro motivo — mesma regra em todo lugar que grava

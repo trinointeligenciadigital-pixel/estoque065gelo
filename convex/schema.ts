@@ -116,6 +116,15 @@ export default defineSchema({
   movimentacoes: defineTable({
     // Idempotência: UUID gerado no cliente. Protege contra duplo-toque e retry.
     chaveIdempotencia: v.string(),
+    // Protocolo curto e legível em voz alta (adendo PWA, tarefa 4) — mostrado
+    // no comprovante, na tela de sucesso e no histórico, com busca. Gerado no
+    // servidor a partir de uma semente própria (nunca reaproveita
+    // chaveIdempotencia direto: em estorno ela é "estorno:<id>" e em ajuste é
+    // "ajuste:<contagem>:<item>" — nenhum dos dois é legível). Linhas do mesmo
+    // carregamento (venda/patrocínio) ou do mesmo lote de ajuste compartilham
+    // o protocolo do grupo — é um recibo só. Ausente = lançamento anterior a
+    // esta tarefa; migrarProtocoloLegado (convex/migracoes.ts) preenche.
+    protocolo: v.optional(v.string()),
 
     tipo: v.union(
       v.literal("producao"), // entrada
@@ -206,7 +215,20 @@ export default defineSchema({
     .index("by_contagem", ["contagemId"])
     .index("by_lote", ["loteId"])
     .index("by_estorno_de", ["estornoDe"])
-    .index("by_registrado_em", ["registradoEm"]),
+    .index("by_registrado_em", ["registradoEm"])
+    .index("by_protocolo", ["protocolo"]),
+
+  // Registro de que o comprovante de um carregamento (venda/patrocínio) foi
+  // enviado por WhatsApp ou copiado (adendo PWA, tarefa 4). Tabela À PARTE de
+  // `movimentacoes` — nunca um patch no lançamento (regra arquitetural 2:
+  // append-only, sem exceção). "Este carregamento já foi compartilhado?" é
+  // sempre esta leitura: existe algum registro para este carregamentoId?
+  // Enquanto não existir, o Desfazer (5 min) continua disponível; a partir do
+  // primeiro registro, some — mesma filosofia do estorno (by_estorno_de).
+  carregamentosCompartilhados: defineTable({
+    carregamentoId: v.string(),
+    compartilhadoEm: v.number(),
+  }).index("by_carregamento", ["carregamentoId"]),
 
   // ---------------------------------------------------------------
   // Contagem física — gera divergência, nunca ajuste automático

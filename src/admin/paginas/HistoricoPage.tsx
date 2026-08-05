@@ -125,6 +125,9 @@ export function HistoricoPage() {
   const [de, setDe] = useState(() => params.get("de") ?? "");
   const [ate, setAte] = useState(() => params.get("ate") ?? "");
   const [contagemId] = useState<Id<"contagens"> | "">(() => (params.get("contagemId") as Id<"contagens">) || "");
+  // Busca por protocolo (tarefa 4 do adendo) — localiza qualquer lançamento,
+  // inclusive ajuste e estorno, sem precisar saber câmara/produto/tipo.
+  const [protocolo, setProtocolo] = useState("");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
   const [estornando, setEstornando] = useState<MovRow | null>(null);
 
@@ -135,6 +138,7 @@ export function HistoricoPage() {
     operadorId: operadorId || undefined,
     autorClerkId: autorClerkId || undefined,
     contagemId: contagemId || undefined,
+    protocolo: protocolo.trim() || undefined,
     de: inicioDoDia(de),
     ate: fimDoDia(ate),
   });
@@ -191,8 +195,9 @@ export function HistoricoPage() {
       motorista: m.motorista ?? "",
       camaraNome: m.camaraNome,
       operadorNome: m.autor,
-      // Num carregamento, o protocolo é o do grupo (8 chars do carregamentoId).
-      protocolo: m.carregamentoId != null ? m.carregamentoId.slice(0, 8).toUpperCase() : m.protocolo,
+      // Todas as linhas do mesmo carregamento já saem do servidor com o
+      // mesmo protocolo (protocoloDe do carregamentoId) — não precisa recalcular aqui.
+      protocolo: m.protocolo,
     };
   }
 
@@ -201,7 +206,16 @@ export function HistoricoPage() {
       <TituloPagina titulo="Histórico" subtitulo="Todas as movimentações. Somente leitura." />
 
       <Cartao className="mb-4 p-3">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
+          <Filtro label="Protocolo">
+            <input
+              type="text"
+              value={protocolo}
+              onChange={(e) => setProtocolo(e.target.value)}
+              placeholder="ex.: 42423F99"
+              className={`${inputCls} font-mono uppercase`}
+            />
+          </Filtro>
           <Filtro label="Câmara">
             <select
               value={camaraId}
@@ -338,6 +352,7 @@ function LinhaMov({
       <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">
         {indentado ? <span className="mr-1 text-texto-fraco">↳</span> : null}
         {dataHora(m.registradoEm)}
+        <span className="block text-texto-fraco">{m.protocolo}</span>
       </td>
       <td className="px-3 py-2.5">
         <span className={m.sinal > 0 ? "text-entrada" : "text-saida"}>

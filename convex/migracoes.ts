@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import { protocoloDe } from "./lib/protocolo";
 
 /*
   Migrações do sprint P0 (auditoria). São internalMutation — só rodam via
@@ -190,5 +191,57 @@ export const migrarLoteAjusteLegado = internalMutation({
     }
 
     return { dryRun, totalSemLote: semLote.length, lotesReconstruidos: grupos.size };
+  },
+});
+
+// Adendo PWA, tarefa 4: protocolo curto e legível em voz alta, agora um campo
+// próprio (`movimentacoes.protocolo`) em vez de derivado na hora da leitura —
+// derivar direto de chaveIdempotencia quebrava pra estorno ("estorno:<id>") e
+// ajuste ("ajuste:<contagem>:<item>"), que não são UUID legível. Backfill dos
+// lançamentos gravados antes deste campo existir:
+//   - linha de carregamento (venda/patrocínio em lote): protocolo do GRUPO,
+//     derivado do carregamentoId — todas as linhas do mesmo carregamento saem
+//     com o mesmo protocolo, como um recibo só (mesma regra que os novos
+//     lançamentos já seguem).
+//   - ajuste com loteId: protocolo do lote, derivado do loteId — mesma lógica.
+//   - estorno: chaveIdempotencia não é legível; gera um protocolo fresco,
+//     próprio deste registro (não há grupo pra herdar).
+//   - qualquer outro lançamento avulso: protocolo da própria chaveIdempotencia
+//     (é um UUID real do cliente nesses casos — determinístico, legível).
+export const migrarProtocoloLegado = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const dryRun = args.dryRun ?? true;
+
+    const todas = await ctx.db.query("movimentacoes").collect();
+    const semProtocolo = todas.filter((m) => m.protocolo === undefined);
+
+    let deCarregamento = 0;
+    let deLote = 0;
+    let deEstorno = 0;
+    let avulso = 0;
+    for (const m of semProtocolo) {
+      const protocolo =
+        m.carregamentoId !== undefined
+          ? (deCarregamento++, protocoloDe(m.carregamentoId))
+          : m.loteId !== undefined
+            ? (deLote++, protocoloDe(m.loteId))
+            : m.tipo === "estorno"
+              ? (deEstorno++, protocoloDe(crypto.randomUUID()))
+              : (avulso++, protocoloDe(m.chaveIdempotencia));
+
+      if (!dryRun) {
+        await ctx.db.patch(m._id, { protocolo });
+      }
+    }
+
+    return {
+      dryRun,
+      totalSemProtocolo: semProtocolo.length,
+      deCarregamento,
+      deLote,
+      deEstorno,
+      avulso,
+    };
   },
 });

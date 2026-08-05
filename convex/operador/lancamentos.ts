@@ -7,6 +7,7 @@ import { exigirSessaoOperadorMutavel, exigirPermissao, exigirCamaraDoProduto } f
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
+import { protocoloDe } from "../lib/protocolo";
 
 /*
   Lançamentos do colaborador. Regras invioláveis aplicadas aqui:
@@ -64,12 +65,16 @@ export const lancarProducao = mutation({
 
     // Idempotência: se já existe, devolve sem inserir (RF34).
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
-    if (existente !== null) return { movimentacaoId: existente._id, duplicado: true };
+    if (existente !== null) {
+      return { movimentacaoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(args.chaveIdempotencia) };
+    }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const protocolo = protocoloDe(args.chaveIdempotencia);
 
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
+      protocolo,
       tipo: "producao",
       sinal: 1,
       produtoId: args.produtoId,
@@ -82,7 +87,7 @@ export const lancarProducao = mutation({
       autorNome: operador.nome,
       registradoEm: Date.now(),
     });
-    return { movimentacaoId, duplicado: false };
+    return { movimentacaoId, duplicado: false, protocolo };
   },
 });
 
@@ -128,7 +133,9 @@ export const lancarSaida = mutation({
 
     // Idempotência antes de qualquer efeito (RF34).
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
-    if (existente !== null) return { movimentacaoId: existente._id, duplicado: true };
+    if (existente !== null) {
+      return { movimentacaoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(args.chaveIdempotencia) };
+    }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
 
@@ -141,8 +148,10 @@ export const lancarSaida = mutation({
       throw new ConvexError("Saldo insuficiente nesta câmara — avise o Admin.");
     }
 
+    const protocolo = protocoloDe(args.chaveIdempotencia);
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
+      protocolo,
       tipo: args.tipo,
       sinal: -1,
       produtoId: args.produtoId,
@@ -163,7 +172,7 @@ export const lancarSaida = mutation({
       autorNome: operador.nome,
       registradoEm: Date.now(),
     });
-    return { movimentacaoId, duplicado: false };
+    return { movimentacaoId, duplicado: false, protocolo };
   },
 });
 
@@ -205,7 +214,11 @@ export const lancarSaidaMultipla = mutation({
       .withIndex("by_carregamento", (q) => q.eq("carregamentoId", args.carregamentoId))
       .collect();
     if (jaGravadas.length > 0) {
-      return { movimentacaoIds: jaGravadas.map((m) => m._id), duplicado: true };
+      return {
+        movimentacaoIds: jaGravadas.map((m) => m._id),
+        duplicado: true,
+        protocolo: jaGravadas[0].protocolo ?? protocoloDe(args.carregamentoId),
+      };
     }
 
     // Valida cada item e deriva qtd/peso no servidor, sem gravar ainda.
@@ -233,12 +246,17 @@ export const lancarSaidaMultipla = mutation({
     const cliente = args.clienteNome.trim() || undefined;
     const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
     const motorista = args.motorista?.trim() || undefined;
+    // Um recibo só por carregamento: todas as linhas do grupo compartilham o
+    // mesmo protocolo, derivado do carregamentoId (não da chaveIdempotencia de
+    // cada item, que é por linha).
+    const protocolo = protocoloDe(args.carregamentoId);
 
     const movimentacaoIds = [];
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i];
       const id = await ctx.db.insert("movimentacoes", {
         chaveIdempotencia: args.itens[i].chaveIdempotencia,
+        protocolo,
         carregamentoId: args.carregamentoId,
         tipo: args.tipo,
         sinal: -1,
@@ -258,7 +276,7 @@ export const lancarSaidaMultipla = mutation({
       });
       movimentacaoIds.push(id);
     }
-    return { movimentacaoIds, duplicado: false };
+    return { movimentacaoIds, duplicado: false, protocolo };
   },
 });
 
@@ -284,7 +302,9 @@ export const lancarRetorno = mutation({
     }
 
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
-    if (existente !== null) return { movimentacaoId: existente._id, duplicado: true };
+    if (existente !== null) {
+      return { movimentacaoId: existente._id, duplicado: true, protocolo: existente.protocolo ?? protocoloDe(args.chaveIdempotencia) };
+    }
 
     // Produto, câmara e formato herdados da origem (RF40) — não vêm do cliente.
     const formato = await ctx.db.get(origem.formatoId);
@@ -305,8 +325,10 @@ export const lancarRetorno = mutation({
       throw new ConvexError("Retorno maior do que o que saiu neste patrocínio.");
     }
 
+    const protocolo = protocoloDe(args.chaveIdempotencia);
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
+      protocolo,
       tipo: "retornoPatrocinio",
       sinal: 1,
       produtoId: origem.produtoId,
@@ -321,6 +343,6 @@ export const lancarRetorno = mutation({
       autorNome: operador.nome,
       registradoEm: Date.now(),
     });
-    return { movimentacaoId, duplicado: false };
+    return { movimentacaoId, duplicado: false, protocolo };
   },
 });

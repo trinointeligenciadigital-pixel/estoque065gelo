@@ -34,21 +34,35 @@ export const listar = query({
     // tarefa 5). Quando presente, o front não colapsa por loteId — o Admin já
     // pediu para ver justamente as linhas daquela contagem.
     contagemId: v.optional(v.id("contagens")),
+    // Busca por protocolo (tarefa 4 do adendo) — qualquer lançamento (inclusive
+    // ajuste e estorno) pode ser localizado por ele. Não combina com o LIMITE
+    // dos outros filtros: é uma busca direta pelo índice, não uma varredura.
+    protocolo: v.optional(v.string()),
     de: v.optional(v.number()),
     ate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     await exigirAdmin(ctx);
 
-    // Se filtra por câmara, usa o índice; senão varre por data (mais recente).
-    const base = args.camaraId
+    const buscaProtocolo = args.protocolo?.trim().toUpperCase() || undefined;
+
+    // Busca por protocolo: pelo índice dedicado, ignora a escolha de índice
+    // por câmara/data (o protocolo já é específico o bastante). Sem protocolo,
+    // segue como antes — câmara se filtrada, senão por data (mais recente).
+    const base = buscaProtocolo
       ? await ctx.db
           .query("movimentacoes")
-          .withIndex("by_camara", (q) => q.eq("camaraId", args.camaraId!))
+          .withIndex("by_protocolo", (q) => q.eq("protocolo", buscaProtocolo))
           .collect()
-      : await ctx.db.query("movimentacoes").withIndex("by_registrado_em").collect();
+      : args.camaraId
+        ? await ctx.db
+            .query("movimentacoes")
+            .withIndex("by_camara", (q) => q.eq("camaraId", args.camaraId!))
+            .collect()
+        : await ctx.db.query("movimentacoes").withIndex("by_registrado_em").collect();
 
     const filtradas = base
+      .filter((m) => (args.camaraId ? m.camaraId === args.camaraId : true))
       .filter((m) => (args.produtoId ? m.produtoId === args.produtoId : true))
       .filter((m) => (args.tipo ? m.tipo === args.tipo : true))
       .filter((m) => (args.operadorId ? m.operadorId === args.operadorId : true))
@@ -125,11 +139,12 @@ export const listar = query({
           // Estorno (tarefa 6): `estornado` é derivado (ver acima), nunca lido de
           // um campo — não existe "estornadoPor" gravado em lugar nenhum.
           estornado: idsEstornados.has(m._id),
-          estornoDeProtocolo: original ? original.chaveIdempotencia.slice(0, 8).toUpperCase() : null,
-          // Protocolo do comprovante: 8 chars da chave de idempotência (UUID do
-          // cliente), nunca o _id interno (RNF13). Num carregamento, o front usa
-          // os 8 chars do carregamentoId para todas as linhas do grupo.
-          protocolo: m.chaveIdempotencia.slice(0, 8).toUpperCase(),
+          estornoDeProtocolo: original ? (original.protocolo ?? original.chaveIdempotencia.slice(0, 8).toUpperCase()) : null,
+          // Protocolo (tarefa 4 do adendo): campo próprio, nunca o _id interno
+          // (RNF13). Registro anterior a este campo cai no cálculo antigo (8
+          // chars da chaveIdempotencia) só pra nunca ficar em branco — a
+          // migração migrarProtocoloLegado preenche todo mundo de verdade.
+          protocolo: m.protocolo ?? m.chaveIdempotencia.slice(0, 8).toUpperCase(),
         };
       }),
     );
