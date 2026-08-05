@@ -176,6 +176,18 @@ function SaidaCarregamento({
     setPasso("produto");
   }
 
+  // Formato único: seleciona sozinho e pula direto pra quantidade (tarefa 2).
+  function escolherProdutoNoCarrinho(p: ProdutoGrid) {
+    setProduto(p);
+    if (p.formatos.length === 1) {
+      setFormato(p.formatos[0]);
+      setValor("");
+      setPasso("quantidade");
+    } else {
+      setPasso("formato");
+    }
+  }
+
   // Toca numa linha do carrinho para corrigir a quantidade sem refazer tudo.
   function editarItem(i: number) {
     const it = itens[i];
@@ -353,7 +365,7 @@ function SaidaCarregamento({
         camaraNome={camaraNome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
       >
-        <ListaProdutos produtos={produtos} onEscolher={(p) => { setProduto(p); setPasso("formato"); }} />
+        <ListaProdutos produtos={produtos} onEscolher={escolherProdutoNoCarrinho} />
       </Tela>
     );
   }
@@ -375,6 +387,7 @@ function SaidaCarregamento({
     const num = Number(valor);
     const validoBasico = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
     const editando = editIdx !== null;
+    const pulouFormato = produto.formatos.length === 1;
 
     // Saldo disponível já descontando o que este carregamento reserva do mesmo
     // formato (o servidor revalida no Confirmar; aqui é para não montar em falso).
@@ -388,7 +401,11 @@ function SaidaCarregamento({
       <Tela
         titulo={editando ? `${rotulo} — editar item` : `${rotulo} — quantidade`}
         camaraNome={`${produto.nome} · ${formato.nome}`}
-        onVoltar={editando ? () => { limparRascunho(); setPasso("itens"); } : () => setPasso("formato")}
+        onVoltar={
+          editando
+            ? () => { limparRascunho(); setPasso("itens"); }
+            : () => setPasso(pulouFormato ? "produto" : "formato")
+        }
         rodape={
           <BotaoGrande variante="saida" onClick={salvarItem} disabled={!valido}>
             {editando ? "Salvar alteração" : "Adicionar ao carregamento"}
@@ -572,6 +589,22 @@ function SaidaPerda({
     setPasso("quantidade");
   }
 
+  // Formato único: seleciona sozinho e pula direto pra quantidade (tarefa 2).
+  function escolherProduto(p: ProdutoGrid) {
+    setProduto(p);
+    if (p.formatos.length === 1) {
+      setFormato(p.formatos[0]);
+      setValor("");
+      setChave(crypto.randomUUID());
+      setPasso("quantidade");
+    } else {
+      setPasso("formato");
+    }
+  }
+
+  const pulouFormato = produto !== null && produto.formatos.length === 1;
+  const totalEtapasPerda = pulouFormato ? 4 : 5;
+
   async function confirmar() {
     if (!produto || !formato) return;
     setErro("");
@@ -627,7 +660,7 @@ function SaidaPerda({
   if (passo === "produto") {
     return (
       <Tela titulo="Perda — produto" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={5}>
-        <ListaProdutos produtos={produtos} onEscolher={(p) => { setProduto(p); setPasso("formato"); }} />
+        <ListaProdutos produtos={produtos} onEscolher={escolherProduto} />
       </Tela>
     );
   }
@@ -647,9 +680,9 @@ function SaidaPerda({
       <Tela
         titulo="Perda — quantidade"
         camaraNome={`${produto.nome} · ${formato.nome}`}
-        onVoltar={() => setPasso("formato")}
-        etapa={3}
-        totalEtapas={5}
+        onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
+        etapa={pulouFormato ? 2 : 3}
+        totalEtapas={totalEtapasPerda}
         rodape={
           <BotaoGrande variante="saida" onClick={() => setPasso("contexto")} disabled={!valido}>
             Continuar
@@ -668,8 +701,8 @@ function SaidaPerda({
         titulo="Perda — detalhes"
         camaraNome={camaraNome}
         onVoltar={() => setPasso("quantidade")}
-        etapa={4}
-        totalEtapas={5}
+        etapa={pulouFormato ? 3 : 4}
+        totalEtapas={totalEtapasPerda}
         rodape={
           <BotaoGrande variante="saida" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
             Continuar
@@ -706,8 +739,8 @@ function SaidaPerda({
         titulo="Perda — confira"
         camaraNome={camaraNome}
         onVoltar={() => setPasso("contexto")}
-        etapa={5}
-        totalEtapas={5}
+        etapa={pulouFormato ? 4 : 5}
+        totalEtapas={totalEtapasPerda}
         rodape={
           <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
             {enviando ? "Enviando…" : "Confirmar perda"}

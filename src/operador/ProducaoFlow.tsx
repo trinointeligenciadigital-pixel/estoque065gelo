@@ -42,9 +42,19 @@ export function ProducaoFlow({
     setPasso("produto");
   }
 
+  // Formato único: nem mostra a lista de um item só — seleciona sozinho e já
+  // pula pra quantidade (tarefa 2 do sprint PWA). O formato continua visível
+  // no subtítulo da tela seguinte e na conferência; só o TOQUE some.
   function escolherProduto(p: ProdutoGrid) {
     setProduto(p);
-    setPasso("formato");
+    if (p.formatos.length === 1) {
+      setFormato(p.formatos[0]);
+      setValor("");
+      setChave(crypto.randomUUID());
+      setPasso("quantidade");
+    } else {
+      setPasso("formato");
+    }
   }
 
   function escolherFormato(f: FormatoGrid) {
@@ -53,6 +63,12 @@ export function ProducaoFlow({
     setChave(crypto.randomUUID()); // uma chave por lançamento
     setPasso("quantidade");
   }
+
+  // Só sabemos se o passo de formato foi pulado depois que o produto é
+  // escolhido — por isso a barra de progresso do passo "produto" usa o total
+  // "cheio" (4) como padrão neutro.
+  const pulouFormato = produto !== null && produto.formatos.length === 1;
+  const totalEtapas = pulouFormato ? 3 : 4;
 
   async function confirmar() {
     if (!produto || !formato) return;
@@ -126,9 +142,9 @@ export function ProducaoFlow({
       <Tela
         titulo="Produção — quantidade"
         camaraNome={`${produto.nome} · ${formato.nome}`}
-        onVoltar={() => setPasso("formato")}
-        etapa={3}
-        totalEtapas={4}
+        onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
+        etapa={pulouFormato ? 2 : 3}
+        totalEtapas={totalEtapas}
         rodape={
           <BotaoGrande variante="entrada" onClick={() => setPasso("revisar")} disabled={!valido}>
             Continuar
@@ -147,8 +163,8 @@ export function ProducaoFlow({
         titulo="Produção — confira"
         camaraNome={camaraNome}
         onVoltar={() => setPasso("quantidade")}
-        etapa={4}
-        totalEtapas={4}
+        etapa={pulouFormato ? 3 : 4}
+        totalEtapas={totalEtapas}
         rodape={
           <BotaoGrande variante="entrada" onClick={confirmar} disabled={enviando}>
             {enviando ? "Enviando…" : "Confirmar produção"}
