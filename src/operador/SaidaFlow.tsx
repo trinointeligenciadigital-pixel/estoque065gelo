@@ -356,7 +356,7 @@ function SaidaCarregamento({
         operadorNome={nome}
         onVoltar={tentarSair}
         rodape={
-          <BotaoGrande variante="saida" onClick={() => setPasso("contexto")} disabled={itens.length === 0}>
+          <BotaoGrande variante="primario" onClick={() => setPasso("contexto")} disabled={itens.length === 0}>
             Continuar
           </BotaoGrande>
         }
@@ -468,7 +468,7 @@ function SaidaCarregamento({
               </BotaoGrande>
             </div>
           ) : (
-            <BotaoGrande variante="saida" onClick={salvarItem} disabled={!valido}>
+            <BotaoGrande variante="primario" onClick={salvarItem} disabled={!valido}>
               {editando ? "Salvar alteração" : "Adicionar ao carregamento"}
             </BotaoGrande>
           )
@@ -507,7 +507,7 @@ function SaidaCarregamento({
         etapa={1}
         totalEtapas={2}
         rodape={
-          <BotaoGrande variante="saida" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
+          <BotaoGrande variante="primario" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
             Continuar
           </BotaoGrande>
         }
@@ -567,7 +567,7 @@ function SaidaCarregamento({
         etapa={2}
         totalEtapas={2}
         rodape={
-          <BotaoGrande variante="saida" onClick={confirmar} disabled={enviando}>
+          <BotaoGrande variante="primario" onClick={confirmar} disabled={enviando}>
             {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : `Confirmar ${rotulo.toLowerCase()}`}
           </BotaoGrande>
         }

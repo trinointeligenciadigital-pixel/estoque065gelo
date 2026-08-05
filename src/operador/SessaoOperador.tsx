@@ -100,13 +100,15 @@ export function SessaoOperador({
     chave: Tela;
     rotulo: string;
     Icone: typeof PackagePlus;
-    variante: "entrada" | "saida" | "neutro";
+    variante: "entrada" | "primario" | "neutro";
   }[] = [
     ...(sessao.podeLancarProducao
       ? [{ chave: "producao" as const, rotulo: "Produção", Icone: PackagePlus, variante: "entrada" as const }]
       : []),
     ...(sessao.podeLancarSaida
-      ? [{ chave: "saida" as const, rotulo: "Saída / retorno", Icone: Truck, variante: "saida" as const }]
+      ? // Teal, não vermelho (tarefa 1 do adendo): saída/venda é a operação mais
+        // rotineira da fábrica, não é perigo. Vermelho fica só para Perda.
+        [{ chave: "saida" as const, rotulo: "Saída / retorno", Icone: Truck, variante: "primario" as const }]
       : []),
     ...(!temContagemAberta
       ? [{ chave: "saldo" as const, rotulo: "Ver saldo", Icone: Gauge, variante: "neutro" as const }]
