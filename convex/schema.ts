@@ -138,6 +138,22 @@ export default defineSchema({
     ),
     observacao: v.optional(v.string()), // obrigatório em código quando motivoPerda === "outro"
 
+    // Motivo do ajuste (RF55: ajuste só nasce da aprovação de contagem — não há
+    // mutation pública que crie "ajuste", então a categoria é sempre "contagem",
+    // preenchida automaticamente lá. "nao_informado" é só da migração de legados
+    // (convex/migracoes.ts) — nenhum código de escrita normal grava esse valor.
+    motivoCategoria: v.optional(
+      v.union(
+        v.literal("contagem"),
+        v.literal("quebra"),
+        v.literal("derretimento"),
+        v.literal("erro_lancamento"),
+        v.literal("outro"),
+        v.literal("nao_informado"),
+      ),
+    ),
+    motivoTexto: v.optional(v.string()), // obrigatório em código quando motivoCategoria === "outro"
+
     // Vínculos
     patrocinioOrigemId: v.optional(v.id("movimentacoes")), // retorno → patrocínio
     contagemId: v.optional(v.id("contagens")), // ajuste → contagem aprovada

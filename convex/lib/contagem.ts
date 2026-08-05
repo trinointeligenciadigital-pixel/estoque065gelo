@@ -121,6 +121,7 @@ export async function gerarAjustesDaContagem(
       quantidade,
       pesoKg,
       contagemId: contagem._id,
+      motivoCategoria: "contagem",
       registradoPorTipo: "admin",
       clerkId,
       autorNome,

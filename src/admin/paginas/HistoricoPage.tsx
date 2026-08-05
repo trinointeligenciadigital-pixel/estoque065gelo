@@ -29,6 +29,13 @@ const rotuloTipo: Record<Tipo, string> = {
   perda: "Perda",
   ajuste: "Ajuste",
 };
+const rotuloMotivoAjuste: Record<string, string> = {
+  contagem: "Contagem",
+  quebra: "Quebra",
+  derretimento: "Derretimento",
+  erro_lancamento: "Erro de lançamento",
+  outro: "Outro",
+};
 
 // Converte "AAAA-MM-DD" (input date) em ms; fim inclui o dia inteiro.
 function inicioDoDia(s: string): number | undefined {
@@ -208,8 +215,21 @@ export function HistoricoPage() {
               </td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
               <td className="px-3 py-2.5 text-texto-suave">
-                {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
-                {m.observacao ? ` · ${m.observacao}` : ""}
+                {m.tipo === "ajuste" ? (
+                  m.motivoCategoria === null || m.motivoCategoria === "nao_informado" ? (
+                    <span className="text-texto-fraco italic">— anterior à exigência de motivo</span>
+                  ) : (
+                    <>
+                      {rotuloMotivoAjuste[m.motivoCategoria] ?? m.motivoCategoria}
+                      {m.motivoCategoria === "outro" && m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
+                    </>
+                  )
+                ) : (
+                  <>
+                    {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
+                    {m.observacao ? ` · ${m.observacao}` : ""}
+                  </>
+                )}
               </td>
               <td className="px-3 py-2.5 text-texto-suave">
                 {m.autor}{" "}

@@ -79,6 +79,8 @@ export const listar = query({
           motorista: m.motorista ?? null,
           motivoPerda: m.motivoPerda ?? null,
           observacao: m.observacao ?? null,
+          motivoCategoria: m.motivoCategoria ?? null,
+          motivoTexto: m.motivoTexto ?? null,
           // autorNome é o snapshot da tarefa 3; registros pré-migração ainda
           // sem ele caem no mesmo cálculo que o Histórico já fazia antes.
           autor:

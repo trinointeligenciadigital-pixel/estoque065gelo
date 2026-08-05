@@ -140,6 +140,67 @@ describe("Tarefa 3 — autor nominal em todo lançamento", () => {
   });
 });
 
+describe("Tarefa 4 — motivo obrigatório em ajuste", () => {
+  test("ajuste gerado pela aprovação de contagem recebe motivoCategoria 'contagem' automaticamente", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [{ produtoId, formatoId, saldoContado: 4 }],
+    });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    const ajustes = await t.run((ctx) =>
+      ctx.db
+        .query("movimentacoes")
+        .withIndex("by_tipo", (q) => q.eq("tipo", "ajuste"))
+        .collect(),
+    );
+    expect(ajustes).toHaveLength(1);
+    expect(ajustes[0].motivoCategoria).toBe("contagem");
+  });
+});
+
+describe("Migração — migrarMotivoAjusteLegado (tarefa 4)", () => {
+  test("dryRun não grava nada; sem dryRun marca ajustes antigos como 'nao_informado', sem chutar o motivo real", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+
+    // Ajuste "legado": exatamente como gerarAjustesDaContagem gravava antes da
+    // tarefa 4 existir (sem motivoCategoria).
+    const ajusteId = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "ajuste",
+        sinal: 1,
+        produtoId,
+        camaraId,
+        formatoId,
+        quantidade: 2,
+        pesoKg: 4,
+        registradoPorTipo: "admin",
+        clerkId: "clerk_a",
+        registradoEm: Date.now(),
+      }),
+    );
+
+    const seco = await t.mutation(internal.migracoes.migrarMotivoAjusteLegado, {});
+    expect(seco).toEqual({ dryRun: true, totalSemMotivo: 1 });
+    expect((await t.run((ctx) => ctx.db.get(ajusteId)))?.motivoCategoria).toBeUndefined();
+
+    await t.mutation(internal.migracoes.migrarMotivoAjusteLegado, { dryRun: false });
+    expect((await t.run((ctx) => ctx.db.get(ajusteId)))?.motivoCategoria).toBe("nao_informado");
+
+    const deNovo = await t.mutation(internal.migracoes.migrarMotivoAjusteLegado, { dryRun: false });
+    expect(deNovo.totalSemMotivo).toBe(0);
+  });
+});
+
 describe("Migração — migrarAutorLegado (tarefa 3)", () => {
   test("dryRun não grava nada; sem dryRun preenche operador com o nome real e admin com rótulo genérico", async () => {
     const t = convexTest(schema, modules);

@@ -50,3 +50,28 @@ export const migrarAutorLegado = internalMutation({
     };
   },
 });
+
+// Tarefa 4: ajustes gravados antes do campo `motivoCategoria` existir. Marca
+// como "nao_informado" — reservado à migração, nenhum código de escrita normal
+// grava esse valor (a única origem de ajuste, gerarAjustesDaContagem, sempre
+// grava "contagem"). Sem chute de qual seria o motivo real.
+export const migrarMotivoAjusteLegado = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const dryRun = args.dryRun ?? true;
+
+    const ajustes = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_tipo", (q) => q.eq("tipo", "ajuste"))
+      .collect();
+    const semMotivo = ajustes.filter((m) => m.motivoCategoria === undefined);
+
+    if (!dryRun) {
+      for (const m of semMotivo) {
+        await ctx.db.patch(m._id, { motivoCategoria: "nao_informado" });
+      }
+    }
+
+    return { dryRun, totalSemMotivo: semMotivo.length };
+  },
+});
