@@ -29,6 +29,10 @@ export const listar = query({
     // Filtra por um Admin específico (clerkId), não "qualquer admin" — desde a
     // tarefa 3 o filtro lista pessoas reais, não mais um balde genérico "Admin".
     autorClerkId: v.optional(v.string()),
+    // Vindo de um link "ver ajustes desta contagem" (aba Histórico de Contagens,
+    // tarefa 5). Quando presente, o front não colapsa por loteId — o Admin já
+    // pediu para ver justamente as linhas daquela contagem.
+    contagemId: v.optional(v.id("contagens")),
     de: v.optional(v.number()),
     ate: v.optional(v.number()),
   },
@@ -48,6 +52,7 @@ export const listar = query({
       .filter((m) => (args.tipo ? m.tipo === args.tipo : true))
       .filter((m) => (args.operadorId ? m.operadorId === args.operadorId : true))
       .filter((m) => (args.autorClerkId ? m.clerkId === args.autorClerkId : true))
+      .filter((m) => (args.contagemId ? m.contagemId === args.contagemId : true))
       .filter((m) => (args.de !== undefined ? m.registradoEm >= args.de : true))
       .filter((m) => (args.ate !== undefined ? m.registradoEm <= args.ate : true))
       .sort((a, b) => b.registradoEm - a.registradoEm)
@@ -91,6 +96,12 @@ export const listar = query({
           // Agrupador do carregamento (venda/patrocínio multi-produto). Linhas
           // antigas/avulsas vêm null e seguem como comprovante de 1 item.
           carregamentoId: m.carregamentoId ?? null,
+          // Agrupador dos ajustes de uma mesma aprovação de contagem (tarefa 5).
+          // loteInferido=true → lote reconstruído por migração, sem contagemId
+          // (não linka pra contagem nenhuma — não dá pra provar o vínculo).
+          loteId: m.loteId ?? null,
+          loteInferido: m.loteInferido ?? false,
+          contagemId: m.contagemId ?? null,
           // Protocolo do comprovante: 8 chars da chave de idempotência (UUID do
           // cliente), nunca o _id interno (RNF13). Num carregamento, o front usa
           // os 8 chars do carregamentoId para todas as linhas do grupo.

@@ -75,3 +75,43 @@ export const migrarMotivoAjusteLegado = internalMutation({
     return { dryRun, totalSemMotivo: semMotivo.length };
   },
 });
+
+// Tarefa 5: ajustes de contagem gravados antes do campo `loteId` existir saem
+// soltos no Histórico — os 15 ajustes de uma mesma aprovação aparecem como 15
+// linhas sem vínculo entre si. Agrupa por heurística: mesmo segundo + mesmo
+// autor (clerkId, sempre admin — ajuste só nasce assim) + mesma câmara. NÃO
+// atribui contagemId (não dá pra provar qual contagem gerou cada lote antigo);
+// loteInferido:true marca esses lotes reconstruídos para o Histórico rotular
+// como "Ajuste em lote (agrupamento inferido)", sem link para nenhuma contagem.
+export const migrarLoteAjusteLegado = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const dryRun = args.dryRun ?? true;
+
+    const ajustes = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_tipo", (q) => q.eq("tipo", "ajuste"))
+      .collect();
+    const semLote = ajustes.filter((m) => m.loteId === undefined);
+
+    const grupos = new Map<string, typeof semLote>();
+    for (const m of semLote) {
+      const segundo = Math.floor(m.registradoEm / 1000);
+      const chave = `${segundo}:${m.clerkId ?? "—"}:${m.camaraId}`;
+      const grupo = grupos.get(chave) ?? [];
+      grupo.push(m);
+      grupos.set(chave, grupo);
+    }
+
+    if (!dryRun) {
+      for (const grupo of grupos.values()) {
+        const loteId = crypto.randomUUID();
+        for (const m of grupo) {
+          await ctx.db.patch(m._id, { loteId, loteInferido: true });
+        }
+      }
+    }
+
+    return { dryRun, totalSemLote: semLote.length, lotesReconstruidos: grupos.size };
+  },
+});

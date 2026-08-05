@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -30,7 +31,16 @@ type Vista =
 export function ContagensPage() {
   const pendentes = useQuery(api.admin.contagens.pendentes);
   const emAndamento = useQuery(api.admin.contagens.emAndamento);
-  const [vista, setVista] = useState<Vista>({ tela: "lista" });
+  const historico = useQuery(api.admin.contagens.historico);
+  // "Ver contagem" no grupo de ajustes do Histórico abre /contagens?ver=<id>
+  // direto no detalhe (tarefa 5) — mesmo padrão de pré-carga por URL que o
+  // Histórico já usa para período.
+  const [params] = useSearchParams();
+  const [vista, setVista] = useState<Vista>(() => {
+    const ver = params.get("ver");
+    return ver ? { tela: "detalhe", id: ver as Id<"contagens"> } : { tela: "lista" };
+  });
+  const [aba, setAba] = useState<"pendentes" | "historico">("pendentes");
   const voltar = () => setVista({ tela: "lista" });
 
   if (vista.tela === "detalhe") {
@@ -63,25 +73,70 @@ export function ContagensPage() {
         </section>
       ) : null}
 
-      <h2 className="mb-2 text-sm font-semibold text-texto">Aguardando decisão</h2>
-      <Tabela colunas={["Câmara", "Aberta por", "Fechada em", { rotulo: "Ação", dir: true }]}>
-        {pendentes === undefined ? (
-          <LinhaMensagem colSpan={4}>Carregando…</LinhaMensagem>
-        ) : pendentes.length === 0 ? (
-          <LinhaMensagem colSpan={4}>Nenhuma contagem aguardando decisão.</LinhaMensagem>
-        ) : (
-          pendentes.map((c) => (
-            <LinhaTabela key={c._id}>
-              <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
-              <td className="px-3 py-2.5 text-texto-suave">{c.abertaPorNome}</td>
-              <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.fechadaEm)}</td>
-              <td className="px-3 py-2.5 text-right">
-                <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Conferir</Botao>
-              </td>
-            </LinhaTabela>
-          ))
-        )}
-      </Tabela>
+      <div className="mb-3 inline-flex rounded-lg border border-borda bg-superficie p-0.5">
+        {(["pendentes", "historico"] as const).map((a) => (
+          <button
+            key={a}
+            onClick={() => setAba(a)}
+            aria-pressed={aba === a}
+            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+              aba === a ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
+            }`}
+          >
+            {a === "pendentes" ? "Aguardando decisão" : "Histórico"}
+          </button>
+        ))}
+      </div>
+
+      {aba === "pendentes" ? (
+        <Tabela colunas={["Câmara", "Aberta por", "Fechada em", { rotulo: "Ação", dir: true }]}>
+          {pendentes === undefined ? (
+            <LinhaMensagem colSpan={4}>Carregando…</LinhaMensagem>
+          ) : pendentes.length === 0 ? (
+            <LinhaMensagem colSpan={4}>Nenhuma contagem aguardando decisão.</LinhaMensagem>
+          ) : (
+            pendentes.map((c) => (
+              <LinhaTabela key={c._id}>
+                <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
+                <td className="px-3 py-2.5 text-texto-suave">{c.abertaPorNome}</td>
+                <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.fechadaEm)}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Conferir</Botao>
+                </td>
+              </LinhaTabela>
+            ))
+          )}
+        </Tabela>
+      ) : (
+        <Tabela colunas={["Câmara", "Status", "Decidida por", "Quando", { rotulo: "Divergência", dir: true }, { rotulo: "Ação", dir: true }]}>
+          {historico === undefined ? (
+            <LinhaMensagem colSpan={6}>Carregando…</LinhaMensagem>
+          ) : historico.length === 0 ? (
+            <LinhaMensagem colSpan={6}>Nenhuma contagem decidida ainda.</LinhaMensagem>
+          ) : (
+            historico.map((c) => (
+              <LinhaTabela key={c._id}>
+                <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
+                <td className="px-3 py-2.5">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      c.status === "aprovada" ? "bg-entrada/10 text-entrada" : "bg-alerta/10 text-alerta"
+                    }`}
+                  >
+                    {c.status === "aprovada" ? "aprovada" : "rejeitada"}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 text-texto-suave">{c.decididaPorNome}</td>
+                <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.decididaEm)}</td>
+                <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(c.divergenciaTotalKg)}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Ver</Botao>
+                </td>
+              </LinhaTabela>
+            ))
+          )}
+        </Tabela>
+      )}
 
       {vista.tela === "nova" ? <NovaContagem onFechar={voltar} /> : null}
       {vista.tela === "retomar" ? <NovaContagem retomar={vista.retomar} onFechar={voltar} /> : null}
@@ -212,7 +267,19 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
         })}
       </Tabela>
 
-      {contagem.euAbri ? (
+      {contagem.status !== "pendente" ? (
+        <div className="mt-4 flex flex-col gap-3">
+          <Aviso tom="info">
+            {contagem.status === "aprovada" ? "Aprovada" : "Rejeitada"} em {dataHoraOuTraco(contagem.decididaEm)}.
+            {contagem.observacaoDecisao ? ` "${contagem.observacaoDecisao}"` : ""}
+          </Aviso>
+          {contagem.status === "aprovada" ? (
+            <Link to={`/historico?contagemId=${id}`} className="text-sm font-medium text-acento">
+              Ver ajustes gerados no Histórico →
+            </Link>
+          ) : null}
+        </div>
+      ) : contagem.euAbri ? (
         <div className="mt-4">
           <Aviso tom="info">
             Você abriu esta contagem, então não pode decidi-la. Peça a outro Admin para conferir e aprovar/rejeitar.

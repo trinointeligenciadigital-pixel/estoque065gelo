@@ -271,3 +271,134 @@ describe("Migração — migrarAutorLegado (tarefa 3)", () => {
     expect(relatorioDeNovo.totalSemAutor).toBe(0);
   });
 });
+
+describe("Tarefa 5 — agrupar ajustes de contagem por loteId", () => {
+  test("todos os ajustes de uma aprovação recebem o mesmo loteId e contagemId", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+    const formatoId2 = await adminA.mutation(api.admin.formatos.criar, {
+      produtoId,
+      nome: "Saco 5kg",
+      pesoKg: 5,
+      pesoVariavel: false,
+    });
+
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [
+        { produtoId, formatoId, saldoContado: 4 }, // sistema=0 → +4
+        { produtoId, formatoId: formatoId2, saldoContado: 2 }, // sistema=0 → +2
+      ],
+    });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId });
+
+    const ajustes = await t.run((ctx) =>
+      ctx.db.query("movimentacoes").withIndex("by_tipo", (q) => q.eq("tipo", "ajuste")).collect(),
+    );
+    expect(ajustes).toHaveLength(2);
+    expect(ajustes[0].loteId).toBeDefined();
+    expect(ajustes[0].loteId).toBe(ajustes[1].loteId);
+    expect(ajustes.every((a) => a.contagemId === contagemId)).toBe(true);
+    expect(ajustes.every((a) => a.loteInferido === undefined)).toBe(true);
+  });
+
+  test("admin.contagens.historico lista aprovadas/rejeitadas com divergência total em kg e quem decidiu", async () => {
+    const t = convexTest(schema, modules);
+    const adminA = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const adminB = await comoAdmin(t, "clerk_b", "Bianca Reis");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(adminA);
+
+    const { contagemId } = await adminA.mutation(api.admin.contagens.abrir, { camaraId });
+    await adminA.mutation(api.admin.contagens.fechar, {
+      contagemId,
+      itens: [{ produtoId, formatoId, saldoContado: 4 }], // +4 pacotes de 2kg = +8kg
+    });
+    await adminB.mutation(api.admin.contagens.aprovar, { contagemId, observacao: "confere" });
+
+    const historico = await adminA.query(api.admin.contagens.historico, {});
+    expect(historico).toHaveLength(1);
+    expect(historico[0].status).toBe("aprovada");
+    expect(historico[0].camaraNome).toBe("Câmara Saborizado");
+    expect(historico[0].decididaPorNome).toBe("Bianca Reis");
+    expect(historico[0].divergenciaTotalKg).toBe(8);
+  });
+});
+
+describe("Migração — migrarLoteAjusteLegado (tarefa 5)", () => {
+  test("agrupa ajustes legados por segundo+autor+câmara, sem atribuir contagemId", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t, "clerk_a", "Alisson Sousa");
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const outraCamaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Cubo" });
+
+    const agora = Date.now();
+    // Dois ajustes no MESMO segundo, mesmo autor, mesma câmara — devem virar 1 lote.
+    const ajuste1 = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "ajuste",
+        sinal: 1,
+        produtoId,
+        camaraId,
+        formatoId,
+        quantidade: 1,
+        pesoKg: 2,
+        registradoPorTipo: "admin",
+        clerkId: "clerk_a",
+        registradoEm: agora,
+      }),
+    );
+    const ajuste2 = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "ajuste",
+        sinal: -1,
+        produtoId,
+        camaraId,
+        formatoId,
+        quantidade: 1,
+        pesoKg: 2,
+        registradoPorTipo: "admin",
+        clerkId: "clerk_a",
+        registradoEm: agora + 1, // mesmo segundo, ms diferente
+      }),
+    );
+    // Câmara diferente, mesmo segundo/autor — NÃO deve entrar no mesmo lote.
+    const ajusteOutraCamara = await t.run((ctx) =>
+      ctx.db.insert("movimentacoes", {
+        chaveIdempotencia: crypto.randomUUID(),
+        tipo: "ajuste",
+        sinal: 1,
+        produtoId,
+        camaraId: outraCamaraId,
+        formatoId,
+        quantidade: 1,
+        pesoKg: 2,
+        registradoPorTipo: "admin",
+        clerkId: "clerk_a",
+        registradoEm: agora,
+      }),
+    );
+
+    const seco = await t.mutation(internal.migracoes.migrarLoteAjusteLegado, {});
+    expect(seco).toEqual({ dryRun: true, totalSemLote: 3, lotesReconstruidos: 2 });
+
+    await t.mutation(internal.migracoes.migrarLoteAjusteLegado, { dryRun: false });
+
+    const m1 = await t.run((ctx) => ctx.db.get(ajuste1));
+    const m2 = await t.run((ctx) => ctx.db.get(ajuste2));
+    const m3 = await t.run((ctx) => ctx.db.get(ajusteOutraCamara));
+
+    expect(m1?.loteId).toBeDefined();
+    expect(m1?.loteId).toBe(m2?.loteId);
+    expect(m3?.loteId).not.toBe(m1?.loteId);
+    expect(m1?.loteInferido).toBe(true);
+    expect(m1?.contagemId).toBeUndefined(); // não dá pra provar o vínculo — não inventa
+
+    const deNovo = await t.mutation(internal.migracoes.migrarLoteAjusteLegado, { dryRun: false });
+    expect(deNovo.totalSemLote).toBe(0);
+  });
+});

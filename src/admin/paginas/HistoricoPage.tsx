@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Check, MessageCircle } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Check, ChevronRight, MessageCircle } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -37,6 +37,63 @@ const rotuloMotivoAjuste: Record<string, string> = {
   outro: "Outro",
 };
 
+// Uma linha do resultado de `historico.listar`.
+type MovRow = {
+  _id: Id<"movimentacoes">;
+  tipo: Tipo;
+  sinal: 1 | -1;
+  produtoNome: string;
+  formatoNome: string;
+  formatoPesoVariavel: boolean;
+  camaraNome: string;
+  quantidade: number;
+  pesoKg: number;
+  clienteNome: string | null;
+  veiculo: string | null;
+  motorista: string | null;
+  motivoPerda: "derreteu" | "danificado" | "descarte" | "outro" | null;
+  observacao: string | null;
+  motivoCategoria:
+    | "contagem"
+    | "quebra"
+    | "derretimento"
+    | "erro_lancamento"
+    | "outro"
+    | "nao_informado"
+    | null;
+  motivoTexto: string | null;
+  autor: string;
+  autorTipo: "operador" | "admin";
+  registradoEm: number;
+  carregamentoId: string | null;
+  loteId: string | null;
+  loteInferido: boolean;
+  contagemId: Id<"contagens"> | null;
+  protocolo: string;
+};
+
+type LinhaAgrupada =
+  | { tipo: "individual"; mov: MovRow }
+  | { tipo: "grupo"; loteId: string; itens: MovRow[] };
+
+// Colapsa linhas com o mesmo loteId (ajustes de uma mesma aprovação de
+// contagem) numa entrada de grupo; o resto segue individual. Preserva a
+// ordem de chegada (movs já vem ordenado por data, mais recente primeiro).
+function agruparPorLote(movs: MovRow[]): LinhaAgrupada[] {
+  const vistos = new Set<string>();
+  const resultado: LinhaAgrupada[] = [];
+  for (const m of movs) {
+    if (m.loteId === null) {
+      resultado.push({ tipo: "individual", mov: m });
+      continue;
+    }
+    if (vistos.has(m.loteId)) continue;
+    vistos.add(m.loteId);
+    resultado.push({ tipo: "grupo", loteId: m.loteId, itens: movs.filter((x) => x.loteId === m.loteId) });
+  }
+  return resultado;
+}
+
 // Converte "AAAA-MM-DD" (input date) em ms; fim inclui o dia inteiro.
 function inicioDoDia(s: string): number | undefined {
   return s ? new Date(`${s}T00:00:00`).getTime() : undefined;
@@ -48,8 +105,10 @@ function fimDoDia(s: string): number | undefined {
 export function HistoricoPage() {
   const opcoes = useQuery(api.admin.historico.opcoesFiltro);
 
-  // Pré-carrega o período pela URL (ex.: clique num dia do gráfico do Painel abre
-  // /historico?de=AAAA-MM-DD&ate=AAAA-MM-DD). Depois vira estado interno normal.
+  // Pré-carrega o período (ou a contagem) pela URL — ex.: clique num dia do
+  // gráfico do Painel abre /historico?de=AAAA-MM-DD&ate=AAAA-MM-DD, e "Ver
+  // ajustes gerados" em Contagens abre /historico?contagemId=<id>. Depois vira
+  // estado interno normal.
   const [params] = useSearchParams();
 
   const [camaraId, setCamaraId] = useState<Id<"camaras"> | "">("");
@@ -59,6 +118,7 @@ export function HistoricoPage() {
   const [autorClerkId, setAutorClerkId] = useState<string>("");
   const [de, setDe] = useState(() => params.get("de") ?? "");
   const [ate, setAte] = useState(() => params.get("ate") ?? "");
+  const [contagemId] = useState<Id<"contagens"> | "">(() => (params.get("contagemId") as Id<"contagens">) || "");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
 
   const movs = useQuery(api.admin.historico.listar, {
@@ -67,9 +127,18 @@ export function HistoricoPage() {
     tipo: tipo || undefined,
     operadorId: operadorId || undefined,
     autorClerkId: autorClerkId || undefined,
+    contagemId: contagemId || undefined,
     de: inicioDoDia(de),
     ate: fimDoDia(ate),
   });
+
+  // Com produto ou contagem específicos já filtrados, mostrar as linhas
+  // individuais (o Admin está procurando algo pontual). Sem esses filtros,
+  // ajustes da mesma aprovação de contagem colapsam numa linha-resumo.
+  const semAgrupar = produtoId !== "" || contagemId !== "";
+  const linhas: LinhaAgrupada[] = semAgrupar
+    ? (movs ?? []).map((mov) => ({ tipo: "individual" as const, mov }))
+    : agruparPorLote(movs ?? []);
 
   // Produtos filtrados pela câmara escolhida (se houver).
   const produtos = (opcoes?.produtos ?? []).filter((p) => !camaraId || p.camaraId === camaraId);
@@ -200,58 +269,134 @@ export function HistoricoPage() {
         ) : movs.length === 0 ? (
           <LinhaMensagem colSpan={9}>Nenhuma movimentação com esses filtros.</LinhaMensagem>
         ) : (
-          movs.map((m) => (
-            <LinhaTabela key={m._id}>
-              <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(m.registradoEm)}</td>
-              <td className="px-3 py-2.5">
-                <span className={m.sinal > 0 ? "text-entrada" : "text-saida"}>
-                  {m.sinal > 0 ? "+" : "−"} {rotuloTipo[m.tipo] ?? m.tipo}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {m.formatoNome}</span></td>
-              <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">
-                {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
-              </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
-              <td className="px-3 py-2.5 text-texto-suave">
-                {m.tipo === "ajuste" ? (
-                  m.motivoCategoria === null || m.motivoCategoria === "nao_informado" ? (
-                    <span className="text-texto-fraco italic">— anterior à exigência de motivo</span>
-                  ) : (
-                    <>
-                      {rotuloMotivoAjuste[m.motivoCategoria] ?? m.motivoCategoria}
-                      {m.motivoCategoria === "outro" && m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
-                    </>
-                  )
-                ) : (
-                  <>
-                    {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
-                    {m.observacao ? ` · ${m.observacao}` : ""}
-                  </>
-                )}
-              </td>
-              <td className="px-3 py-2.5 text-texto-suave">
-                {m.autor}{" "}
-                <span className="rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
-                  {m.autorTipo === "admin" ? "Admin" : "Colaborador"}
-                </span>
-              </td>
-              <td className="px-3 py-2.5 text-right">
-                {m.tipo === "venda" || m.tipo === "patrocinio" ? (
-                  <Botao variante="neutro" onClick={() => setComprovante(montarComprovante(m))}>
-                    Comprovante
-                  </Botao>
-                ) : null}
-              </td>
-            </LinhaTabela>
-          ))
+          linhas.map((l) =>
+            l.tipo === "individual" ? (
+              <LinhaMov key={l.mov._id} m={l.mov} onComprovante={() => setComprovante(montarComprovante(l.mov))} />
+            ) : (
+              <LinhaGrupo
+                key={l.loteId}
+                itens={l.itens}
+                onComprovante={(m) => setComprovante(montarComprovante(m))}
+              />
+            ),
+          )
         )}
       </Tabela>
 
       {comprovante ? (
         <ComprovanteModal dados={comprovante} onFechar={() => setComprovante(null)} />
       ) : null}
+    </>
+  );
+}
+
+// Uma linha de movimentação — usada tanto solta quanto dentro de um grupo
+// expandido (`indentado` dá o recuo visual que mostra que ela pertence a um
+// lote).
+function LinhaMov({
+  m,
+  onComprovante,
+  indentado = false,
+}: {
+  m: MovRow;
+  onComprovante: () => void;
+  indentado?: boolean;
+}) {
+  return (
+    <LinhaTabela className={indentado ? "bg-superficie-fria/40" : ""}>
+      <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">
+        {indentado ? <span className="mr-1 text-texto-fraco">↳</span> : null}
+        {dataHora(m.registradoEm)}
+      </td>
+      <td className="px-3 py-2.5">
+        <span className={m.sinal > 0 ? "text-entrada" : "text-saida"}>
+          {m.sinal > 0 ? "+" : "−"} {rotuloTipo[m.tipo] ?? m.tipo}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {m.formatoNome}</span></td>
+      <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
+      <td className="px-3 py-2.5 text-right font-mono text-texto">
+        {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
+      </td>
+      <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
+      <td className="px-3 py-2.5 text-texto-suave">
+        {m.tipo === "ajuste" ? (
+          m.motivoCategoria === null || m.motivoCategoria === "nao_informado" ? (
+            <span className="text-texto-fraco italic">— anterior à exigência de motivo</span>
+          ) : (
+            <>
+              {rotuloMotivoAjuste[m.motivoCategoria] ?? m.motivoCategoria}
+              {m.motivoCategoria === "outro" && m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
+            </>
+          )
+        ) : (
+          <>
+            {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
+            {m.observacao ? ` · ${m.observacao}` : ""}
+          </>
+        )}
+      </td>
+      <td className="px-3 py-2.5 text-texto-suave">
+        {m.autor}{" "}
+        <span className="rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+          {m.autorTipo === "admin" ? "Admin" : "Colaborador"}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        {m.tipo === "venda" || m.tipo === "patrocinio" ? (
+          <Botao variante="neutro" onClick={onComprovante}>Comprovante</Botao>
+        ) : null}
+      </td>
+    </LinhaTabela>
+  );
+}
+
+// Linha-resumo de um lote de ajustes (tarefa 5): "Ajuste de contagem ·
+// Saborizado · 15 itens · −250,4 kg · Alisson Sousa", expansível. Lotes
+// reconstruídos por migração (loteInferido) não linkam para contagem nenhuma
+// — não dá pra provar qual contagem gerou aquele lote antigo.
+function LinhaGrupo({
+  itens,
+  onComprovante,
+}: {
+  itens: MovRow[];
+  onComprovante: (m: MovRow) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const primeiro = itens[0];
+  const pesoTotal = itens.reduce((acc, it) => acc + it.sinal * it.pesoKg, 0);
+  const rotulo = primeiro.loteInferido ? "Ajuste em lote (agrupamento inferido)" : "Ajuste de contagem";
+
+  return (
+    <>
+      <tr className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
+        <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(primeiro.registradoEm)}</td>
+        <td colSpan={6} className="px-3 py-2.5">
+          <button
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          >
+            <ChevronRight
+              size={14}
+              className={`shrink-0 text-texto-suave transition-transform ${aberto ? "rotate-90" : ""}`}
+              aria-hidden="true"
+            />
+            <span>
+              {rotulo} · {primeiro.camaraNome} · {itens.length} {itens.length === 1 ? "item" : "itens"} ·{" "}
+              <span className="font-mono font-medium">{formatarPeso(pesoTotal)}</span> · {primeiro.autor}
+            </span>
+          </button>
+        </td>
+        <td className="px-3 py-2.5 text-right" colSpan={2}>
+          {!primeiro.loteInferido && primeiro.contagemId ? (
+            <Link to={`/contagens?ver=${primeiro.contagemId}`} className="text-xs font-medium text-acento">
+              Ver contagem →
+            </Link>
+          ) : null}
+        </td>
+      </tr>
+      {aberto ? itens.map((m) => <LinhaMov key={m._id} m={m} onComprovante={() => onComprovante(m)} indentado />) : null}
     </>
   );
 }

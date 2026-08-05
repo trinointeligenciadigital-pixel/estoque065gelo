@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import { exigirAdmin } from "../lib/auth";
 import {
   contagemAtivaDaCamara,
@@ -184,6 +184,64 @@ export const cancelar = mutation({
       observacaoDecisao: observacao?.trim() || undefined,
     });
     return { ok: true };
+  },
+});
+
+// Peso equivalente da divergência de um item, na mesma conta que
+// gerarAjustesDaContagem usa pra gravar o ajuste — mas só pra EXIBIR aqui;
+// nunca grava nada (o ajuste real, se houver, já está no ledger).
+function pesoDivergencia(divergencia: number, formato: Doc<"formatos">): number {
+  return formato.pesoVariavel ? divergencia : divergencia * formato.pesoKg;
+}
+
+// Contagens já decididas (aprovada/rejeitada), para a aba Histórico (tarefa 5).
+// Mostra a divergência total em PESO (kg) — nunca soma quantidade de formatos
+// diferentes (regra arquitetural 6) — e quem decidiu, para auditoria.
+export const historico = query({
+  args: {},
+  handler: async (ctx) => {
+    await exigirAdmin(ctx);
+
+    const [aprovadas, rejeitadas] = await Promise.all([
+      ctx.db.query("contagens").withIndex("by_status", (q) => q.eq("status", "aprovada")).collect(),
+      ctx.db.query("contagens").withIndex("by_status", (q) => q.eq("status", "rejeitada")).collect(),
+    ]);
+    const todas = [...aprovadas, ...rejeitadas].sort(
+      (a, b) => (b.decididaEm ?? 0) - (a.decididaEm ?? 0),
+    );
+
+    return await Promise.all(
+      todas.map(async (c) => {
+        const camara = await ctx.db.get(c.camaraId);
+        const decidiu = c.decididaPorClerkId
+          ? await ctx.db
+              .query("usuarios")
+              .withIndex("by_clerk_id", (q) => q.eq("clerkId", c.decididaPorClerkId!))
+              .first()
+          : null;
+
+        const itens = await ctx.db
+          .query("contagemItens")
+          .withIndex("by_contagem", (q) => q.eq("contagemId", c._id))
+          .collect();
+        let divergenciaTotalKg = 0;
+        for (const it of itens) {
+          if (it.divergencia === 0) continue;
+          const formato = await ctx.db.get(it.formatoId);
+          if (formato === null) continue;
+          divergenciaTotalKg += pesoDivergencia(it.divergencia, formato);
+        }
+
+        return {
+          _id: c._id,
+          status: c.status as "aprovada" | "rejeitada",
+          camaraNome: camara?.nome ?? "—",
+          decididaPorNome: decidiu?.nome ?? "—",
+          decididaEm: c.decididaEm ?? null,
+          divergenciaTotalKg,
+        };
+      }),
+    );
   },
 });
 

@@ -160,6 +160,13 @@ export default defineSchema({
     carregamentoId: v.optional(v.string()), // agrupa as linhas de uma mesma saída
     // (venda/patrocínio) num carregamento. UUID do cliente. NÃO é agregação: cada
     // produto+formato segue sendo uma linha; o carregamento só as vincula.
+    // Agrupa os ajustes de uma mesma aprovação de contagem (ou, fora de contagem,
+    // qualquer operação que grave vários lançamentos juntos). Todo ajuste gerado
+    // por gerarAjustesDaContagem ganha o mesmo loteId. `loteInferido: true` marca
+    // lotes reconstruídos por migração (heurística por segundo+autor+câmara, sem
+    // contagemId — não dá pra provar o vínculo de um lote legado).
+    loteId: v.optional(v.string()),
+    loteInferido: v.optional(v.boolean()),
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -178,6 +185,8 @@ export default defineSchema({
     .index("by_tipo", ["tipo"])
     .index("by_patrocinio_origem", ["patrocinioOrigemId"])
     .index("by_carregamento", ["carregamentoId"])
+    .index("by_contagem", ["contagemId"])
+    .index("by_lote", ["loteId"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------

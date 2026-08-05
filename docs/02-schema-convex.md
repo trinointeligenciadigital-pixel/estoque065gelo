@@ -180,6 +180,10 @@ export default defineSchema({
                                                            // num carregamento. Vínculo, não
                                                            // agregação — cada produto+formato
                                                            // segue sendo uma linha do ledger.
+    loteId: v.optional(v.string()),                        // agrupa os ajustes de uma
+    loteInferido: v.optional(v.boolean()),                 // mesma aprovação de contagem
+                                                           // (loteInferido=true nos lotes
+                                                           // reconstruídos por migração)
 
     // Autoria
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
@@ -198,6 +202,8 @@ export default defineSchema({
     .index("by_tipo", ["tipo"])
     .index("by_patrocinio_origem", ["patrocinioOrigemId"])
     .index("by_carregamento", ["carregamentoId"])
+    .index("by_contagem", ["contagemId"])
+    .index("by_lote", ["loteId"])
     .index("by_registrado_em", ["registradoEm"]),
 
   // ---------------------------------------------------------------

@@ -98,6 +98,12 @@ export async function gerarAjustesDaContagem(
     .withIndex("by_contagem", (q) => q.eq("contagemId", contagem._id))
     .collect();
 
+  // Um loteId por aprovação — agrupa todos os ajustes desta contagem no
+  // Histórico (tarefa 5). Só é gerado uma vez aqui porque `aprovar` já garante
+  // que uma contagem só passa por esta função uma única vez (exigirDecidivel
+  // exige status "pendente", que vira "aprovada" na mesma chamada).
+  const loteId = crypto.randomUUID();
+
   let gerados = 0;
   for (const it of itens) {
     if (it.divergencia === 0) continue;
@@ -121,6 +127,7 @@ export async function gerarAjustesDaContagem(
       quantidade,
       pesoKg,
       contagemId: contagem._id,
+      loteId,
       motivoCategoria: "contagem",
       registradoPorTipo: "admin",
       clerkId,
