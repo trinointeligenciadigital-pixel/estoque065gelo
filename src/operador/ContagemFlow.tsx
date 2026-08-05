@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
-import { AvisoOperador, BotaoGrande, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, primeiroNome, Tela } from "./ui.tsx";
 
 /*
   Contagem física do colaborador (RF46–RF50). ÀS CEGAS: a tela nunca mostra o saldo
@@ -14,12 +14,15 @@ import { AvisoOperador, BotaoGrande, Tela } from "./ui.tsx";
 export function ContagemFlow({
   token,
   camaraNome,
+  operadorNome,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   onVoltar: () => void;
 }) {
+  const nome = primeiroNome(operadorNome);
   const estado = useQuery(api.operador.contagem.estado, { token });
   const abrir = useMutation(api.operador.contagem.abrir);
 
@@ -42,12 +45,20 @@ export function ContagemFlow({
 
   // Já contando (retomando uma contagem aberta por mim, ou recém-aberta agora).
   if (contagemId) {
-    return <Preenchimento token={token} camaraNome={camaraNome} contagemId={contagemId} onVoltar={onVoltar} />;
+    return (
+      <Preenchimento
+        token={token}
+        camaraNome={camaraNome}
+        operadorNome={operadorNome}
+        contagemId={contagemId}
+        onVoltar={onVoltar}
+      />
+    );
   }
 
   if (estado === undefined) {
     return (
-      <Tela titulo="Contagem" camaraNome={camaraNome} onVoltar={onVoltar}>
+      <Tela titulo="Contagem" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
         <p className="text-base text-texto-suave">Carregando…</p>
       </Tela>
     );
@@ -55,13 +66,19 @@ export function ContagemFlow({
 
   if (estado.situacao === "minha" && estado.contagemId) {
     return (
-      <Preenchimento token={token} camaraNome={camaraNome} contagemId={estado.contagemId} onVoltar={onVoltar} />
+      <Preenchimento
+        token={token}
+        camaraNome={camaraNome}
+        operadorNome={operadorNome}
+        contagemId={estado.contagemId}
+        onVoltar={onVoltar}
+      />
     );
   }
 
   if (estado.situacao === "pendente") {
     return (
-      <Tela titulo="Contagem" camaraNome={camaraNome} onVoltar={onVoltar}>
+      <Tela titulo="Contagem" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
         <AvisoOperador>Já existe uma contagem desta câmara aguardando o Admin. Fale com ele.</AvisoOperador>
       </Tela>
     );
@@ -69,7 +86,7 @@ export function ContagemFlow({
 
   if (estado.situacao === "de_outro") {
     return (
-      <Tela titulo="Contagem" camaraNome={camaraNome} onVoltar={onVoltar}>
+      <Tela titulo="Contagem" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
         <AvisoOperador>Outra pessoa já está contando esta câmara agora.</AvisoOperador>
       </Tela>
     );
@@ -80,6 +97,7 @@ export function ContagemFlow({
     <Tela
       titulo="Contagem"
       camaraNome={camaraNome}
+      operadorNome={nome}
       onVoltar={onVoltar}
       rodape={
         <BotaoGrande onClick={iniciar} disabled={abrindo}>
@@ -99,14 +117,17 @@ export function ContagemFlow({
 function Preenchimento({
   token,
   camaraNome,
+  operadorNome,
   contagemId,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   contagemId: Id<"contagens">;
   onVoltar: () => void;
 }) {
+  const nome = primeiroNome(operadorNome);
   const grid = useQuery(api.operador.consulta.gridProdutos, { token });
   const fechar = useMutation(api.operador.contagem.fechar);
 
@@ -161,7 +182,7 @@ function Preenchimento({
 
   if (sucesso) {
     return (
-      <Tela titulo="Contagem enviada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
+      <Tela titulo="Contagem enviada" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">Contagem enviada para o Admin conferir. Obrigado!</AvisoOperador>
         <div className="mt-6">
           <BotaoGrande variante="neutro" onClick={onVoltar}>Voltar ao menu</BotaoGrande>
@@ -174,6 +195,7 @@ function Preenchimento({
     <Tela
       titulo="Contagem — o que há na câmara"
       camaraNome={camaraNome}
+      operadorNome={nome}
       onVoltar={onVoltar}
       rodape={
         <BotaoGrande onClick={confirmar} disabled={enviando || grid === undefined}>

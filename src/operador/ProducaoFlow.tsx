@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer } from "./desfazer.tsx";
@@ -20,12 +20,18 @@ type Passo = "produto" | "formato" | "quantidade" | "revisar" | "sucesso";
 export function ProducaoFlow({
   token,
   camaraNome,
+  operadorNome,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   onVoltar: () => void;
 }) {
+  // Primeiro nome sempre visível no cabeçalho (tarefa 6) — é o que faz a
+  // pessoa perceber que está lançando na conta de outro, se o celular ficou
+  // esquecido logado.
+  const nome = primeiroNome(operadorNome);
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
   const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarProducao);
@@ -128,7 +134,7 @@ export function ProducaoFlow({
 
   if (passo === "sucesso") {
     return (
-      <Tela titulo="Produção lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
+      <Tela titulo="Produção lançada" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
         {produto && formato && !desfeito ? (
           <div className="mt-4">
@@ -166,7 +172,7 @@ export function ProducaoFlow({
 
   if (passo === "produto") {
     return (
-      <Tela titulo="Produção — produto" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={4}>
+      <Tela titulo="Produção — produto" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar} etapa={1} totalEtapas={4}>
         <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
       </Tela>
     );
@@ -174,7 +180,7 @@ export function ProducaoFlow({
 
   if (passo === "formato" && produto) {
     return (
-      <Tela titulo="Produção — formato" camaraNome={produto.nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={4}>
+      <Tela titulo="Produção — formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={4}>
         <ListaFormatos produto={produto} onEscolher={escolherFormato} />
       </Tela>
     );
@@ -186,6 +192,7 @@ export function ProducaoFlow({
       <Tela
         titulo="Produção — quantidade"
         camaraNome={`${produto.nome} · ${formato.nome}`}
+        operadorNome={nome}
         onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
         etapa={pulouFormato ? 2 : 3}
         totalEtapas={totalEtapas}
@@ -216,6 +223,7 @@ export function ProducaoFlow({
       <Tela
         titulo="Produção — confira"
         camaraNome={camaraNome}
+        operadorNome={nome}
         // Sem voltar enquanto envia (tarefa 5) — evita sair no meio de um
         // envio em curso.
         onVoltar={enviando ? undefined : () => setPasso("quantidade")}

@@ -2,6 +2,7 @@ import { ConvexError } from "convex/values";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { movimentacaoExistente } from "./idempotencia";
+import { dataHoraCuiaba } from "./data";
 
 /*
   Estorno — mecânica compartilhada entre o Admin (convex/admin/estorno.ts,
@@ -17,16 +18,6 @@ import { movimentacaoExistente } from "./idempotencia";
   by_estorno_de — a mesma filosofia da regra 1 (nunca cachear o que dá pra
   derivar em leitura).
 */
-
-const CUIABA_OFFSET_MS = -4 * 60 * 60 * 1000; // UTC−4, sem horário de verão (RNF15)
-function dataHoraCuiaba(ms: number): string {
-  const d = new Date(ms + CUIABA_OFFSET_MS);
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const hh = String(d.getUTCHours()).padStart(2, "0");
-  const min = String(d.getUTCMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${d.getUTCFullYear()} ${hh}:${min}`;
-}
 
 // Motivo pelo qual este lançamento NÃO pode ser estornado agora, ou null se
 // puder. Usado tanto pela preview do Admin (mostra o bloqueio antes de

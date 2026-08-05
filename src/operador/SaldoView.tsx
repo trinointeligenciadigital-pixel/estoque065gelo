@@ -1,6 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { AvisoOperador, Kg, Tela } from "./ui.tsx";
+import { AvisoOperador, Kg, primeiroNome, Tela } from "./ui.tsx";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 
 /*
@@ -14,16 +14,18 @@ import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 export function SaldoView({
   token,
   camaraNome,
+  operadorNome,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   onVoltar: () => void;
 }) {
   const saldos = useQuery(api.operador.consulta.saldos, { token });
 
   return (
-    <Tela titulo="Saldo da câmara" camaraNome={camaraNome} onVoltar={onVoltar}>
+    <Tela titulo="Saldo da câmara" camaraNome={camaraNome} operadorNome={primeiroNome(operadorNome)} onVoltar={onVoltar}>
       {saldos === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
       ) : saldos === null ? (

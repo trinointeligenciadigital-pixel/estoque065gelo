@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
@@ -36,13 +36,14 @@ export function SaidaFlow({
   onVoltar: () => void;
 }) {
   const [modo, setModo] = useState<Tipo | "retorno" | null>(null);
+  const nome = primeiroNome(operadorNome);
 
   if (modo === "retorno") {
-    return <RetornoFlow token={token} camaraNome={camaraNome} onVoltar={() => setModo(null)} />;
+    return <RetornoFlow token={token} camaraNome={camaraNome} operadorNome={operadorNome} onVoltar={() => setModo(null)} />;
   }
   if (modo === null) {
     return (
-      <Tela titulo="Saída / retorno" camaraNome={camaraNome} onVoltar={onVoltar}>
+      <Tela titulo="Saída / retorno" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
         <div className="flex flex-col gap-3">
           <OpcaoGrande titulo="Venda" onClick={() => setModo("venda")} />
           <OpcaoGrande titulo="Patrocínio" onClick={() => setModo("patrocinio")} />
@@ -54,7 +55,9 @@ export function SaidaFlow({
   }
 
   if (modo === "perda") {
-    return <SaidaPerda token={token} camaraNome={camaraNome} onVoltar={() => setModo(null)} />;
+    return (
+      <SaidaPerda token={token} camaraNome={camaraNome} operadorNome={operadorNome} onVoltar={() => setModo(null)} />
+    );
   }
 
   return (
@@ -101,6 +104,7 @@ function SaidaCarregamento({
   operadorNome: string;
   onVoltar: () => void;
 }) {
+  const nome = primeiroNome(operadorNome);
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
   const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const veiculos = useQuery(api.operador.consulta.veiculos, { token });
@@ -293,7 +297,7 @@ function SaidaCarregamento({
     };
 
     return (
-      <Tela titulo={`${rotulo} lançada`} camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
+      <Tela titulo={`${rotulo} lançada`} camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">
           Registrado com sucesso · {itens.length} {itens.length === 1 ? "produto" : "produtos"}.
         </AvisoOperador>
@@ -313,6 +317,7 @@ function SaidaCarregamento({
       <Tela
         titulo={`Descartar ${rotulo.toLowerCase()}?`}
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={() => setPasso("itens")}
         rodape={
           <div className="flex flex-col gap-3">
@@ -339,6 +344,7 @@ function SaidaCarregamento({
       <Tela
         titulo={`${rotulo} — carregamento`}
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={tentarSair}
         rodape={
           <BotaoGrande variante="saida" onClick={() => setPasso("contexto")} disabled={itens.length === 0}>
@@ -381,6 +387,7 @@ function SaidaCarregamento({
       <Tela
         titulo={`${rotulo} — produto`}
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
       >
         <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProdutoNoCarrinho} />
@@ -391,7 +398,7 @@ function SaidaCarregamento({
   // -------- Adicionar item: formato --------
   if (passo === "formato" && produto) {
     return (
-      <Tela titulo={`${rotulo} — formato`} camaraNome={produto.nome} onVoltar={() => setPasso("produto")}>
+      <Tela titulo={`${rotulo} — formato`} camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")}>
         <ListaFormatos
           produto={produto}
           onEscolher={(f) => { setFormato(f); setValor(""); setPasso("quantidade"); }}
@@ -431,6 +438,7 @@ function SaidaCarregamento({
       <Tela
         titulo={editando ? `${rotulo} — editar item` : `${rotulo} — quantidade`}
         camaraNome={`${produto.nome} · ${formato.nome}`}
+        operadorNome={nome}
         onVoltar={
           editando
             ? () => { limparRascunho(); setPasso("itens"); }
@@ -479,6 +487,7 @@ function SaidaCarregamento({
       <Tela
         titulo={`${rotulo} — detalhes`}
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={() => setPasso("itens")}
         etapa={1}
         totalEtapas={2}
@@ -538,6 +547,7 @@ function SaidaCarregamento({
       <Tela
         titulo={`${rotulo} — confira`}
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={enviando ? undefined : () => setPasso("contexto")}
         etapa={2}
         totalEtapas={2}
@@ -602,12 +612,15 @@ type PassoPerda = "produto" | "formato" | "quantidade" | "contexto" | "revisar" 
 function SaidaPerda({
   token,
   camaraNome,
+  operadorNome,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   onVoltar: () => void;
 }) {
+  const nome = primeiroNome(operadorNome);
   const produtos = useQuery(api.operador.consulta.gridProdutos, { token });
   const frequentes = useQuery(api.operador.consulta.produtosFrequentes, { token });
   const saldos = useQuery(api.operador.consulta.saldos, { token });
@@ -720,7 +733,7 @@ function SaidaPerda({
   if (passo === "sucesso") {
     const pesoKg = produto && formato ? kgDe(formato, num, num) : 0;
     return (
-      <Tela titulo="Perda lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
+      <Tela titulo="Perda lançada" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">{desfeito ? "Lançamento desfeito." : "Registrado com sucesso."}</AvisoOperador>
         {produto && formato && !desfeito ? (
           <div className="mt-4">
@@ -759,7 +772,7 @@ function SaidaPerda({
 
   if (passo === "produto") {
     return (
-      <Tela titulo="Perda — produto" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={5}>
+      <Tela titulo="Perda — produto" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar} etapa={1} totalEtapas={5}>
         <ListaProdutos produtos={produtos} frequentesIds={frequentes} onEscolher={escolherProduto} />
       </Tela>
     );
@@ -767,7 +780,7 @@ function SaidaPerda({
 
   if (passo === "formato" && produto) {
     return (
-      <Tela titulo="Perda — formato" camaraNome={produto.nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={5}>
+      <Tela titulo="Perda — formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")} etapa={2} totalEtapas={5}>
         <ListaFormatos produto={produto} onEscolher={escolherFormato} />
       </Tela>
     );
@@ -786,6 +799,7 @@ function SaidaPerda({
       <Tela
         titulo="Perda — quantidade"
         camaraNome={`${produto.nome} · ${formato.nome}`}
+        operadorNome={nome}
         onVoltar={() => setPasso(pulouFormato ? "produto" : "formato")}
         etapa={pulouFormato ? 2 : 3}
         totalEtapas={totalEtapasPerda}
@@ -821,6 +835,7 @@ function SaidaPerda({
       <Tela
         titulo="Perda — detalhes"
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={() => setPasso("quantidade")}
         etapa={pulouFormato ? 3 : 4}
         totalEtapas={totalEtapasPerda}
@@ -869,6 +884,7 @@ function SaidaPerda({
       <Tela
         titulo="Perda — confira"
         camaraNome={camaraNome}
+        operadorNome={nome}
         onVoltar={enviando ? undefined : () => setPasso("contexto")}
         etapa={pulouFormato ? 4 : 5}
         totalEtapas={totalEtapasPerda}

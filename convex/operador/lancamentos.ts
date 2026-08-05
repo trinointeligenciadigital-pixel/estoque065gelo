@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { exigirSessaoOperador, exigirPermissao, exigirCamaraDoProduto } from "../lib/auth";
+import { exigirSessaoOperadorMutavel, exigirPermissao, exigirCamaraDoProduto } from "../lib/auth";
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
@@ -57,7 +57,7 @@ export const lancarProducao = mutation({
     pesoKgVariavel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, args.token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, args.token);
     exigirPermissao(operador, "producao");
     await exigirCamaraDoProduto(ctx, args.produtoId, camara._id);
     const formato = await formatoDoProduto(ctx, args.formatoId, args.produtoId);
@@ -106,7 +106,7 @@ export const lancarSaida = mutation({
     observacao: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, args.token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, args.token);
     exigirPermissao(operador, "saida");
     await exigirCamaraDoProduto(ctx, args.produtoId, camara._id);
     const formato = await formatoDoProduto(ctx, args.formatoId, args.produtoId);
@@ -192,7 +192,7 @@ export const lancarSaidaMultipla = mutation({
     motorista: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, args.token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, args.token);
     exigirPermissao(operador, "saida");
 
     if (args.itens.length === 0) throw new ConvexError("Adicione ao menos um produto.");
@@ -271,7 +271,7 @@ export const lancarRetorno = mutation({
     pesoKgVariavel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, args.token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, args.token);
     exigirPermissao(operador, "saida");
 
     const origem = await ctx.db.get(args.patrocinioOrigemId);

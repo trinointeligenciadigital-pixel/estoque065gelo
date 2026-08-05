@@ -5,7 +5,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { data } from "../lib/data.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
-import { AvisoOperador, BotaoGrande, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, primeiroNome, Tela } from "./ui.tsx";
 
 function formatarQtd(n: number, pesoVariavel: boolean): string {
   return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
@@ -33,12 +33,15 @@ type Patrocinio = {
 export function RetornoFlow({
   token,
   camaraNome,
+  operadorNome,
   onVoltar,
 }: {
   token: string;
   camaraNome: string;
+  operadorNome: string;
   onVoltar: () => void;
 }) {
+  const nome = primeiroNome(operadorNome);
   const abertos = useQuery(api.operador.consulta.patrociniosAbertos, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarRetorno);
 
@@ -80,7 +83,7 @@ export function RetornoFlow({
   if (sucesso) {
     const num = Number(valor);
     return (
-      <Tela titulo="Retorno lançado" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
+      <Tela titulo="Retorno lançado" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">
           Retorno registrado:{" "}
           <span className="font-mono">{formatarQtd(num, alvo?.formatoPesoVariavel ?? false)}</span>
@@ -100,6 +103,7 @@ export function RetornoFlow({
       <Tela
         titulo="Retorno — quantidade"
         camaraNome={`${alvo.produtoNome} · ${alvo.formatoNome}`}
+        operadorNome={nome}
         onVoltar={() => setAlvo(null)}
         etapa={2}
         totalEtapas={2}
@@ -137,7 +141,7 @@ export function RetornoFlow({
   }
 
   return (
-    <Tela titulo="Retorno de patrocínio" camaraNome={camaraNome} onVoltar={onVoltar} etapa={1} totalEtapas={2}>
+    <Tela titulo="Retorno de patrocínio" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar} etapa={1} totalEtapas={2}>
       {abertos === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
       ) : abertos.length === 0 ? (

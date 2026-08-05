@@ -6,6 +6,7 @@ import {
   pesoLiquidoDoFormato,
   pesoTotalDoProduto,
 } from "../lib/saldo";
+import { inicioDoDiaCuiaba } from "../lib/data";
 
 /*
   Painel do Admin (RF57–RF60). Regra crítica RF57: o saldo de cada produto agrega
@@ -17,15 +18,6 @@ import {
   alerta. O badge conta formatos abaixo do mínimo.
 */
 const DIA_MS = 24 * 60 * 60 * 1000;
-const CUIABA_OFFSET_MS = -4 * 60 * 60 * 1000; // UTC−4, sem horário de verão
-
-// Início do dia de HOJE no fuso de Cuiabá, em ms UTC (RNF15). O ledger guarda UTC;
-// "hoje" para o Admin é o dia de Cuiabá, não o do servidor.
-function inicioDoDiaCuiaba(agora: number): number {
-  const local = agora + CUIABA_OFFSET_MS;
-  const meiaNoiteLocal = local - (((local % DIA_MS) + DIA_MS) % DIA_MS);
-  return meiaNoiteLocal - CUIABA_OFFSET_MS;
-}
 
 /*
   Movimento por período (Fase 2/3 do Painel). LEITURA apenas — soma o ledger por

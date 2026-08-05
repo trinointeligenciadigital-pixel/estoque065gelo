@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import { exigirSessaoOperador, exigirPermissao } from "../lib/auth";
+import { exigirSessaoOperador, exigirSessaoOperadorMutavel, exigirPermissao } from "../lib/auth";
 import {
   contagemAtivaDaCamara,
   fecharContagemComItens,
@@ -59,7 +59,7 @@ export const contagemAbertaDoColaborador = query({
 export const abrir = mutation({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, token);
     exigirPermissao(operador, "contar");
 
     const ativa = await contagemAtivaDaCamara(ctx, camara._id);
@@ -99,7 +99,7 @@ export const fechar = mutation({
     ),
   },
   handler: async (ctx, { token, contagemId, itens }) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, token);
     exigirPermissao(operador, "contar");
 
     const contagem = await ctx.db.get(contagemId);

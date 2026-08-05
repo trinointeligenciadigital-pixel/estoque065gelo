@@ -1,14 +1,17 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { PinScreen } from "./PinScreen.tsx";
 import { SessaoOperador } from "./SessaoOperador.tsx";
 import { instalarVoltarHardware } from "./voltarHardware.ts";
+import { useOciosidade } from "./ociosidade.ts";
 
 /*
-  App do colaborador. A câmara vem do QR (:qrToken). A sessão (token de 12h) fica
-  no localStorage, presa a este QR. Enquanto não há sessão válida, mostra o PIN.
+  App do colaborador. A câmara vem do QR (:qrToken). A sessão fica no
+  localStorage, presa a este QR — expira por 20 min de inatividade ou na
+  virada do dia em Cuiabá, o que vier primeiro (sprint PWA, tarefa 6; era
+  12h fixas). Enquanto não há sessão válida, mostra o PIN.
 */
 export function OperadorApp() {
   const { qrToken } = useParams<{ qrToken: string }>();
@@ -17,6 +20,7 @@ export function OperadorApp() {
   const camara = useQuery(api.operador.acesso.resolverCamara, qrToken ? { qrToken } : "skip");
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(chaveLocal));
   const sessao = useQuery(api.operador.acesso.sessaoAtual, token ? { token } : "skip");
+  const sair = useMutation(api.operador.acesso.sair);
 
   // "Voltar" físico do celular navega dentro do app (um passo por vez), em vez de
   // sair do fluxo. Ativo enquanto o app do operador estiver montado.
@@ -39,6 +43,14 @@ export function OperadorApp() {
     localStorage.removeItem(chaveLocal);
     setToken(null);
   }
+
+  // Inatividade (tarefa 6): 20 min sem tocar a tela volta pro PIN. A garantia
+  // de verdade é no servidor (expiraEm já não aceitaria a próxima ação); isto
+  // só faz a UI perceber sozinha, sem esperar uma ação falhar.
+  useOciosidade(token !== null && sessao != null, () => {
+    if (token) void sair({ token }).catch(() => {});
+    aoSair();
+  });
 
   if (camara === undefined) {
     return <Centro>Carregando…</Centro>;

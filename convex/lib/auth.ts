@@ -1,6 +1,7 @@
 import { ConvexError } from "convex/values";
-import type { QueryCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { fimDoDiaCuiaba } from "./data";
 
 /*
   Autorização — o Convex NÃO tem RLS. Toda checagem de identidade e escopo vive
@@ -75,6 +76,29 @@ export async function exigirSessaoOperador(
   }
 
   return { sessao, operador, camara };
+}
+
+// Janela de inatividade da sessão do colaborador (sprint PWA, tarefa 6): 20
+// minutos sem uso, ou a virada do dia em Cuiabá — o que vier primeiro. Só
+// mutations chamam isto (queries não podem `patch`); é por isso que a sessão
+// só "anda pra frente" quando o colaborador de fato FAZ algo (lança, abre
+// contagem, sai), não só olhando uma tela. Na prática todo uso real do app
+// passa por uma mutation logo em seguida, então isso já cobre o caso real —
+// um celular parado numa tela sem ação nenhuma expira quando a expiração
+// original (do login ou da última ação) chegar.
+export const INATIVIDADE_MS = 20 * 60 * 1000;
+
+export async function exigirSessaoOperadorMutavel(
+  ctx: MutationCtx,
+  token: string,
+): Promise<SessaoOperador> {
+  const r = await exigirSessaoOperador(ctx, token);
+  const agora = Date.now();
+  const novoExpiraEm = Math.min(agora + INATIVIDADE_MS, fimDoDiaCuiaba(agora));
+  if (novoExpiraEm > r.sessao.expiraEm) {
+    await ctx.db.patch(r.sessao._id, { expiraEm: novoExpiraEm });
+  }
+  return r;
 }
 
 // -----------------------------------------------------------------------------

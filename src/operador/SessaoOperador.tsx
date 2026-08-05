@@ -47,7 +47,14 @@ export function SessaoOperador({
   }
 
   if (tela === "producao") {
-    return <ProducaoFlow token={token} camaraNome={sessao.camaraNome} onVoltar={() => setTela("menu")} />;
+    return (
+      <ProducaoFlow
+        token={token}
+        camaraNome={sessao.camaraNome}
+        operadorNome={sessao.operadorNome}
+        onVoltar={() => setTela("menu")}
+      />
+    );
   }
   if (tela === "saida") {
     return (
@@ -60,10 +67,24 @@ export function SessaoOperador({
     );
   }
   if (tela === "saldo") {
-    return <SaldoView token={token} camaraNome={sessao.camaraNome} onVoltar={() => setTela("menu")} />;
+    return (
+      <SaldoView
+        token={token}
+        camaraNome={sessao.camaraNome}
+        operadorNome={sessao.operadorNome}
+        onVoltar={() => setTela("menu")}
+      />
+    );
   }
   if (tela === "contagem") {
-    return <ContagemFlow token={token} camaraNome={sessao.camaraNome} onVoltar={() => setTela("menu")} />;
+    return (
+      <ContagemFlow
+        token={token}
+        camaraNome={sessao.camaraNome}
+        operadorNome={sessao.operadorNome}
+        onVoltar={() => setTela("menu")}
+      />
+    );
   }
 
   // Contagem cega (tarefa 1): "Ver saldo" some da home enquanto durar — não

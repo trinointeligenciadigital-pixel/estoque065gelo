@@ -508,3 +508,104 @@ describe("Tarefa 5 — desfazerMeuLancamento", () => {
     ).rejects.toThrow();
   });
 });
+
+describe("Tarefa 6 — sessão, PIN e identidade", () => {
+  test("a partir da 3ª tentativa a mensagem conta quantas faltam; 5ª bloqueia 1 min; 8ª bloqueia 15 min", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const camaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Saborizado" });
+    const operadorId = await admin.mutation(api.admin.operadores.criar, {
+      nome: "João",
+      camarasPermitidas: [camaraId],
+      podeLancarProducao: true,
+      podeLancarSaida: true,
+      podeContar: true,
+    });
+    const { pin } = await admin.mutation(api.admin.operadores.gerarPinOperador, { id: operadorId });
+    const camara = await t.run((ctx) => ctx.db.get(camaraId));
+    const pinErrado = pin === "000000" ? "111111" : "000000";
+
+    // 1ª e 2ª: mensagem genérica, sem contar tentativas.
+    const r1 = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado });
+    expect(r1.ok).toBe(false);
+    expect("mensagem" in r1 && r1.mensagem).not.toMatch(/tentativa/);
+    await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado });
+
+    // 3ª: "Mais 2 tentativas antes do bloqueio."
+    const r3 = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado });
+    expect("mensagem" in r3 && r3.mensagem).toContain("Mais 2 tentativas");
+
+    // 4ª: "Mais 1 tentativa" (singular).
+    const r4 = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado });
+    expect("mensagem" in r4 && r4.mensagem).toContain("Mais 1 tentativa antes");
+
+    // 5ª: bloqueia por 1 minuto.
+    const r5 = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado });
+    expect("mensagem" in r5 && r5.mensagem).toContain("Aguarde 1 minuto");
+    const camaraApos5 = await t.run((ctx) => ctx.db.get(camaraId));
+    expect(camaraApos5?.bloqueadoAte).toBeDefined();
+
+    // Simula o minuto passando (sem esperar de verdade) pra continuar até a 8ª.
+    await t.run((ctx) => ctx.db.patch(camaraId, { bloqueadoAte: Date.now() - 1000 }));
+    await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado }); // 6ª
+    await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado }); // 7ª
+    const r8 = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin: pinErrado }); // 8ª
+    expect("mensagem" in r8 && r8.mensagem).toContain("Aguarde 15 minutos");
+
+    // O PIN certo continua recusado durante o bloqueio de 15 min.
+    const certo = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin });
+    expect(certo.ok).toBe(false);
+  });
+
+  test("login cria sessão de ~20 minutos (não mais 12h fixas)", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const camaraId = await admin.mutation(api.admin.camaras.criar, { nome: "Câmara Saborizado" });
+    const operadorId = await admin.mutation(api.admin.operadores.criar, {
+      nome: "João",
+      camarasPermitidas: [camaraId],
+      podeLancarProducao: true,
+      podeLancarSaida: true,
+      podeContar: true,
+    });
+    const { pin } = await admin.mutation(api.admin.operadores.gerarPinOperador, { id: operadorId });
+    const camara = await t.run((ctx) => ctx.db.get(camaraId));
+
+    const antes = Date.now();
+    const login = await t.mutation(api.operador.acesso.entrar, { qrToken: camara!.qrToken, pin });
+    if (!login.ok) throw new Error("login falhou");
+
+    const sessao = await t.run((ctx) =>
+      ctx.db.query("sessoesOperador").withIndex("by_token", (q) => q.eq("token", login.token)).first(),
+    );
+    const duracaoMs = sessao!.expiraEm - antes;
+    expect(duracaoMs).toBeLessThanOrEqual(20 * 60 * 1000 + 2000); // folga p/ tempo de execução do teste
+    expect(duracaoMs).toBeGreaterThan(19 * 60 * 1000); // bem menor que as 12h de antes
+  });
+
+  test("uma mutation do colaborador estende a sessão (janela de inatividade desliza)", async () => {
+    const t = convexTest(schema, modules);
+    const admin = await comoAdmin(t);
+    const { camaraId, produtoId, formatoId } = await cadastroBase(admin);
+    const joao = await operadorLogado(t, admin, camaraId, "João");
+
+    // Simula a sessão prestes a expirar (2 min restantes).
+    const sessaoAntes = await t.run((ctx) =>
+      ctx.db.query("sessoesOperador").withIndex("by_token", (q) => q.eq("token", joao.token)).first(),
+    );
+    const expiraEmCurto = Date.now() + 2 * 60 * 1000;
+    await t.run((ctx) => ctx.db.patch(sessaoAntes!._id, { expiraEm: expiraEmCurto }));
+
+    // Uma mutation real (lançar produção) estende a janela pra ~20 min de novo.
+    await t.mutation(api.operador.lancamentos.lancarProducao, {
+      token: joao.token,
+      chaveIdempotencia: crypto.randomUUID(),
+      produtoId,
+      formatoId,
+      quantidade: 5,
+    });
+
+    const sessaoDepois = await t.run((ctx) => ctx.db.get(sessaoAntes!._id));
+    expect(sessaoDepois!.expiraEm).toBeGreaterThan(expiraEmCurto);
+  });
+});

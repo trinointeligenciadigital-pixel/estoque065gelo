@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { mutation } from "../_generated/server";
-import { exigirSessaoOperador } from "../lib/auth";
+import { exigirSessaoOperadorMutavel } from "../lib/auth";
 import { motivoBloqueio, inserirEstorno } from "../lib/estorno";
 
 /*
@@ -22,7 +22,7 @@ const JANELA_DESFAZER_MS = 5 * 60 * 1000;
 export const desfazerMeuLancamento = mutation({
   args: { token: v.string(), lancamentoId: v.id("movimentacoes") },
   handler: async (ctx, { token, lancamentoId }) => {
-    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const { operador, camara } = await exigirSessaoOperadorMutavel(ctx, token);
 
     const original = await ctx.db.get(lancamentoId);
     if (original === null) throw new ConvexError("Lançamento não encontrado.");

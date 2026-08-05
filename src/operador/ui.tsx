@@ -30,6 +30,12 @@ export type ProdutoGrid = {
   saldo: SaldoProdutoGrid;
 };
 
+// "Renato Alves" → "Renato" (tarefa 6) — o crachá no cabeçalho usa só o
+// primeiro nome, curto o bastante pra não brigar com o resto do header.
+export function primeiroNome(nomeCompleto: string): string {
+  return nomeCompleto.trim().split(/\s+/)[0] ?? nomeCompleto;
+}
+
 // Peso em kg em tempo real (RF31). Peso fixo: quantidade × pesoKg. Peso
 // variável: o próprio kg digitado.
 export function kgDe(
@@ -49,6 +55,7 @@ export function Tela({
   totalEtapas,
   children,
   rodape,
+  operadorNome,
 }: {
   titulo: string;
   camaraNome?: string;
@@ -60,6 +67,11 @@ export function Tela({
   totalEtapas?: number;
   children: ReactNode;
   rodape?: ReactNode;
+  // Primeiro nome de quem está logado, sempre visível (tarefa 6) — é o que
+  // faz a pessoa perceber que está lançando na conta de outro, se o celular
+  // ficou esquecido logado. Fica à parte do `camaraNome`, que em muitas
+  // telas mostra outra coisa (produto, formato) em vez da câmara.
+  operadorNome?: string;
 }) {
   // O voltar físico do celular usa a seta da tela; se não houver seta, o handler
   // de tela terminal (menu). Sem nenhum, sai do app (comportamento no menu/PIN).
@@ -80,10 +92,15 @@ export function Tela({
               <ChevronLeft size={26} aria-hidden="true" />
             </button>
           ) : null}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="truncate font-titulo text-lg font-semibold tracking-[0.02em] text-texto uppercase">{titulo}</h1>
             {camaraNome ? <p className="truncate text-sm text-texto-suave">{camaraNome}</p> : null}
           </div>
+          {operadorNome ? (
+            <span className="shrink-0 rounded-full border border-borda px-2.5 py-1 font-mono text-[11px] font-medium text-texto-suave">
+              {operadorNome}
+            </span>
+          ) : null}
         </div>
         {temProgresso ? (
           <div className="mt-2.5 flex items-center gap-2.5" role="group" aria-label={`Passo ${etapa} de ${totalEtapas}`}>
