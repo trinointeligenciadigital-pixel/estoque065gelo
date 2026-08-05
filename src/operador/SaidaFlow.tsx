@@ -151,6 +151,14 @@ function SaidaCarregamento({
   const [desfeito, setDesfeito] = useState(false);
 
   const pesoTotal = itens.reduce((acc, it) => acc + pesoDoItem(it), 0);
+  // Total de pacotes (tarefa 5 do adendo): quem carrega a van conta pacotes, não
+  // quilos — soma só os itens de formato fixo (peso variável não tem "pacote").
+  // 0 quando o carregamento é só granel: nesse caso não existe "0 pacotes" pra
+  // mostrar, só o peso.
+  const totalPacotes = itens.reduce(
+    (acc, it) => (it.formato.pesoVariavel ? acc : acc + (Number(it.valor) || 0)),
+    0,
+  );
 
   // Hook no topo (regra dos hooks) — a query só ativa com produto+formato+
   // quantidade > 0, então não pesa nos outros passos do carrinho.
@@ -312,7 +320,12 @@ function SaidaCarregamento({
     };
 
     return (
-      <Tela titulo={`${rotulo} lançada`} camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
+      <Tela
+        titulo={`${rotulo} lançad${tipo === "venda" ? "a" : "o"}`}
+        camaraNome={camaraNome}
+        operadorNome={nome}
+        aoVoltarHardware={onVoltar}
+      >
         <AvisoOperador tom="ok">
           {desfeito ? "Lançamento desfeito." : `Registrado com sucesso · ${itens.length} ${itens.length === 1 ? "produto" : "produtos"}.`}
         </AvisoOperador>
@@ -351,7 +364,7 @@ function SaidaCarregamento({
   if (passo === "confirmarSair") {
     return (
       <Tela
-        titulo={`Descartar ${rotulo.toLowerCase()}?`}
+        titulo="Descartar?"
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={() => setPasso("itens")}
@@ -378,7 +391,7 @@ function SaidaCarregamento({
   if (passo === "itens") {
     return (
       <Tela
-        titulo={`${rotulo} — carregamento`}
+        titulo="Carregamento"
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={tentarSair}
@@ -405,9 +418,13 @@ function SaidaCarregamento({
                   />
                 ))}
               </div>
+              {/* Quantidade primeiro (tarefa 5): quem carrega a van conta
+                  pacotes; o peso é o dado do romaneio, mostrado ao lado. */}
               <div className="flex items-baseline justify-between border-t border-borda px-1 pt-3">
-                <span className="text-base text-texto-suave">Peso total</span>
-                <span className="font-mono text-lg font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
+                <span className="text-base text-texto-suave">Total</span>
+                <span className="font-mono text-lg font-semibold text-texto">
+                  {totalPacotes > 0 ? `${formatarPacotes(totalPacotes)} · ${formatarPeso(pesoTotal)}` : formatarPeso(pesoTotal)}
+                </span>
               </div>
             </>
           )}
@@ -421,7 +438,7 @@ function SaidaCarregamento({
   if (passo === "produto") {
     return (
       <Tela
-        titulo={`${rotulo} — produto`}
+        titulo="Produto"
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
@@ -439,7 +456,7 @@ function SaidaCarregamento({
   // -------- Adicionar item: formato --------
   if (passo === "formato" && produto) {
     return (
-      <Tela titulo={`${rotulo} — formato`} camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")}>
+      <Tela titulo="Formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")}>
         <ListaFormatos
           produto={produto}
           onEscolher={(f) => { setFormato(f); setValor(""); setPasso("quantidade"); }}
@@ -478,7 +495,7 @@ function SaidaCarregamento({
 
     return (
       <Tela
-        titulo={editando ? `${rotulo} — editar item` : `${rotulo} — quantidade`}
+        titulo={editando ? "Editar item" : "Quantidade"}
         camaraNome={`${produto.nome} · ${rotuloFormato(formato)}`}
         operadorNome={nome}
         onVoltar={
@@ -527,12 +544,10 @@ function SaidaCarregamento({
     const podeConfirmar = cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
     return (
       <Tela
-        titulo={`${rotulo} — detalhes`}
+        titulo="Detalhes"
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={() => setPasso("itens")}
-        etapa={1}
-        totalEtapas={2}
         rodape={
           <BotaoGrande variante="primario" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
             Continuar
@@ -587,19 +602,23 @@ function SaidaCarregamento({
 
     return (
       <Tela
-        titulo={`${rotulo} — confira`}
+        titulo="Confira"
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={enviando ? undefined : () => setPasso("contexto")}
-        etapa={2}
-        totalEtapas={2}
         rodape={
           <BotaoGrande variante="primario" onClick={confirmar} disabled={enviando}>
             {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : `Confirmar ${rotulo.toLowerCase()}`}
           </BotaoGrande>
         }
       >
-        <ResumoLancamento pesoKg={pesoTotal} linhas={linhas} />
+        {/* Mesma hierarquia da produção (tarefa 5): quantidade em destaque,
+            peso derivado abaixo — não o contrário. */}
+        <ResumoLancamento
+          pesoKg={pesoTotal}
+          quantidadePacotes={totalPacotes > 0 ? totalPacotes : null}
+          linhas={linhas}
+        />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>
     );
@@ -609,6 +628,9 @@ function SaidaCarregamento({
 }
 
 // Linha de item no carrinho: toca para editar a quantidade; lixeira para remover.
+// A lixeira nunca remove com um toque só (tarefa 5): com luva e celular
+// molhado, é fácil apagar sem querer — confirmação inline nomeando o item
+// antes de tirar do carregamento.
 function LinhaItem({
   titulo,
   detalhe,
@@ -622,6 +644,26 @@ function LinhaItem({
   onEditar: () => void;
   onRemover: () => void;
 }) {
+  const [confirmando, setConfirmando] = useState(false);
+
+  if (confirmando) {
+    return (
+      <div className="flex flex-col gap-2 rounded-xl border border-borda bg-superficie p-3">
+        <p className="text-base text-texto">
+          Remover <span className="font-medium">{titulo}</span>?
+        </p>
+        <div className="flex gap-2">
+          <BotaoGrande variante="neutro" onClick={() => setConfirmando(false)} className="flex-1">
+            Cancelar
+          </BotaoGrande>
+          <BotaoGrande variante="saida" onClick={onRemover} className="flex-1">
+            Remover
+          </BotaoGrande>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-1 rounded-xl border border-borda bg-superficie">
       <button
@@ -636,7 +678,7 @@ function LinhaItem({
         <span className="shrink-0 font-mono text-base text-texto">{formatarPeso(peso)}</span>
       </button>
       <button
-        onClick={onRemover}
+        onClick={() => setConfirmando(true)}
         aria-label={`Remover ${titulo}`}
         className="mr-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
       >
