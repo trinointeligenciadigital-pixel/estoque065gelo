@@ -91,6 +91,7 @@ export async function gerarAjustesDaContagem(
   ctx: MutationCtx,
   contagem: Doc<"contagens">,
   clerkId: string,
+  autorNome: string,
 ): Promise<number> {
   const itens = await ctx.db
     .query("contagemItens")
@@ -122,6 +123,7 @@ export async function gerarAjustesDaContagem(
       contagemId: contagem._id,
       registradoPorTipo: "admin",
       clerkId,
+      autorNome,
       registradoEm: Date.now(),
     });
     gerados++;

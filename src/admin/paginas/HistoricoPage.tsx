@@ -49,7 +49,7 @@ export function HistoricoPage() {
   const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">("");
   const [tipo, setTipo] = useState<Tipo | "">("");
   const [operadorId, setOperadorId] = useState<Id<"operadores"> | "">("");
-  const [autorTipo, setAutorTipo] = useState<"operador" | "admin" | "">("");
+  const [autorClerkId, setAutorClerkId] = useState<string>("");
   const [de, setDe] = useState(() => params.get("de") ?? "");
   const [ate, setAte] = useState(() => params.get("ate") ?? "");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
@@ -59,7 +59,7 @@ export function HistoricoPage() {
     produtoId: produtoId || undefined,
     tipo: tipo || undefined,
     operadorId: operadorId || undefined,
-    autorTipo: autorTipo || undefined,
+    autorClerkId: autorClerkId || undefined,
     de: inicioDoDia(de),
     ate: fimDoDia(ate),
   });
@@ -144,18 +144,26 @@ export function HistoricoPage() {
           </Filtro>
           <Filtro label="Autor">
             <select
-              value={operadorId ? `op:${operadorId}` : autorTipo === "admin" ? "admin" : ""}
+              value={operadorId ? `op:${operadorId}` : autorClerkId ? `admin:${autorClerkId}` : ""}
               onChange={(e) => {
                 const v = e.target.value;
-                if (v === "admin") { setAutorTipo("admin"); setOperadorId(""); }
-                else if (v.startsWith("op:")) { setOperadorId(v.slice(3) as Id<"operadores">); setAutorTipo(""); }
-                else { setOperadorId(""); setAutorTipo(""); }
+                if (v.startsWith("admin:")) { setAutorClerkId(v.slice(6)); setOperadorId(""); }
+                else if (v.startsWith("op:")) { setOperadorId(v.slice(3) as Id<"operadores">); setAutorClerkId(""); }
+                else { setOperadorId(""); setAutorClerkId(""); }
               }}
               className={inputCls}
             >
               <option value="">Todos</option>
-              <option value="admin">Admin</option>
-              {(opcoes?.operadores ?? []).map((o) => <option key={o._id} value={`op:${o._id}`}>{o.nome}</option>)}
+              <optgroup label="Admin">
+                {(opcoes?.admins ?? []).map((a) => (
+                  <option key={a.clerkId} value={`admin:${a.clerkId}`}>{a.nome}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Colaborador">
+                {(opcoes?.operadores ?? []).map((o) => (
+                  <option key={o._id} value={`op:${o._id}`}>{o.nome}</option>
+                ))}
+              </optgroup>
             </select>
           </Filtro>
           <Filtro label="De">
@@ -203,7 +211,12 @@ export function HistoricoPage() {
                 {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
                 {m.observacao ? ` · ${m.observacao}` : ""}
               </td>
-              <td className="px-3 py-2.5 text-texto-suave">{m.autor}</td>
+              <td className="px-3 py-2.5 text-texto-suave">
+                {m.autor}{" "}
+                <span className="rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+                  {m.autorTipo === "admin" ? "Admin" : "Colaborador"}
+                </span>
+              </td>
               <td className="px-3 py-2.5 text-right">
                 {m.tipo === "venda" || m.tipo === "patrocinio" ? (
                   <Botao variante="neutro" onClick={() => setComprovante(montarComprovante(m))}>

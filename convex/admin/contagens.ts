@@ -265,7 +265,7 @@ export const aprovar = mutation({
     const usuario = await exigirAdmin(ctx);
     const contagem = await exigirDecidivel(ctx, contagemId, usuario.clerkId);
 
-    const ajustes = await gerarAjustesDaContagem(ctx, contagem, usuario.clerkId);
+    const ajustes = await gerarAjustesDaContagem(ctx, contagem, usuario.clerkId, usuario.nome);
 
     await ctx.db.patch(contagem._id, {
       status: "aprovada",

@@ -79,6 +79,7 @@ export const lancarProducao = mutation({
       pesoKg,
       registradoPorTipo: "operador",
       operadorId: operador._id,
+      autorNome: operador.nome,
       registradoEm: Date.now(),
     });
     return { movimentacaoId, duplicado: false };
@@ -159,6 +160,7 @@ export const lancarSaida = mutation({
       observacao: args.observacao?.trim() || undefined,
       registradoPorTipo: "operador",
       operadorId: operador._id,
+      autorNome: operador.nome,
       registradoEm: Date.now(),
     });
     return { movimentacaoId, duplicado: false };
@@ -251,6 +253,7 @@ export const lancarSaidaMultipla = mutation({
         motorista,
         registradoPorTipo: "operador",
         operadorId: operador._id,
+        autorNome: operador.nome,
         registradoEm: Date.now(),
       });
       movimentacaoIds.push(id);
@@ -315,6 +318,7 @@ export const lancarRetorno = mutation({
       patrocinioOrigemId: origem._id,
       registradoPorTipo: "operador",
       operadorId: operador._id,
+      autorNome: operador.nome,
       registradoEm: Date.now(),
     });
     return { movimentacaoId, duplicado: false };

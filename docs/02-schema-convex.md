@@ -169,6 +169,10 @@ export default defineSchema({
     registradoPorTipo: v.union(v.literal("operador"), v.literal("admin")),
     operadorId: v.optional(v.id("operadores")),
     clerkId: v.optional(v.string()),
+    // Nome de quem registrou, no momento do lançamento (SNAPSHOT — se a pessoa
+    // for renomeada depois, o histórico não muda). Ausente = legado anterior à
+    // sprint de auditoria; migrarAutorLegado (convex/migracoes.ts) preenche.
+    autorNome: v.optional(v.string()),
     registradoEm: v.number(),
   })
     .index("by_chave_idempotencia", ["chaveIdempotencia"])

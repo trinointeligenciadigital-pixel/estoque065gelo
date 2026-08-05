@@ -26,7 +26,9 @@ export const listar = query({
       ),
     ),
     operadorId: v.optional(v.id("operadores")),
-    autorTipo: v.optional(v.union(v.literal("operador"), v.literal("admin"))),
+    // Filtra por um Admin específico (clerkId), não "qualquer admin" — desde a
+    // tarefa 3 o filtro lista pessoas reais, não mais um balde genérico "Admin".
+    autorClerkId: v.optional(v.string()),
     de: v.optional(v.number()),
     ate: v.optional(v.number()),
   },
@@ -45,7 +47,7 @@ export const listar = query({
       .filter((m) => (args.produtoId ? m.produtoId === args.produtoId : true))
       .filter((m) => (args.tipo ? m.tipo === args.tipo : true))
       .filter((m) => (args.operadorId ? m.operadorId === args.operadorId : true))
-      .filter((m) => (args.autorTipo ? m.registradoPorTipo === args.autorTipo : true))
+      .filter((m) => (args.autorClerkId ? m.clerkId === args.autorClerkId : true))
       .filter((m) => (args.de !== undefined ? m.registradoEm >= args.de : true))
       .filter((m) => (args.ate !== undefined ? m.registradoEm <= args.ate : true))
       .sort((a, b) => b.registradoEm - a.registradoEm)
@@ -77,7 +79,11 @@ export const listar = query({
           motorista: m.motorista ?? null,
           motivoPerda: m.motivoPerda ?? null,
           observacao: m.observacao ?? null,
-          autor: m.registradoPorTipo === "operador" ? operador?.nome ?? "—" : "Admin",
+          // autorNome é o snapshot da tarefa 3; registros pré-migração ainda
+          // sem ele caem no mesmo cálculo que o Histórico já fazia antes.
+          autor:
+            m.autorNome ??
+            (m.registradoPorTipo === "operador" ? operador?.nome ?? "—" : "Admin (registro anterior)"),
           autorTipo: m.registradoPorTipo,
           registradoEm: m.registradoEm,
           // Agrupador do carregamento (venda/patrocínio multi-produto). Linhas
@@ -101,10 +107,14 @@ export const opcoesFiltro = query({
     const camaras = await ctx.db.query("camaras").collect();
     const produtos = await ctx.db.query("produtos").collect();
     const operadores = await ctx.db.query("operadores").collect();
+    const admins = await ctx.db.query("usuarios").collect();
     return {
       camaras: camaras.map((c) => ({ _id: c._id, nome: c.nome })),
       produtos: produtos.map((p) => ({ _id: p._id, nome: p.nome, camaraId: p.camaraId })),
       operadores: operadores.map((o) => ({ _id: o._id, nome: o.nome })),
+      // Filtro "Autor" lista pessoas reais (tarefa 3) — inclui inativos porque
+      // lançamentos antigos de um Admin desativado continuam no Histórico.
+      admins: admins.map((a) => ({ clerkId: a.clerkId, nome: a.nome })),
     };
   },
 });
