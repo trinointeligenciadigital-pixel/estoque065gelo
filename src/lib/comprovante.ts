@@ -1,4 +1,4 @@
-import { dataHora } from "./data.ts";
+import { dataHoraComprovante } from "./data.ts";
 import { formatarPeso } from "./formato.ts";
 
 /*
@@ -93,7 +93,7 @@ export function textoComprovante(d: DadosComprovante): string {
 
   return [
     "*Comprovante de saída — 065 Gelo*",
-    `${d.rotulo} · ${dataHora(d.quandoMs)}`,
+    `${d.rotulo} · ${dataHoraComprovante(d.quandoMs)}`,
     "",
     `Cliente: ${d.cliente || "—"}`,
     ...blocoItens,

@@ -11,7 +11,7 @@ import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer, BotaoDesfazerCarregamento } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
-import { dataHora } from "../lib/data.ts";
+import { dataHoraComprovante } from "../lib/data.ts";
 import { linhasComprovante, linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../lib/comprovante.ts";
 
 /*
@@ -1083,7 +1083,7 @@ function ComprovanteSaida({
           </div>
           <div className="mt-0.5 text-base font-semibold text-texto">
             {dados.rotulo}{" "}
-            <span className="font-mono text-sm font-normal text-texto-suave">{dataHora(dados.quandoMs)}</span>
+            <span className="font-mono text-sm font-normal text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
           </div>
         </div>
         <dl>

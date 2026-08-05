@@ -6,7 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { dataHora } from "../../lib/data.ts";
+import { dataHora, dataHoraComprovante } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import {
@@ -589,7 +589,7 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
         <div className="overflow-hidden rounded-lg border border-borda">
           <div className="border-b border-borda px-3 py-2">
             <span className="text-sm font-semibold text-texto">{dados.rotulo}</span>{" "}
-            <span className="font-mono text-xs text-texto-suave">{dataHora(dados.quandoMs)}</span>
+            <span className="font-mono text-xs text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
           </div>
           <dl>
             {linhas.map((l, i) =>
