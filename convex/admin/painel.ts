@@ -127,7 +127,6 @@ export const resumo = query({
               return {
                 nome: f.nome,
                 pesoVariavel: f.pesoVariavel,
-                unidade: f.pesoVariavel ? "kg" : "pct",
                 saldo,
                 estoqueMinimo: minimo,
                 abaixoMinimo: minimo > 0 && saldo < minimo,

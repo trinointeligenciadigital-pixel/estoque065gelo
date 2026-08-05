@@ -2,13 +2,14 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { LinhaMensagem, LinhaTabela, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { data } from "../../lib/data.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 
 /*
   Consulta de patrocínio (RF42). Para cada patrocínio: quanto saiu, quanto voltou
   e quanto foi consumido. Somente leitura.
 */
-function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+function formatarQtd(n: number, unidade: string): string {
+  return unidade === "kg" ? formatarPeso(n) : formatarPacotes(n);
 }
 
 export function PatrociniosPage() {
@@ -39,9 +40,9 @@ export function PatrociniosPage() {
               <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{data(p.registradoEm)}</td>
               <td className="px-3 py-2.5 font-medium text-texto">{p.clienteNome || "—"}</td>
               <td className="px-3 py-2.5 text-texto-suave">{p.produtoNome} / {p.formatoNome}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(p.saiu)} {p.unidade}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-entrada">{num(p.retornado)} {p.unidade}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(p.consumido)} {p.unidade}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.saiu, p.unidade)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-entrada">{formatarQtd(p.retornado, p.unidade)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.consumido, p.unidade)}</td>
               <td className="px-3 py-2.5">
                 {p.emAberto ? (
                   <span className="inline-block rounded-full bg-acento/10 px-2 py-0.5 text-[11px] font-semibold text-acento">

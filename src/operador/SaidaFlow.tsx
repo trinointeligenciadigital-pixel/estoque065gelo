@@ -3,7 +3,8 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, numero, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
+import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
@@ -82,8 +83,7 @@ function pesoDoItem(it: ItemCarrinho): number {
 }
 function labelQtdItem(it: ItemCarrinho): string {
   if (it.formato.pesoVariavel) return "";
-  const n = Number(it.valor);
-  return `${n} ${n === 1 ? "pacote" : "pacotes"}`;
+  return formatarPacotes(Number(it.valor));
 }
 
 function SaidaCarregamento({
@@ -335,7 +335,7 @@ function SaidaCarregamento({
               </div>
               <div className="flex items-baseline justify-between border-t border-borda px-1 pt-3">
                 <span className="text-base text-texto-suave">Peso total</span>
-                <span className="font-mono text-lg font-semibold text-texto">{numero(pesoTotal)} kg</span>
+                <span className="font-mono text-lg font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
               </div>
             </>
           )}
@@ -375,7 +375,6 @@ function SaidaCarregamento({
     const num = Number(valor);
     const validoBasico = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
     const editando = editIdx !== null;
-    const unidade = formato.pesoVariavel ? "kg" : "pacotes";
 
     // Saldo disponível já descontando o que este carregamento reserva do mesmo
     // formato (o servidor revalida no Confirmar; aqui é para não montar em falso).
@@ -399,13 +398,16 @@ function SaidaCarregamento({
         <CampoQuantidade formato={formato} valor={valor} onChange={setValor} />
         {disponivel !== null ? (
           <p className="mt-3 text-center text-base text-texto-suave">
-            Disponível nesta câmara: <span className="font-mono text-texto">{numero(disponivel)} {unidade}</span>
+            Disponível nesta câmara:{" "}
+            <span className="font-mono text-texto">
+              {formato.pesoVariavel ? formatarPeso(disponivel) : formatarPacotes(disponivel)}
+            </span>
           </p>
         ) : null}
         {excede ? (
           <div className="mt-4">
             <AvisoOperador>
-              Só há {numero(disponivel!)} {unidade} deste formato nesta câmara
+              Só há {formato.pesoVariavel ? formatarPeso(disponivel!) : formatarPacotes(disponivel!)} deste formato nesta câmara
               {jaNoCarrinho(formato._id, editIdx) > 0 ? " (contando o que já está no carregamento)" : ""}.
             </AvisoOperador>
           </div>
@@ -467,7 +469,7 @@ function SaidaCarregamento({
       { rotulo: "Tipo", valor: `${rotulo} (saída)` },
       ...itens.map((it) => ({
         rotulo: `${it.produto.nome} · ${it.formato.nome}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`,
-        valor: `${numero(pesoDoItem(it))} kg`,
+        valor: formatarPeso(pesoDoItem(it)),
         mono: true,
       })),
       { rotulo: "Cliente", valor: cliente.trim() },
@@ -523,7 +525,7 @@ function LinhaItem({
           <span className="block truncate text-base font-medium text-texto">{titulo}</span>
           <span className="block truncate text-sm text-texto-suave">{detalhe}</span>
         </span>
-        <span className="shrink-0 font-mono text-base text-texto">{numero(peso)} kg</span>
+        <span className="shrink-0 font-mono text-base text-texto">{formatarPeso(peso)}</span>
       </button>
       <button
         onClick={onRemover}
@@ -598,7 +600,7 @@ function SaidaPerda({
   if (passo === "sucesso") {
     const num = Number(valor);
     const pesoKg = produto && formato ? kgDe(formato, num, num) : 0;
-    const quantidadeLabel = formato?.pesoVariavel ? "" : `${num} ${num === 1 ? "pacote" : "pacotes"}`;
+    const quantidadeLabel = formato?.pesoVariavel ? "" : formatarPacotes(num);
     return (
       <Tela titulo="Perda lançada" camaraNome={camaraNome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">Registrado com sucesso.</AvisoOperador>
@@ -694,7 +696,7 @@ function SaidaPerda({
       { rotulo: "Tipo", valor: "Perda (saída)" },
       { rotulo: "Produto", valor: produto.nome },
       { rotulo: "Formato", valor: formato.nome },
-      ...(formato.pesoVariavel ? [] : [{ rotulo: "Quantidade", valor: `${num} ${num === 1 ? "pacote" : "pacotes"}`, mono: true }]),
+      ...(formato.pesoVariavel ? [] : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
       { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
       ...(motivo === "outro" ? [{ rotulo: "Descrição", valor: observacao.trim() }] : []),
       { rotulo: "Câmara", valor: camaraNome },

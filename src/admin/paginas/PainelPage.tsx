@@ -5,14 +5,15 @@ import { api } from "../../../convex/_generated/api";
 import { Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 
 /*
   Painel do Admin (RF57–RF60) — "painel de instrumentos de câmara fria". KPIs em
   leitura de instrumento, produção de hoje, réguas de estoque por produto (peso,
   RF57) e saídas recentes. O badge de estoque mínimo é por formato (RF59).
 */
-function fmt(n: number): string {
-  return n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+function formatarQtd(n: number, pesoVariavel: boolean): string {
+  return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
 }
 // "AAAA-MM-DD" da data de um dia do gráfico, no fuso de Cuiabá (o `dia` é a meia-
 // noite local guardada em ms UTC). Usado para abrir o Histórico já filtrado.
@@ -85,7 +86,7 @@ function PainelConteudo() {
 
       {/* KPIs — Estado (agora) à esquerda, Movimento (período) à direita */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi rotulo="Estoque total" valor={fmt(r.kpis.estoqueTotalKg)} unidade="kg" rodape="soma por peso · agora" />
+        <Kpi rotulo="Estoque total" valor={formatarPeso(r.kpis.estoqueTotalKg)} rodape="soma por peso · agora" />
         <button
           onClick={() => r.qtdAbaixoMinimo > 0 && setSoAbaixo((v) => !v)}
           className={`flex flex-col gap-2.5 rounded-[10px] border p-4 text-left ${
@@ -101,8 +102,8 @@ function PainelConteudo() {
             {r.qtdAbaixoMinimo > 0 ? (soAbaixo ? "mostrando só estes ✓" : "ver quais →") : "tudo acima do mínimo"}
           </span>
         </button>
-        <Kpi rotulo={`Produção · ${rotuloPeriodo}`} valor={t ? fmt(t.producaoKg) : "—"} unidade="kg" cor="text-entrada" rodape={t ? `${t.qtdLancamentos} lançamentos` : "carregando…"} />
-        <Kpi rotulo={`Saídas · ${rotuloPeriodo}`} valor={t ? fmt(t.saidasKg) : "—"} unidade="kg" rodape="venda · patrocínio · perda" />
+        <Kpi rotulo={`Produção · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.producaoKg) : "—"} cor="text-entrada" rodape={t ? `${t.qtdLancamentos} lançamentos` : "carregando…"} />
+        <Kpi rotulo={`Saídas · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.saidasKg) : "—"} rodape="venda · patrocínio · perda" />
       </div>
 
       {/* Por categoria (RF58) */}
@@ -112,7 +113,7 @@ function PainelConteudo() {
           {r.porCategoria.map((c) => (
             <span key={c.categoria} className="text-[13px] text-texto">
               {rotuloCat[c.categoria] ?? c.categoria}{" "}
-              <span className="font-mono font-semibold text-acento">{fmt(c.pesoKg)} kg</span>
+              <span className="font-mono font-semibold text-acento">{formatarPeso(c.pesoKg)}</span>
             </span>
           ))}
         </div>
@@ -154,7 +155,7 @@ function PainelConteudo() {
                     </td>
                     <td className="py-2.5 pr-3 text-texto-suave">{m.autor}</td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
-                    <td className="py-2.5 pr-3 text-right font-mono text-texto">{fmt(m.pesoKg)} kg</td>
+                    <td className="py-2.5 pr-3 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
                     <td className="py-2.5 text-right"><Pill tom="entrada">entrada</Pill></td>
                   </tr>
                 ))}
@@ -168,7 +169,7 @@ function PainelConteudo() {
         <Cartao className="p-5">
           <PanelHead
             titulo="Estoque por produto"
-            extra={<span className="font-mono text-[11px] text-texto-fraco">{produtos.length} · peso kg</span>}
+            extra={<span className="font-mono text-[11px] text-texto-fraco">{produtos.length} produtos · ordenado por peso</span>}
           />
           {produtos.length === 0 ? (
             <Vazio>{soAbaixo ? "Nenhum formato abaixo do mínimo." : "Nenhum produto ativo. Cadastre em Produtos."}</Vazio>
@@ -181,7 +182,7 @@ function PainelConteudo() {
                       {p.nome}
                       <span className="ml-1.5 font-mono text-[10px] tracking-wide text-texto-fraco uppercase">{p.categoria}</span>
                     </span>
-                    <span className="font-mono text-sm font-semibold text-texto">{fmt(p.pesoTotalKg)} kg</span>
+                    <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(p.pesoTotalKg)}</span>
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gelo-trilho">
                     <div
@@ -197,7 +198,7 @@ function PainelConteudo() {
                             <div className="flex items-baseline justify-between gap-2 text-[11px]">
                               <span className={f.abaixoMinimo ? "font-medium text-alerta" : "text-texto-suave"}>{f.nome}</span>
                               <span className={`font-mono ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
-                                {fmt(f.saldo)} / mín {fmt(f.estoqueMinimo)} {f.unidade}
+                                {formatarQtd(f.saldo, f.pesoVariavel)} / mín {formatarQtd(f.estoqueMinimo, f.pesoVariavel)}
                                 {f.abaixoMinimo ? " ↓" : ""}
                               </span>
                             </div>
@@ -207,7 +208,7 @@ function PainelConteudo() {
                           <div key={f.nome} className="flex items-baseline justify-between gap-2 text-[11px]">
                             <span className="text-texto-fraco">{f.nome}</span>
                             <span className="font-mono text-texto-fraco">
-                              {fmt(f.saldo)} {f.unidade}
+                              {formatarQtd(f.saldo, f.pesoVariavel)}
                             </span>
                           </div>
                         ),
@@ -239,7 +240,7 @@ function PainelConteudo() {
                   <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {m.formatoNome}</span></td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.veiculo}</td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
-                  <td className="py-2.5 pr-3 text-right font-mono text-texto">{fmt(m.pesoKg)} kg</td>
+                  <td className="py-2.5 pr-3 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
                   <td className="py-2.5 text-right"><Pill tom={m.tipo === "patrocinio" ? "patroc" : m.tipo === "perda" ? "perda" : "venda"}>{rotuloTipo(m.tipo)}</Pill></td>
                 </tr>
               ))}
@@ -304,13 +305,13 @@ function Eyebrow({ children }: { children: ReactNode }) {
   return <span className="font-mono text-[10.5px] font-medium tracking-[0.11em] text-texto-fraco uppercase">{children}</span>;
 }
 
-function Kpi({ rotulo, valor, unidade, cor = "text-texto", rodape }: { rotulo: string; valor: string; unidade: string; cor?: string; rodape: string }) {
+function Kpi({ rotulo, valor, unidade, cor = "text-texto", rodape }: { rotulo: string; valor: string; unidade?: string; cor?: string; rodape: string }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-[10px] border border-borda bg-superficie p-4">
       <Eyebrow>{rotulo}</Eyebrow>
       <span className={`font-mono text-3xl leading-none font-semibold ${cor}`}>
         {valor}
-        <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{unidade}</span>
+        {unidade ? <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{unidade}</span> : null}
       </span>
       <span className="text-[11.5px] text-texto-fraco">{rodape}</span>
     </div>

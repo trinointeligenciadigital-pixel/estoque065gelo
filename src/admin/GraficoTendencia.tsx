@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { formatarPeso } from "../lib/formato.ts";
 
 /*
   Gráfico de tendência Produção × Saídas por dia — SVG desenhado à mão, sem
@@ -26,7 +27,10 @@ const PAD = { top: 14, right: 18, bottom: 26, left: 46 };
 const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top - PAD.bottom;
 
-function fmtKg(n: number): string {
+// Rótulo compacto das linhas-guia do eixo Y — só aqui, porque gridline é
+// referência de escala, não leitura exata (essa vai por formatarPeso, no
+// tooltip e no aria-label).
+function rotuloEixoY(n: number): string {
   return n.toLocaleString("pt-BR", { maximumFractionDigits: n >= 100 ? 0 : 1 });
 }
 function rotuloDia(ms: number): string {
@@ -155,7 +159,7 @@ export function GraficoTendencia({
         className="w-full"
         style={{ height: "auto" }}
         role="img"
-        aria-label={`Tendência de ${n} dias. Produção total ${fmtKg(total.producao)} kg, saídas total ${fmtKg(total.saidas)} kg.`}
+        aria-label={`Tendência de ${n} dias. Produção total ${formatarPeso(total.producao)}, saídas total ${formatarPeso(total.saidas)}.`}
         onMouseMove={moverMouse}
         onMouseLeave={() => fixado === null && setHover(null)}
         onClick={clicar}
@@ -173,7 +177,7 @@ export function GraficoTendencia({
               strokeDasharray={i === 0 ? "0" : "3 3"}
             />
             <text x={PAD.left - 8} y={yFor(v) + 3} textAnchor="end" className="font-mono" fontSize={10} fill="var(--color-texto-fraco)">
-              {fmtKg(v)}
+              {rotuloEixoY(v)}
             </text>
           </g>
         ))}
@@ -229,12 +233,12 @@ export function GraficoTendencia({
           <div className="flex items-center gap-1.5 text-[11.5px]">
             <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-entrada)" }} />
             <span className="text-texto-suave">Produção</span>
-            <span className="ml-auto pl-3 font-mono font-semibold text-texto">{fmtKg(serie[ativo].producaoKg)} kg</span>
+            <span className="ml-auto pl-3 font-mono font-semibold text-texto">{formatarPeso(serie[ativo].producaoKg)}</span>
           </div>
           <div className="flex items-center gap-1.5 text-[11.5px]">
             <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-saida)" }} />
             <span className="text-texto-suave">Saídas</span>
-            <span className="ml-auto pl-3 font-mono font-semibold text-texto">{fmtKg(serie[ativo].saidasKg)} kg</span>
+            <span className="ml-auto pl-3 font-mono font-semibold text-texto">{formatarPeso(serie[ativo].saidasKg)}</span>
           </div>
           {fixado !== null && hrefDoDia ? (
             <Link

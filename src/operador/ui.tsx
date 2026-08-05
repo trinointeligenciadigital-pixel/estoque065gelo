@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { ChevronLeft } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
+import { formatarPeso } from "../lib/formato.ts";
 
 /*
   Componentes das telas do colaborador — arejadas, para uso em pé, com uma mão,
@@ -166,17 +167,7 @@ export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode;
 }
 
 export function Kg({ valor }: { valor: number }) {
-  const txt = Number.isInteger(valor) ? String(valor) : valor.toFixed(2);
-  return (
-    <span className="font-mono">
-      {txt} <span className="text-texto-suave">kg</span>
-    </span>
-  );
-}
-
-// Número no padrão do app: inteiro sem casas, senão duas casas.
-export function numero(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return <span className="font-mono">{formatarPeso(valor)}</span>;
 }
 
 // Resumo de confirmação antes de gravar (rede de segurança do ledger append-only,
@@ -198,8 +189,7 @@ export function ResumoLancamento({
           Peso
         </span>
         <span className="font-mono text-3xl leading-none font-semibold text-texto">
-          {numero(pesoKg)}
-          <span className="ml-1.5 font-sans text-sm font-medium text-texto-fraco">kg</span>
+          {formatarPeso(pesoKg)}
         </span>
       </div>
       <dl>

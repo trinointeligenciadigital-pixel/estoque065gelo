@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { dataHora } from "../../lib/data.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 import {
   linhasComprovante,
   linkWhatsappComprovante,
@@ -28,9 +29,6 @@ const rotuloTipo: Record<Tipo, string> = {
   ajuste: "Ajuste",
 };
 
-function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
 // Converte "AAAA-MM-DD" (input date) em ms; fim inclui o dia inteiro.
 function inicioDoDia(s: string): number | undefined {
   return s ? new Date(`${s}T00:00:00`).getTime() : undefined;
@@ -80,7 +78,7 @@ export function HistoricoPage() {
     const itens = irmas.map((x) => ({
       produtoNome: x.produtoNome,
       formatoNome: x.formatoNome,
-      quantidadeLabel: x.formatoPesoVariavel ? "" : `${x.quantidade} ${x.quantidade === 1 ? "pacote" : "pacotes"}`,
+      quantidadeLabel: x.formatoPesoVariavel ? "" : formatarPacotes(x.quantidade),
       pesoKg: x.pesoKg,
     }));
     return {
@@ -179,8 +177,10 @@ export function HistoricoPage() {
               </td>
               <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {m.formatoNome}</span></td>
               <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(m.quantidade)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(m.pesoKg)} kg</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">
+                {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
+              </td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
               <td className="px-3 py-2.5 text-texto-suave">
                 {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
                 {m.observacao ? ` · ${m.observacao}` : ""}

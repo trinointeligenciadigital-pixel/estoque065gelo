@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 
 /*
   Lançamento manual pelo Admin (RF63). Mesmas validações do colaborador: saldo,
@@ -34,10 +35,6 @@ type ItemCarregamento = {
   valor: string;
   pesoKg: number;
 };
-
-function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
 
 export function LancamentoPage() {
   const produtos = useQuery(api.admin.lancamentos.produtosParaLancamento);
@@ -226,7 +223,7 @@ export function LancamentoPage() {
                     <p className="truncate text-sm text-texto">{it.produtoNome} <span className="text-texto-suave">/ {it.formatoNome}</span></p>
                   </div>
                   <span className="shrink-0 font-mono text-sm text-texto">
-                    {it.pesoVariavel ? "" : `${num(Number(it.valor))} × `}{num(it.pesoKg)} kg
+                    {it.pesoVariavel ? "" : `${formatarPacotes(Number(it.valor))} × `}{formatarPeso(it.pesoKg)}
                   </span>
                   <button
                     onClick={() => removerItem(it.chave)}
@@ -239,7 +236,7 @@ export function LancamentoPage() {
               ))}
               <div className="flex items-baseline justify-between border-t border-borda pt-2">
                 <span className="text-sm text-texto-suave">Peso total</span>
-                <span className="font-mono text-sm font-semibold text-texto">{num(pesoTotal)} kg</span>
+                <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
               </div>
             </div>
           ) : null}
@@ -254,7 +251,7 @@ export function LancamentoPage() {
             <Selecao label="Formato" value={formatoId} onChange={(e) => setFormatoId(e.target.value as Id<"formatos">)} disabled={!produto}>
               <option value="">— escolha —</option>
               {(produto?.formatos ?? []).map((f) => (
-                <option key={f._id} value={f._id}>{f.nome}{f.pesoVariavel ? " (kg)" : ` · ${f.pesoKg}kg`}</option>
+                <option key={f._id} value={f._id}>{f.nome}{f.pesoVariavel ? " (kg)" : ` · ${formatarPeso(f.pesoKg)}`}</option>
               ))}
             </Selecao>
           </div>
@@ -272,7 +269,7 @@ export function LancamentoPage() {
               className="w-40"
             />
             {pesoPrevisto !== null && !formato?.pesoVariavel ? (
-              <span className="pb-1.5 font-mono text-sm text-texto-suave">= {pesoPrevisto} kg</span>
+              <span className="pb-1.5 font-mono text-sm text-texto-suave">= {formatarPeso(pesoPrevisto)}</span>
             ) : null}
             {ehCarregamento ? (
               <Botao variante="neutro" onClick={adicionarItem} disabled={!itemStaged} className="ml-auto">

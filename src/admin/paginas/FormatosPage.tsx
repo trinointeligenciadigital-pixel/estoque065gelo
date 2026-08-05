@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 
 type Formato = {
   _id: Id<"formatos">;
@@ -53,10 +54,14 @@ export function FormatosPage() {
             <LinhaTabela key={f._id}>
               <td className="px-3 py-2.5 font-medium text-texto">{f.nome}</td>
               <td className="px-3 py-2.5 text-right font-mono text-texto">
-                {f.pesoVariavel ? <span className="text-texto-suave">variável</span> : f.pesoKg}
+                {f.pesoVariavel ? <span className="text-texto-suave">variável</span> : formatarPeso(f.pesoKg)}
               </td>
               <td className="px-3 py-2.5 text-right font-mono text-texto-suave">
-                {f.estoqueMinimo ? `${f.estoqueMinimo} ${f.pesoVariavel ? "kg" : "pct"}` : "—"}
+                {f.estoqueMinimo
+                  ? f.pesoVariavel
+                    ? formatarPeso(f.estoqueMinimo)
+                    : formatarPacotes(f.estoqueMinimo)
+                  : "—"}
               </td>
               <td className="px-3 py-2.5"><Etiqueta ativo={f.ativo} /></td>
               <td className="px-3 py-2.5 text-right">

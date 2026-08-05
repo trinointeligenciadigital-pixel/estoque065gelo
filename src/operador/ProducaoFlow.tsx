@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { mensagemErro } from "../lib/erros.ts";
+import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 
@@ -89,7 +90,7 @@ export function ProducaoFlow({
                 { rotulo: "Formato", valor: formato.nome },
                 ...(formato.pesoVariavel
                   ? []
-                  : [{ rotulo: "Quantidade", valor: `${num} ${num === 1 ? "pacote" : "pacotes"}`, mono: true }]),
+                  : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
               ]}
             />
           </div>
@@ -162,7 +163,7 @@ export function ProducaoFlow({
             { rotulo: "Formato", valor: formato.nome },
             ...(formato.pesoVariavel
               ? []
-              : [{ rotulo: "Quantidade", valor: `${num} ${num === 1 ? "pacote" : "pacotes"}`, mono: true }]),
+              : [{ rotulo: "Quantidade", valor: formatarPacotes(num), mono: true }]),
             { rotulo: "Câmara", valor: camaraNome },
           ]}
         />
@@ -216,7 +217,7 @@ export function ListaFormatos({
         <OpcaoGrande
           key={f._id}
           titulo={f.nome}
-          detalhe={f.pesoVariavel ? "peso variável" : `${f.pesoKg} kg`}
+          detalhe={f.pesoVariavel ? "peso variável" : formatarPeso(f.pesoKg)}
           onClick={() => onEscolher(f)}
         />
       ))}

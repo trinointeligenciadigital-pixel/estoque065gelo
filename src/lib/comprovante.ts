@@ -1,4 +1,5 @@
 import { dataHora } from "./data.ts";
+import { formatarPeso } from "./formato.ts";
 
 /*
   Comprovante de saída (venda/patrocínio) — formato único usado pelo operador (na
@@ -28,14 +29,10 @@ export type DadosComprovante = {
   protocolo: string;
 };
 
-function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
-
 // Rótulo do item usado quando há mais de um produto no carregamento.
 function itemLabel(it: ItemComprovante): string {
   const qtd = it.quantidadeLabel ? `${it.quantidadeLabel} · ` : "";
-  return `${it.produtoNome} · ${it.formatoNome} — ${qtd}${num(it.pesoKg)} kg`;
+  return `${it.produtoNome} · ${it.formatoNome} — ${qtd}${formatarPeso(it.pesoKg)}`;
 }
 
 // Uma linha do cartão do comprovante. `forte` marca a linha do peso — o número
@@ -60,7 +57,7 @@ export function linhasComprovante(d: DadosComprovante): LinhaComprovante[] {
       { rotulo: "Produto", valor: it.produtoNome },
       { rotulo: "Formato", valor: it.formatoNome },
       ...(it.quantidadeLabel ? [{ rotulo: "Quantidade", valor: it.quantidadeLabel, mono: true }] : []),
-      { rotulo: "Peso", valor: `${num(it.pesoKg)} kg`, mono: true, forte: true },
+      { rotulo: "Peso", valor: formatarPeso(it.pesoKg), mono: true, forte: true },
       ...contexto,
     ];
   }
@@ -69,10 +66,10 @@ export function linhasComprovante(d: DadosComprovante): LinhaComprovante[] {
     { rotulo: "Cliente", valor: d.cliente || "—" },
     ...d.itens.map((it) => ({
       rotulo: `${it.produtoNome} · ${it.formatoNome}${it.quantidadeLabel ? ` · ${it.quantidadeLabel}` : ""}`,
-      valor: `${num(it.pesoKg)} kg`,
+      valor: formatarPeso(it.pesoKg),
       mono: true,
     })),
-    { rotulo: "Peso total", valor: `${num(d.pesoTotalKg)} kg`, mono: true, forte: true },
+    { rotulo: "Peso total", valor: formatarPeso(d.pesoTotalKg), mono: true, forte: true },
     ...contexto,
   ];
 }
@@ -86,12 +83,12 @@ export function textoComprovante(d: DadosComprovante): string {
         `Produto: ${it0.produtoNome}`,
         `Formato: ${it0.formatoNome}`,
         ...(it0.quantidadeLabel ? [`Quantidade: ${it0.quantidadeLabel}`] : []),
-        `Peso: ${num(it0.pesoKg)} kg`,
+        `Peso: ${formatarPeso(it0.pesoKg)}`,
       ]
     : [
         "Itens:",
         ...d.itens.map((it) => `- ${itemLabel(it)}`),
-        `Peso total: ${num(d.pesoTotalKg)} kg`,
+        `Peso total: ${formatarPeso(d.pesoTotalKg)}`,
       ];
 
   return [

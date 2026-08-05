@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Kg, Tela } from "./ui.tsx";
+import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 
 /*
   Ver saldo (RF43–RF45). Somente leitura: saldo por formato e peso total por
@@ -41,8 +42,7 @@ export function SaldoView({
                     <div key={f._id} className="flex items-center justify-between text-base">
                       <span className="text-texto-suave">{f.nome}</span>
                       <span className="font-mono text-texto">
-                        {f.saldo}{" "}
-                        <span className="text-texto-suave">{f.pesoVariavel ? "un" : "pct"}</span>
+                        {f.pesoVariavel ? formatarPeso(f.pesoLiquidoKg) : formatarPacotes(f.saldo)}
                       </span>
                     </div>
                   ))

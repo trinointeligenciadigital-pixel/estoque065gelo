@@ -5,6 +5,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
+import { formatarPacotes, formatarPeso } from "../../lib/formato.ts";
 
 /*
   Contagens (RF51–RF56). O Admin vê as pendentes, confere a divergência item a
@@ -12,8 +13,8 @@ import { dataHora } from "../../lib/data.ts";
   ledger. Quem abriu não decide (RF52) — os botões somem e a mutation revalida.
   O Admin também pode ABRIR e contar às cegas (RF46).
 */
-function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+function formatarQtd(n: number, pesoVariavel: boolean): string {
+  return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
 }
 function dataHoraOuTraco(ms: number | null): string {
   return ms ? dataHora(ms) : "—";
@@ -196,16 +197,15 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
         ]}
       >
         {contagem.itens.map((it) => {
-          const un = it.pesoVariavel ? "kg" : "pct";
           const div = it.divergencia;
           return (
             <tr key={it._id} className={`border-b border-borda/60 last:border-0 ${div !== 0 ? "bg-alerta/5" : ""}`}>
               <td className="px-3 py-2.5 font-medium text-texto">{it.produtoNome}</td>
               <td className="px-3 py-2.5 text-texto-suave">{it.formatoNome}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(it.saldoContado)} {un}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{num(it.saldoSistema)} {un}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel)}</td>
               <td className={`px-3 py-2.5 text-right font-mono ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
-                {div > 0 ? "+" : ""}{num(div)} {un}
+                {div > 0 ? "+" : ""}{formatarQtd(div, it.pesoVariavel)}
               </td>
             </tr>
           );
