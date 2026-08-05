@@ -1,11 +1,15 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Kg, Tela } from "./ui.tsx";
+import { AvisoOperador, Kg, Tela } from "./ui.tsx";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 
 /*
   Ver saldo (RF43–RF45). Somente leitura: saldo por formato e peso total por
-  produto, da câmara da sessão. Não gera movimentação nenhuma.
+  produto, da câmara da sessão. Não gera movimentação nenhuma. Enquanto o
+  colaborador tiver uma contagem aberta nesta câmara, o servidor devolve
+  `null` em vez do saldo (contagem às cegas, sprint PWA tarefa 1) — normalmente
+  esta tela nem é alcançável nesse período ("Ver saldo" some da home), mas a
+  query já protege mesmo que a pessoa tenha a tela aberta de antes.
 */
 export function SaldoView({
   token,
@@ -22,6 +26,8 @@ export function SaldoView({
     <Tela titulo="Saldo da câmara" camaraNome={camaraNome} onVoltar={onVoltar}>
       {saldos === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
+      ) : saldos === null ? (
+        <AvisoOperador>Saldo indisponível durante a contagem.</AvisoOperador>
       ) : saldos.length === 0 ? (
         <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>
       ) : (

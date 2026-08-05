@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { ClipboardList, Gauge, PackagePlus, Truck } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { BotaoGrande, Tela } from "./ui.tsx";
@@ -33,6 +33,10 @@ export function SessaoOperador({
 }) {
   const [tela, setTela] = useState<Tela>("menu");
   const sair = useMutation(api.operador.acesso.sair);
+  // Contagem cega (tarefa 1): enquanto ESTE colaborador tiver uma contagem
+  // aberta nesta câmara, "Ver saldo" some da home — o servidor já nem devolve
+  // o saldo (consulta.saldos), isto só evita mostrar um botão morto.
+  const contagemAberta = useQuery(api.operador.contagem.contagemAbertaDoColaborador, { token });
 
   async function sairAgora() {
     try {
@@ -62,8 +66,15 @@ export function SessaoOperador({
     return <ContagemFlow token={token} camaraNome={sessao.camaraNome} onVoltar={() => setTela("menu")} />;
   }
 
-  // Ações visíveis do menu, conforme as permissões da sessão. "Ver saldo" é sempre
-  // permitida. Cada uma vira um azulejo quadrado na grade 2×2 (launcher da câmara).
+  // Contagem cega (tarefa 1): "Ver saldo" some da home enquanto durar — não
+  // fica desabilitado (some mesmo), porque um botão morto convida a tentar de
+  // novo. Enquanto a query carrega, assume que NÃO há contagem aberta (o
+  // servidor protege o dado de qualquer forma; o pior caso aqui é o botão
+  // aparecer por um instante, nunca um vazamento de saldo).
+  const temContagemAberta = !!contagemAberta;
+
+  // Ações visíveis do menu, conforme as permissões da sessão. Cada uma vira um
+  // azulejo quadrado na grade 2×2 (launcher da câmara).
   const acoes: {
     chave: Tela;
     rotulo: string;
@@ -76,7 +87,9 @@ export function SessaoOperador({
     ...(sessao.podeLancarSaida
       ? [{ chave: "saida" as const, rotulo: "Saída / retorno", Icone: Truck, variante: "saida" as const }]
       : []),
-    { chave: "saldo" as const, rotulo: "Ver saldo", Icone: Gauge, variante: "neutro" as const },
+    ...(!temContagemAberta
+      ? [{ chave: "saldo" as const, rotulo: "Ver saldo", Icone: Gauge, variante: "neutro" as const }]
+      : []),
     ...(sessao.podeContar
       ? [{ chave: "contagem" as const, rotulo: "Contar", Icone: ClipboardList, variante: "neutro" as const }]
       : []),
@@ -85,6 +98,21 @@ export function SessaoOperador({
 
   return (
     <Tela titulo={`Olá, ${sessao.operadorNome}`} camaraNome={sessao.camaraNome}>
+      {temContagemAberta ? (
+        <button
+          onClick={() => setTela("contagem")}
+          className="mb-4 flex w-full flex-col gap-0.5 rounded-xl border border-acento bg-acento/5 px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+        >
+          <span className="flex items-center gap-2 text-base font-medium text-texto">
+            <ClipboardList size={18} aria-hidden="true" />
+            Contagem em andamento · {sessao.camaraNome}
+          </span>
+          <span className="text-sm text-texto-suave">
+            Toque para continuar. Saldo indisponível até você terminar.
+          </span>
+        </button>
+      ) : null}
+
       <div className="grid grid-cols-2 gap-3">
         {acoes.map(({ chave, rotulo, Icone, variante }, i) => {
           // Contagem ímpar: o último azulejo ocupa a linha inteira (bloco largo mais

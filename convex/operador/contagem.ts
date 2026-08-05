@@ -34,6 +34,25 @@ export const estado = query({
   },
 });
 
+// A contagem que ESTE colaborador tem aberta nesta câmara, se houver — usado
+// por toda tela fora do próprio fluxo de contagem (home, produção, saída) pra
+// saber quando esconder saldo (sprint PWA, tarefa 1). Só "aberta e minha";
+// "pendente" ou "de outro" não bloqueiam saldo — só a contagem que ESTE
+// colaborador está no meio de fazer é que precisa ficar cega.
+export const contagemAbertaDoColaborador = query({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    const ativa = await contagemAtivaDaCamara(ctx, camara._id);
+    const minhaAberta =
+      ativa !== null &&
+      ativa.status === "aberta" &&
+      ativa.abertaPorTipo === "operador" &&
+      ativa.operadorId === operador._id;
+    return minhaAberta ? { contagemId: ativa._id } : null;
+  },
+});
+
 // Abre uma contagem para a câmara da sessão (RF46). Rejeita se já houver aberta
 // ou pendente de outra pessoa (RF47). Se o próprio operador já tem uma aberta,
 // devolve-a (retomar), em vez de criar outra.

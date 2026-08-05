@@ -1,7 +1,28 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
+import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { exigirSessaoOperador } from "../lib/auth";
 import { saldoDoFormato, pesoTotalDoProduto, pesoLiquidoDoFormato } from "../lib/saldo";
+import { contagemAtivaDaCamara } from "../lib/contagem";
+
+// Contagem cega (sprint PWA, tarefa 1): enquanto ESTE colaborador tiver uma
+// contagem aberta NESTA câmara, nenhuma query devolve o saldo esperado — o
+// esconderijo é no servidor, não no JSX, porque o dado trafegando aparece no
+// cache do React Query e nas devtools mesmo que a tela não o desenhe.
+async function contagemMinhaAberta(
+  ctx: QueryCtx,
+  camaraId: Id<"camaras">,
+  operadorId: Id<"operadores">,
+): Promise<boolean> {
+  const ativa = await contagemAtivaDaCamara(ctx, camaraId);
+  return (
+    ativa !== null &&
+    ativa.status === "aberta" &&
+    ativa.abertaPorTipo === "operador" &&
+    ativa.operadorId === operadorId
+  );
+}
 
 /*
   Consultas do colaborador — todas presas à câmara da sessão. O operador só
@@ -42,11 +63,14 @@ export const gridProdutos = query({
 });
 
 // "Ver saldo" (RF43, RF45) — leitura pura: saldo por formato e peso total por
-// produto, da câmara da sessão. Não altera nada.
+// produto, da câmara da sessão. Não altera nada. Devolve `null` (em vez do
+// saldo) enquanto este colaborador tiver uma contagem aberta nesta câmara —
+// contagem às cegas, tarefa 1 do sprint PWA.
 export const saldos = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
-    const { camara } = await exigirSessaoOperador(ctx, token);
+    const { operador, camara } = await exigirSessaoOperador(ctx, token);
+    if (await contagemMinhaAberta(ctx, camara._id, operador._id)) return null;
 
     const produtos = await ctx.db
       .query("produtos")
