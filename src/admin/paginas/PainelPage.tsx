@@ -253,7 +253,9 @@ function PainelConteudo() {
                                   mín {minDestaque}
                                   {f.abaixoMinimo ? " ↓" : ""}
                                 </span>
-                              ) : null}
+                              ) : (
+                                <span className="text-[11px] text-texto-fraco">mín não definido</span>
+                              )}
                             </div>
                             <div className="mt-0.5 flex items-baseline gap-1.5">
                               <span className={`font-mono text-sm font-semibold ${f.abaixoMinimo ? "text-alerta" : "text-texto"}`}>
