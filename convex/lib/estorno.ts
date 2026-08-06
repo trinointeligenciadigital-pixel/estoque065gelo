@@ -30,6 +30,9 @@ export async function motivoBloqueio(ctx: QueryCtx, original: Doc<"movimentacoes
   if (original.tipo === "ajuste") {
     return "Ajuste de contagem não é estornado por aqui — a correção é rejeitar a contagem que o gerou.";
   }
+  if (original.tipo === "transferencia") {
+    return "Transferência estorna as duas pernas juntas — use o botão Estornar na linha agrupada do Histórico.";
+  }
 
   const jaEstornado = await ctx.db
     .query("movimentacoes")
@@ -117,4 +120,91 @@ export function exigirMotivoValido(motivoTexto: string): string {
     throw new ConvexError("Descreva o motivo do estorno (mínimo 5 caracteres).");
   }
   return texto;
+}
+
+// -----------------------------------------------------------------------------
+// Estorno de transferência (tarefa 5.5) — as duas pernas juntas, ou nenhuma
+// -----------------------------------------------------------------------------
+
+// Bloqueio de uma transferência inteira: se QUALQUER perna estiver bloqueada
+// (já estornada, ou reconciliada por contagem aprovada depois dela), a
+// transferência toda fica bloqueada — não existe "estornar meia transferência".
+export async function motivoBloqueioTransferencia(
+  ctx: QueryCtx,
+  pernas: Doc<"movimentacoes">[],
+): Promise<string | null> {
+  for (const perna of pernas) {
+    const jaEstornada = await ctx.db
+      .query("movimentacoes")
+      .withIndex("by_estorno_de", (q) => q.eq("estornoDe", perna._id))
+      .first();
+    if (jaEstornada !== null) {
+      return "Esta transferência já foi estornada.";
+    }
+
+    const contagensDaCamara = await ctx.db
+      .query("contagens")
+      .withIndex("by_camara", (q) => q.eq("camaraId", perna.camaraId))
+      .collect();
+    const ultimaAprovada = contagensDaCamara
+      .filter((c) => c.status === "aprovada" && c.decididaEm !== undefined)
+      .sort((a, b) => b.decididaEm! - a.decididaEm!)[0];
+    if (ultimaAprovada !== undefined && perna.registradoEm < ultimaAprovada.decididaEm!) {
+      return `Uma das câmaras desta transferência já teve contagem aprovada em ${dataHoraCuiaba(ultimaAprovada.decididaEm!)} depois dela. O saldo já foi reconciliado — corrija por uma nova contagem.`;
+    }
+  }
+  return null;
+}
+
+// Grava os DOIS contra-lançamentos na mesma mutation (mesma transação — se
+// uma perna falhar, nenhuma grava). Cada contra-lançamento é idempotente pela
+// mesma chave determinística de sempre (`estorno:<id do original>`), então
+// chamar duas vezes não duplica nenhuma das duas.
+export async function inserirEstornoTransferencia(
+  ctx: MutationCtx,
+  pernas: Doc<"movimentacoes">[],
+  autor: AutorEstorno,
+  motivoTexto: string,
+): Promise<{ estornoIds: Id<"movimentacoes">[]; duplicado: boolean; protocolo: string }> {
+  if (pernas.length !== 2) {
+    throw new ConvexError("Transferência inválida: esperava as duas pernas.");
+  }
+
+  const protocolo = protocoloDe(crypto.randomUUID());
+  const loteEstornoId = crypto.randomUUID();
+  const estornoIds: Id<"movimentacoes">[] = [];
+  let algumNovo = false;
+
+  for (const perna of pernas) {
+    const chaveIdempotencia = `estorno:${perna._id}`;
+    const existente = await movimentacaoExistente(ctx, chaveIdempotencia);
+    if (existente !== null) {
+      estornoIds.push(existente._id);
+      continue;
+    }
+    algumNovo = true;
+    const sinal = perna.sinal === 1 ? (-1 as const) : (1 as const);
+    const id = await ctx.db.insert("movimentacoes", {
+      chaveIdempotencia,
+      protocolo,
+      tipo: "estorno",
+      sinal,
+      produtoId: perna.produtoId,
+      camaraId: perna.camaraId,
+      formatoId: perna.formatoId,
+      quantidade: perna.quantidade,
+      pesoKg: perna.pesoKg,
+      estornoDe: perna._id,
+      loteId: loteEstornoId,
+      motivoTexto,
+      registradoPorTipo: autor.registradoPorTipo,
+      clerkId: autor.registradoPorTipo === "admin" ? autor.clerkId : undefined,
+      operadorId: autor.registradoPorTipo === "operador" ? autor.operadorId : undefined,
+      autorNome: autor.autorNome,
+      registradoEm: Date.now(),
+    });
+    estornoIds.push(id);
+  }
+
+  return { estornoIds, duplicado: !algumNovo, protocolo };
 }

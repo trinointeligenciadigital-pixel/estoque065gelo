@@ -153,6 +153,16 @@ export default defineSchema({
       v.literal("perda"), // saída
       v.literal("ajuste"), // entrada ou saída — só via contagem aprovada
       v.literal("estorno"), // contra-lançamento que desfaz um erro — sinal invertido do original
+      // Movimentação interna entre câmaras (correção Painel/Transferência,
+      // tarefa 5) — sempre em PAR na mesma transação: uma perna de saída na
+      // câmara de origem (sinal -1) e uma de entrada na câmara de destino
+      // (sinal 1), compartilhando loteId e protocolo (mesmo mecanismo dos
+      // ajustes em lote — ver loteId abaixo). NÃO é produção nem saída: os
+      // indicadores de produção/saída e o Estoque total têm que ignorá-la
+      // explicitamente (as duas pernas se cancelam por peso, mas cada uma
+      // conta como movimento se algum indicador filtrar por sinal em vez de
+      // por tipo).
+      v.literal("transferencia"),
     ),
     sinal: v.union(v.literal(1), v.literal(-1)),
 
