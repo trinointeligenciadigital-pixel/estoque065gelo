@@ -154,6 +154,51 @@ export const migrarRotuloFormato = internalMutation({
   },
 });
 
+// Correções Painel/Transferência, Tarefa 2: dois formatos ("Água de Coco" e
+// "Tadala", 5,7kg) escaparam de migrarRotuloFormato acima porque o nome
+// cadastrado era "Pacote 5,7" — sem o sufixo "kg" que aquele PADRAO_KG exige
+// — então rotuloFormato (src/lib/formato.ts) concatenava o peso de novo:
+// "Pacote 5,7 5,7 kg". Diagnóstico: (a) nome do formato cadastrado já embutia
+// o peso; não é bug de template. Esta migração é mais estrita que a anterior
+// de propósito: só reconhece o número final do nome quando ele bate EXATO
+// (em "." ou ",") com o pesoKg já cadastrado NESTE formato — nunca um regex
+// solto por "qualquer número no fim", que arriscaria cortar um nome legítimo
+// que termine em número por outro motivo.
+function sufixoPesoPropriodoFormato(nome: string, pesoKg: number): string | null {
+  const alvo = nome.trim();
+  const variantes = [String(pesoKg), String(pesoKg).replace(".", ",")];
+  for (const v of variantes) {
+    const sufixo = ` ${v}`;
+    if (alvo.length > sufixo.length && alvo.endsWith(sufixo)) {
+      const base = alvo.slice(0, -sufixo.length).trim();
+      if (base) return base;
+    }
+  }
+  return null;
+}
+
+export const migrarNomeFormatoPesoEmbutidoSemSufixo = internalMutation({
+  args: { dryRun: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const dryRun = args.dryRun ?? true;
+
+    const formatos = await ctx.db.query("formatos").collect();
+    const log: { id: string; nomeAntes: string; nomeDepois: string }[] = [];
+
+    for (const f of formatos) {
+      if (f.pesoVariavel) continue; // peso variável não tem peso fixo embutível
+      const nomeDepois = sufixoPesoPropriodoFormato(f.nome, f.pesoKg);
+      if (nomeDepois === null) continue;
+      log.push({ id: f._id, nomeAntes: f.nome, nomeDepois });
+      if (!dryRun) {
+        await ctx.db.patch(f._id, { nome: nomeDepois });
+      }
+    }
+
+    return { dryRun, totalFormatos: formatos.length, corrigidos: log.length, log };
+  },
+});
+
 // Tarefa 5: ajustes de contagem gravados antes do campo `loteId` existir saem
 // soltos no Histórico — os 15 ajustes de uma mesma aprovação aparecem como 15
 // linhas sem vínculo entre si. Agrupa por heurística: mesmo segundo + mesmo
