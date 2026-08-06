@@ -135,6 +135,7 @@ export const resumo = query({
           _id: p._id,
           nome: p.nome,
           categoria: p.categoria,
+          camaraId: p.camaraId,
           camaraNome: nomeCamara.get(p.camaraId) ?? "—",
           unidadeBase: p.unidadeBase,
           pesoTotalKg,
@@ -144,10 +145,18 @@ export const resumo = query({
       }),
     );
 
-    // Agregado por categoria, por peso (RF58).
+    // Agregado por categoria, por peso (RF58). Correção "pacote prevalece, quilo
+    // agrega": pacote só aparece aqui quando a categoria tem exatamente UM
+    // formato ativo no total (entre todos os produtos dela) — é a única situação
+    // em que "pacotes" não está misturando tamanhos diferentes. Com dois ou mais
+    // formatos ativos (ou o único sendo de peso variável), fica só o peso.
     const porCategoria = new Map<string, number>();
+    const formatosPorCategoria = new Map<string, { pesoVariavel: boolean; saldo: number }[]>();
     for (const l of linhas) {
       porCategoria.set(l.categoria, (porCategoria.get(l.categoria) ?? 0) + l.pesoTotalKg);
+      const lista = formatosPorCategoria.get(l.categoria) ?? [];
+      for (const f of l.formatos) lista.push({ pesoVariavel: f.pesoVariavel, saldo: f.saldo });
+      formatosPorCategoria.set(l.categoria, lista);
     }
 
     const pendentes = await ctx.db
@@ -204,6 +213,7 @@ export const resumo = query({
         formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
         formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
         autor: autorDe(m),
+        quantidade: m.quantidade,
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,
       }));
@@ -234,7 +244,14 @@ export const resumo = query({
 
     return {
       produtos: linhas,
-      porCategoria: [...porCategoria.entries()].map(([categoria, pesoKg]) => ({ categoria, pesoKg })),
+      porCategoria: [...porCategoria.entries()].map(([categoria, pesoKg]) => {
+        const formatosDaCategoria = formatosPorCategoria.get(categoria) ?? [];
+        const pacotes =
+          formatosDaCategoria.length === 1 && !formatosDaCategoria[0].pesoVariavel
+            ? formatosDaCategoria[0].saldo
+            : null;
+        return { categoria, pesoKg, pacotes };
+      }),
       qtdAbaixoMinimo,
       qtdContagensPendentes: pendentes.length,
       kpis: {

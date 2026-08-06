@@ -6,16 +6,14 @@ import { Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
-import { rotuloProduto } from "../../lib/produto.ts";
+import { nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
+import { pluralizar } from "../../lib/plural.ts";
 
 /*
   Painel do Admin (RF57–RF60) — "painel de instrumentos de câmara fria". KPIs em
   leitura de instrumento, produção de hoje, réguas de estoque por produto (peso,
   RF57) e saídas recentes. O badge de estoque mínimo é por formato (RF59).
 */
-function formatarQtd(n: number, pesoVariavel: boolean): string {
-  return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
-}
 // "AAAA-MM-DD" da data de um dia do gráfico, no fuso de Cuiabá (o `dia` é a meia-
 // noite local guardada em ms UTC). Usado para abrir o Histórico já filtrado.
 const CUIABA_OFFSET_MS = -4 * 60 * 60 * 1000;
@@ -44,18 +42,39 @@ function PainelConteudo() {
   const [soAbaixo, setSoAbaixo] = useState(false);
   const [dias, setDias] = useState(7);
   const mov = useQuery(api.admin.painel.movimentoPorPeriodo, { dias });
+  // Destaque pacotes/kg do bloco "Estoque por produto" (correção "pacote
+  // prevalece, quilo agrega") — muda qual unidade aparece grande na linha de
+  // formato E a ordenação da lista. Padrão pacotes: é o que alguém separa.
+  const [unidadeDestaque, setUnidadeDestaque] = useState<"pacotes" | "kg">("pacotes");
 
   if (r === undefined) return <PainelSkeleton />;
 
   const rotuloPeriodo = dias === 1 ? "hoje" : `${dias} dias`;
   const t = mov?.totais;
 
-  const maxPeso = Math.max(1, ...r.produtos.map((p) => p.pesoTotalKg));
-  // Abaixo do mínimo primeiro, depois maior peso — o que importa fica no topo da
-  // lista (que rola por dentro quando há muitos produtos).
+  // Só produtos com nome repetido em OUTRA câmara precisam do sufixo de câmara
+  // no rótulo — o resto já tem a categoria como tag ao lado (tarefa 6).
+  const homonimos = nomesHomonimos(r.produtos);
+
+  // Total de pacotes de um produto (soma só formatos de peso fixo) — usado
+  // apenas para ordenar quando o destaque é "pacotes"; nunca é um número
+  // mostrado, porque somar pacotes de tamanhos diferentes não tem significado.
+  function totalPacotes(p: { formatos: { pesoVariavel: boolean; saldo: number }[] }): number {
+    return p.formatos.reduce((acc, f) => acc + (f.pesoVariavel ? 0 : f.saldo), 0);
+  }
+
+  // Abaixo do mínimo primeiro — o que importa fica no topo da lista (que rola
+  // por dentro quando há muitos produtos). Dentro disso, a ordem segue a
+  // unidade em destaque.
   const produtos = (soAbaixo ? r.produtos.filter((p) => p.abaixoMinimo) : r.produtos)
     .slice()
-    .sort((a, b) => Number(b.abaixoMinimo) - Number(a.abaixoMinimo) || b.pesoTotalKg - a.pesoTotalKg);
+    .sort((a, b) => {
+      const abaixoDiff = Number(b.abaixoMinimo) - Number(a.abaixoMinimo);
+      if (abaixoDiff !== 0) return abaixoDiff;
+      return unidadeDestaque === "pacotes"
+        ? totalPacotes(b) - totalPacotes(a)
+        : b.pesoTotalKg - a.pesoTotalKg;
+    });
 
   return (
     <>
@@ -70,7 +89,7 @@ function PainelConteudo() {
             >
               <span className="font-mono text-lg font-semibold text-acento">{r.qtdContagensPendentes}</span>
               <span className="text-[11.5px] leading-tight text-texto-suave">
-                contagens
+                {r.qtdContagensPendentes === 1 ? "contagem" : "contagens"}
                 <br />
                 aguardando decisão
               </span>
@@ -97,13 +116,15 @@ function PainelConteudo() {
           <Eyebrow>Abaixo do mínimo</Eyebrow>
           <span className={`font-mono text-3xl leading-none font-semibold ${r.qtdAbaixoMinimo > 0 ? "text-alerta" : "text-texto"}`}>
             {r.qtdAbaixoMinimo}
-            <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">formatos</span>
+            <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">
+              {r.qtdAbaixoMinimo === 1 ? "formato" : "formatos"}
+            </span>
           </span>
           <span className={`text-[11.5px] ${r.qtdAbaixoMinimo > 0 ? "text-alerta" : "text-texto-fraco"}`}>
             {r.qtdAbaixoMinimo > 0 ? (soAbaixo ? "mostrando só estes ✓" : "ver quais →") : "tudo acima do mínimo"}
           </span>
         </button>
-        <Kpi rotulo={`Produção · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.producaoKg) : "—"} cor="text-entrada" rodape={t ? `${t.qtdLancamentos} lançamentos` : "carregando…"} />
+        <Kpi rotulo={`Produção · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.producaoKg) : "—"} cor="text-entrada" rodape={t ? pluralizar(t.qtdLancamentos, "lançamento", "lançamentos") : "carregando…"} />
         <Kpi rotulo={`Saídas · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.saidasKg) : "—"} rodape="venda · patrocínio · perda" />
       </div>
 
@@ -114,7 +135,9 @@ function PainelConteudo() {
           {r.porCategoria.map((c) => (
             <span key={c.categoria} className="text-[13px] text-texto">
               {rotuloCat[c.categoria] ?? c.categoria}{" "}
-              <span className="font-mono font-semibold text-acento">{formatarPeso(c.pesoKg)}</span>
+              <span className="font-mono font-semibold text-acento">
+                {c.pacotes !== null ? `${formatarPacotes(c.pacotes)} · ${formatarPeso(c.pesoKg)}` : formatarPeso(c.pesoKg)}
+              </span>
             </span>
           ))}
         </div>
@@ -146,7 +169,7 @@ function PainelConteudo() {
             <div className="overflow-x-auto">
             <table className="w-full min-w-[380px] text-sm">
               <thead>
-                <Th cols={["Produto", "Colaborador", "Hora", "Peso", ""]} />
+                <Th cols={["Produto", "Colaborador", "Hora", "Qtd · Peso", ""]} />
               </thead>
               <tbody>
                 {r.producaoHoje.map((m, i) => (
@@ -156,7 +179,16 @@ function PainelConteudo() {
                     </td>
                     <td className="py-2.5 pr-3 text-texto-suave">{m.autor}</td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
-                    <td className="py-2.5 pr-3 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
+                    <td className="py-2.5 pr-3 text-right">
+                      {m.formatoPesoVariavel ? (
+                        <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
+                      ) : (
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="font-mono font-semibold text-texto">{formatarPacotes(m.quantidade)}</span>
+                          <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2.5 text-right"><Pill tom="entrada">entrada</Pill></td>
                   </tr>
                 ))}
@@ -170,7 +202,15 @@ function PainelConteudo() {
         <Cartao className="p-5">
           <PanelHead
             titulo="Estoque por produto"
-            extra={<span className="font-mono text-[11px] text-texto-fraco">{produtos.length} produtos · ordenado por peso</span>}
+            extra={
+              <div className="flex items-center gap-2.5">
+                <SegUnidade unidade={unidadeDestaque} onChange={setUnidadeDestaque} />
+                <span className="font-mono text-[11px] text-texto-fraco">
+                  {pluralizar(produtos.length, "produto", "produtos")} · ordenado por{" "}
+                  {unidadeDestaque === "pacotes" ? "pacotes" : "peso"}
+                </span>
+              </div>
+            }
           />
           {produtos.length === 0 ? (
             <Vazio>{soAbaixo ? "Nenhum formato abaixo do mínimo." : "Nenhum produto ativo. Cadastre em Produtos."}</Vazio>
@@ -180,40 +220,57 @@ function PainelConteudo() {
                 <div key={p._id} className={`rounded-lg p-3 ${p.abaixoMinimo ? "bg-alerta/5" : "bg-superficie-fria"}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="text-[13px] font-semibold text-texto">
-                      {rotuloProduto(p.nome, p.camaraNome)}
+                      {rotuloProduto(p.nome, p.camaraNome, homonimos.has(p.nome.trim().toLowerCase()))}
                       <span className="ml-1.5 font-mono text-[10px] tracking-wide text-texto-fraco uppercase">{p.categoria}</span>
                     </span>
+                    {/* Total do produto agrega formatos (tamanhos diferentes) por
+                        peso — nunca pacotes aqui, mesma regra de "por categoria". */}
                     <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(p.pesoTotalKg)}</span>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gelo-trilho">
-                    <div
-                      className={`h-full rounded-full ${p.abaixoMinimo ? "bg-alerta" : "bg-gelo"}`}
-                      style={{ width: `${Math.max(3, Math.round((p.pesoTotalKg / maxPeso) * 100))}%` }}
-                    />
-                  </div>
                   {p.formatos.length > 0 ? (
-                    <div className="mt-2.5 flex flex-col gap-1.5">
-                      {p.formatos.map((f) =>
-                        f.estoqueMinimo > 0 ? (
+                    <div className="mt-2.5 flex flex-col gap-2">
+                      {p.formatos.map((f) => {
+                        // Destaque = a unidade escolhida no cabeçalho; peso variável
+                        // não tem "pacote", então segue sempre em kg.
+                        const mostrarPacotes = !f.pesoVariavel && unidadeDestaque === "pacotes";
+                        const pesoSaldo = f.pesoVariavel ? f.saldo : f.saldo * f.pesoKg;
+                        const destaque = mostrarPacotes ? formatarPacotes(f.saldo) : formatarPeso(pesoSaldo);
+                        const secundario = f.pesoVariavel
+                          ? null
+                          : mostrarPacotes
+                            ? formatarPeso(pesoSaldo)
+                            : formatarPacotes(f.saldo);
+                        const pesoMinimo = f.pesoVariavel ? f.estoqueMinimo : f.estoqueMinimo * f.pesoKg;
+                        const minDestaque = mostrarPacotes ? formatarPacotes(f.estoqueMinimo) : formatarPeso(pesoMinimo);
+                        return (
                           <div key={f._id}>
-                            <div className="flex items-baseline justify-between gap-2 text-[11px]">
-                              <span className={f.abaixoMinimo ? "font-medium text-alerta" : "text-texto-suave"}>{rotuloFormato(f)}</span>
-                              <span className={`font-mono ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
-                                {formatarQtd(f.saldo, f.pesoVariavel)} / mín {formatarQtd(f.estoqueMinimo, f.pesoVariavel)}
-                                {f.abaixoMinimo ? " ↓" : ""}
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className={`text-[11px] ${f.abaixoMinimo ? "font-medium text-alerta" : "text-texto-suave"}`}>
+                                {rotuloFormato(f)}
                               </span>
+                              {f.estoqueMinimo > 0 ? (
+                                <span className={`text-[11px] ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
+                                  mín {minDestaque}
+                                  {f.abaixoMinimo ? " ↓" : ""}
+                                </span>
+                              ) : null}
                             </div>
-                            <BulletMinimo saldo={f.saldo} minimo={f.estoqueMinimo} abaixo={f.abaixoMinimo} />
+                            <div className="mt-0.5 flex items-baseline gap-1.5">
+                              <span className={`font-mono text-sm font-semibold ${f.abaixoMinimo ? "text-alerta" : "text-texto"}`}>
+                                {destaque}
+                              </span>
+                              {secundario ? (
+                                <span className={`text-[10.5px] ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
+                                  · {secundario}
+                                </span>
+                              ) : null}
+                            </div>
+                            {f.estoqueMinimo > 0 ? (
+                              <BulletMinimo saldo={f.saldo} minimo={f.estoqueMinimo} abaixo={f.abaixoMinimo} />
+                            ) : null}
                           </div>
-                        ) : (
-                          <div key={f._id} className="flex items-baseline justify-between gap-2 text-[11px]">
-                            <span className="text-texto-fraco">{rotuloFormato(f)}</span>
-                            <span className="font-mono text-texto-fraco">
-                              {formatarQtd(f.saldo, f.pesoVariavel)}
-                            </span>
-                          </div>
-                        ),
-                      )}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -277,6 +334,31 @@ function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) =>
           aria-pressed={dias === o.v}
           className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
             dias === o.v ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
+          }`}
+        >
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Alternância pacotes/kg do bloco "Estoque por produto" — mesmo visual do
+// SegPeriodo, versão com 2 opções.
+function SegUnidade({ unidade, onChange }: { unidade: "pacotes" | "kg"; onChange: (u: "pacotes" | "kg") => void }) {
+  const ops = [
+    { v: "pacotes" as const, l: "Pacotes" },
+    { v: "kg" as const, l: "Kg" },
+  ];
+  return (
+    <div className="inline-flex rounded-lg border border-borda bg-superficie p-0.5">
+      {ops.map((o) => (
+        <button
+          key={o.v}
+          onClick={() => onChange(o.v)}
+          aria-pressed={unidade === o.v}
+          className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            unidade === o.v ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
           }`}
         >
           {o.l}
