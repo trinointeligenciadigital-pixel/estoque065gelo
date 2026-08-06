@@ -366,10 +366,10 @@ function LinhaMov({
       </td>
       <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
       <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
-      <td className="px-3 py-2.5 text-right font-mono text-texto">
+      <td className="px-3 py-2.5 text-right font-mono font-semibold text-texto">
         {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
       </td>
-      <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
+      <td className="px-3 py-2.5 text-right font-mono text-xs text-texto-suave">{formatarPeso(m.pesoKg)}</td>
       <td className="px-3 py-2.5 text-texto-suave">
         {m.tipo === "ajuste" ? (
           m.motivoCategoria === null || m.motivoCategoria === "nao_informado" ? (

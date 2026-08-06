@@ -27,6 +27,17 @@ const PAD = { top: 14, right: 18, bottom: 26, left: 46 };
 const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top - PAD.bottom;
 
+// Arredonda o topo do eixo Y para um número redondo (tarefa 6): sem isso as
+// guias saíam com o valor exato do dado (ex.: 0 / 59,8 / 120), decimal e sem
+// nenhum apelo visual de escala. Sobe até o próximo múltiplo de uma casa
+// abaixo da ordem de grandeza do valor — 119,6 vira 120, não 100 nem 200.
+function eixoYArredondado(v: number): number {
+  if (v <= 0) return 1;
+  const exp = Math.floor(Math.log10(v));
+  const passo = Math.pow(10, exp - 1);
+  return Math.ceil(v / passo) * passo;
+}
+
 // Rótulo compacto das linhas-guia do eixo Y — só aqui, porque gridline é
 // referência de escala, não leitura exata (essa vai por formatarPeso, no
 // tooltip e no aria-label).
@@ -80,10 +91,11 @@ export function GraficoTendencia({
     );
   }
 
-  const maxY = Math.max(
+  const maxYBruto = Math.max(
     1,
     ...serie.map((p) => Math.max(mostrar.producao ? p.producaoKg : 0, mostrar.saidas ? p.saidasKg : 0)),
   );
+  const maxY = eixoYArredondado(maxYBruto);
 
   const xFor = (i: number) => PAD.left + (i / (n - 1)) * PLOT_W;
   const yFor = (v: number) => PAD.top + PLOT_H - (v / maxY) * PLOT_H;
