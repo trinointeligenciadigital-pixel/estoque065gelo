@@ -6,7 +6,7 @@ import { Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
-import { nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
+import { mesmoTexto, nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
 import { pluralizar } from "../../lib/plural.ts";
 
 /*
@@ -218,15 +218,39 @@ function PainelConteudo() {
             <div className="flex max-h-[460px] flex-col gap-2.5 overflow-y-auto pr-1">
               {produtos.map((p) => (
                 <div key={p._id} className={`rounded-lg p-3 ${p.abaixoMinimo ? "bg-alerta/5" : "bg-superficie-fria"}`}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[13px] font-semibold text-texto">
-                      {rotuloProduto(p.nome, p.camaraNome, homonimos.has(p.nome.trim().toLowerCase()))}
-                      <span className="ml-1.5 font-mono text-[10px] tracking-wide text-texto-fraco uppercase">{p.categoria}</span>
-                    </span>
-                    {/* Total do produto agrega formatos (tamanhos diferentes) por
-                        peso — nunca pacotes aqui, mesma regra de "por categoria". */}
-                    <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(p.pesoTotalKg)}</span>
-                  </div>
+                  {(() => {
+                    // Total do produto agrega formatos (tamanhos diferentes) por
+                    // peso — nunca pacotes aqui quando há mais de um formato, mesma
+                    // regra de "por categoria". Com um ÚNICO formato ativo (de peso
+                    // fixo), não há o que agregar: o número principal acompanha a
+                    // unidade escolhida no cabeçalho, como já acontece na linha do
+                    // formato logo abaixo.
+                    const unicoFormato = p.formatos.length === 1 && !p.formatos[0].pesoVariavel;
+                    const mostrarPacotes = unicoFormato && unidadeDestaque === "pacotes";
+                    const destaqueProduto = mostrarPacotes
+                      ? formatarPacotes(p.formatos[0].saldo)
+                      : formatarPeso(p.pesoTotalKg);
+                    // Tag de categoria só informa quando difere do nome do produto
+                    // (ex.: "Escamado" categoria "escamado" não diz nada de novo;
+                    // "Morango" categoria "saborizado" diz).
+                    const tagRedundante = mesmoTexto(p.nome, p.categoria);
+                    return (
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[13px] font-semibold text-texto">
+                          {rotuloProduto(p.nome, p.camaraNome, homonimos.has(p.nome.trim().toLowerCase()))}
+                          {tagRedundante ? null : (
+                            <span className="ml-1.5 font-mono text-[10px] tracking-wide text-texto-fraco uppercase">{p.categoria}</span>
+                          )}
+                        </span>
+                        <span className="flex items-baseline gap-1">
+                          <span className="font-mono text-sm font-semibold text-texto">{destaqueProduto}</span>
+                          {mostrarPacotes ? (
+                            <span className="text-[10.5px] text-texto-fraco">· {formatarPeso(p.pesoTotalKg)}</span>
+                          ) : null}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {p.formatos.length > 0 ? (
                     <div className="mt-2.5 flex flex-col gap-2">
                       {p.formatos.map((f) => {

@@ -10,6 +10,16 @@ export function rotuloProduto(nome: string, camaraNome: string, mostrarCamara = 
   return mostrarCamara ? `${nome} · ${camaraNome}` : nome;
 }
 
+// Compara dois textos ignorando acento, caixa e espaço nas pontas — usado para
+// decidir se a tag de categoria repete o nome do produto (ex.: "Escamado" ·
+// categoria "escamado") e por isso não informa nada de novo.
+const MARCAS_DIACRITICAS = new RegExp("[\\u0300-\\u036f]", "g");
+export function mesmoTexto(a: string, b: string): boolean {
+  const normalizar = (s: string) =>
+    s.trim().toLowerCase().normalize("NFD").replace(MARCAS_DIACRITICAS, "");
+  return normalizar(a) === normalizar(b);
+}
+
 // Nomes (normalizados) que aparecem em mais de uma câmara — só esses precisam
 // do sufixo de câmara para não ficarem ambíguos numa lista de produtos.
 export function nomesHomonimos<T extends { nome: string; camaraId: string }>(
