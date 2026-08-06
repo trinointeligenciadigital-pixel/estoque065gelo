@@ -12,6 +12,7 @@ import { rotuloProduto } from "../../lib/produto.ts";
 import {
   linhasContexto,
   linkWhatsappComprovante,
+  SELO_NAO_FISCAL,
   textoComprovante,
   totalPacotesComprovante,
   type DadosComprovante,
@@ -111,6 +112,8 @@ function fimDoDia(s: string): number | undefined {
 
 export function HistoricoPage() {
   const opcoes = useQuery(api.admin.historico.opcoesFiltro);
+  // Cabeçalho do comprovante (tarefa 7) — mesma leitura pública usada pelo operador.
+  const empresa = useQuery(api.empresaPublica.dadosComprovante);
 
   // Pré-carrega o período (ou a contagem) pela URL — ex.: clique num dia do
   // gráfico do Painel abre /historico?de=AAAA-MM-DD&ate=AAAA-MM-DD, e "Ver
@@ -199,6 +202,7 @@ export function HistoricoPage() {
       // Todas as linhas do mesmo carregamento já saem do servidor com o
       // mesmo protocolo (protocoloDe do carregamentoId) — não precisa recalcular aqui.
       protocolo: m.protocolo,
+      empresa: empresa ?? null,
     };
   }
 
@@ -585,10 +589,29 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
     }
   }
 
+  const empresa = dados.empresa;
+
   return (
     <Modal titulo="Comprovante de saída" onFechar={onFechar}>
       <div className="flex flex-col gap-4">
         <div className="overflow-hidden rounded-lg border border-borda">
+          {/* De quem → pra quem → o quê (tarefa 7) — sem isto o único
+              documento que sai da empresa chega anônimo ao cliente. */}
+          {empresa?.nomeFantasia ? (
+            <div className="flex items-center gap-2.5 border-b border-borda px-3 py-2">
+              {empresa.logoUrl ? (
+                <img src={empresa.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain" />
+              ) : null}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-texto">{empresa.nomeFantasia}</p>
+                {empresa.cnpj || empresa.endereco || empresa.telefone ? (
+                  <p className="truncate text-[11px] text-texto-suave">
+                    {[empresa.cnpj, empresa.endereco, empresa.telefone].filter(Boolean).join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className="border-b border-borda px-3 py-2">
             <span className="text-sm font-semibold text-texto">{dados.rotulo}</span>{" "}
             <span className="font-mono text-xs text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
@@ -653,6 +676,7 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
             </span>
             <span className="font-mono text-sm text-texto">{dados.protocolo}</span>
           </div>
+          <p className="border-t border-borda px-3 py-1.5 text-center text-[10.5px] text-texto-fraco">{SELO_NAO_FISCAL}</p>
         </div>
         <div className="flex justify-end gap-2">
           <Botao variante="neutro" onClick={copiar}>

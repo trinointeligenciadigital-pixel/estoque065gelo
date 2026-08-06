@@ -19,6 +19,18 @@ export type ItemComprovante = {
   pesoKg: number;
 };
 
+// Dados da empresa emissora (tarefa 7) — só os campos que vão pro cabeçalho
+// do comprovante. `null` = ainda não cadastrada; cada campo individual pode
+// faltar mesmo com o registro existindo (Admin ainda não preencheu tudo) —
+// nesse caso a linha correspondente simplesmente não aparece.
+export type DadosEmpresaComprovante = {
+  nomeFantasia: string | null;
+  cnpj: string | null;
+  endereco: string | null;
+  telefone: string | null;
+  logoUrl: string | null;
+};
+
 export type DadosComprovante = {
   rotulo: string; // "Venda" | "Patrocínio"
   quandoMs: number;
@@ -30,7 +42,10 @@ export type DadosComprovante = {
   camaraNome: string;
   operadorNome: string;
   protocolo: string;
+  empresa: DadosEmpresaComprovante | null;
 };
+
+export const SELO_NAO_FISCAL = "Documento não fiscal · controle interno de saída";
 
 // Total de pacotes do carregamento — soma só os itens de formato fixo (peso
 // variável não tem "pacote"). 0 quando é só granel: aí não existe "0 pacotes"
@@ -66,10 +81,23 @@ export function linhasContexto(d: DadosComprovante): LinhaComprovante[] {
   ];
 }
 
+// Cabeçalho com a identidade de quem emitiu (tarefa 7.3) — sem isto o único
+// documento que sai da empresa e chega ao cliente por WhatsApp chegava
+// anônimo. Sem nome fantasia cadastrado, cai no genérico (nunca inventa CNPJ,
+// telefone nem nome).
+function linhasCabecalhoEmpresa(empresa: DadosEmpresaComprovante | null): string[] {
+  if (!empresa || !empresa.nomeFantasia) return ["*Comprovante de saída*"];
+  return [
+    `*${empresa.nomeFantasia}*`,
+    ...(empresa.cnpj ? [`CNPJ: ${empresa.cnpj}`] : []),
+    ...(empresa.telefone ? [`Tel: ${empresa.telefone}`] : []),
+  ];
+}
+
 // Texto pronto para WhatsApp / copiar. Usa *negrito* no título (sintaxe do WhatsApp).
 export function textoComprovante(d: DadosComprovante): string {
   return [
-    "*Comprovante de saída — 065 Gelo*",
+    ...linhasCabecalhoEmpresa(d.empresa),
     `${d.rotulo} · ${dataHoraComprovante(d.quandoMs)}`,
     "",
     `Cliente: ${d.cliente || "—"}`,
@@ -82,6 +110,8 @@ export function textoComprovante(d: DadosComprovante): string {
     `Registrado por: ${d.operadorNome}`,
     "",
     `Protocolo: ${d.protocolo}`,
+    "",
+    SELO_NAO_FISCAL,
   ].join("\n");
 }
 

@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
 import {
+  Building2,
   ClipboardCheck,
   Gift,
   LayoutDashboard,
@@ -25,6 +26,7 @@ import { HistoricoPage } from "./paginas/HistoricoPage.tsx";
 import { AdministradoresPage } from "./paginas/AdministradoresPage.tsx";
 import { LancamentoPage } from "./paginas/LancamentoPage.tsx";
 import { PatrociniosPage } from "./paginas/PatrociniosPage.tsx";
+import { EmpresaPage } from "./paginas/EmpresaPage.tsx";
 
 /*
   Casca do painel do Admin — densa, desktop (RNF12). Barra lateral fixa com a
@@ -65,6 +67,7 @@ export function AdminShell({
           <ItemMenu para="/veiculos" rotulo="Veículos" Icone={Truck} />
           <ItemMenu para="/operadores" rotulo="Colaboradores" Icone={Users} />
           <ItemMenu para="/administradores" rotulo="Administradores" Icone={ShieldCheck} />
+          <ItemMenu para="/empresa" rotulo="Empresa" Icone={Building2} />
         </nav>
 
         <div className="mt-auto pt-4">
@@ -107,6 +110,7 @@ export function AdminShell({
           <Route path="veiculos" element={<VeiculosPage />} />
           <Route path="operadores" element={<OperadoresPage />} />
           <Route path="administradores" element={<AdministradoresPage />} />
+          <Route path="empresa" element={<EmpresaPage />} />
           <Route path="*" element={<Navigate to="/painel" replace />} />
         </Routes>
       </main>

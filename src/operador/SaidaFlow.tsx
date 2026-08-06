@@ -15,6 +15,7 @@ import { dataHoraComprovante } from "../lib/data.ts";
 import {
   linhasContexto,
   linkWhatsappComprovante,
+  SELO_NAO_FISCAL,
   textoComprovante,
   totalPacotesComprovante,
   type DadosComprovante,
@@ -121,6 +122,9 @@ function SaidaCarregamento({
   const veiculos = useQuery(api.operador.consulta.veiculos, { token });
   const saldos = useQuery(api.operador.consulta.saldos, { token });
   const lancar = useMutation(api.operador.lancamentos.lancarSaidaMultipla);
+  // Cabeçalho do comprovante (tarefa 7) — leitura pública, sem exigirAdmin: o
+  // operador não tem sessão Clerk.
+  const empresa = useQuery(api.empresaPublica.dadosComprovante);
 
   const rotulo = tipo === "venda" ? "Venda" : "Patrocínio";
 
@@ -319,6 +323,7 @@ function SaidaCarregamento({
       camaraNome,
       operadorNome,
       protocolo: protocolo || "—",
+      empresa: empresa ?? null,
     };
 
     return (
@@ -1107,9 +1112,28 @@ function ComprovanteSaida({
   const contexto = linhasContexto(dados);
   const totalPacotes = totalPacotesComprovante(dados);
 
+  const empresa = dados.empresa;
+
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
+        {/* De quem → pra quem → o quê (tarefa 7): o único documento que sai da
+            empresa e chega ao cliente por WhatsApp não pode chegar anônimo. */}
+        {empresa?.nomeFantasia ? (
+          <div className="flex items-center gap-3 border-b border-borda px-4 py-3">
+            {empresa.logoUrl ? (
+              <img src={empresa.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-contain" />
+            ) : null}
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-texto">{empresa.nomeFantasia}</p>
+              {empresa.cnpj || empresa.endereco || empresa.telefone ? (
+                <p className="truncate text-xs text-texto-suave">
+                  {[empresa.cnpj, empresa.endereco, empresa.telefone].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="border-b border-borda px-4 py-3">
           <div className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
             Comprovante de saída
@@ -1180,6 +1204,7 @@ function ComprovanteSaida({
           </span>
           <span className="font-mono text-sm text-texto">{dados.protocolo}</span>
         </div>
+        <p className="border-t border-borda px-4 py-2 text-center text-[11px] text-texto-fraco">{SELO_NAO_FISCAL}</p>
       </div>
 
       <BotaoGrande variante="primario" onClick={abrirWhatsapp}>

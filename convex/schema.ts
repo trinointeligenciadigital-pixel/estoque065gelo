@@ -100,6 +100,25 @@ export default defineSchema({
     ativo: v.boolean(),
   }).index("by_produto", ["produtoId"]),
 
+  // Dados da empresa emissora do comprovante (correção "pacote prevalece,
+  // quilo agrega", tarefa 7) — singleton: no máximo um registro nesta tabela,
+  // criado/editado pelo Admin em Cadastros → Empresa. Guardado em tabela, não
+  // em constante no código, para o mesmo sistema servir outro cliente sem
+  // alteração de código. Todo campo é opcional porque o registro nasce vazio
+  // (nenhum dado inventado); o comprovante omite qualquer linha vazia em vez
+  // de mostrar espaço em branco ou placeholder.
+  empresa: defineTable({
+    razaoSocial: v.optional(v.string()),
+    nomeFantasia: v.optional(v.string()),
+    cnpj: v.optional(v.string()),
+    inscricaoEstadual: v.optional(v.string()),
+    endereco: v.optional(v.string()),
+    telefone: v.optional(v.string()),
+    whatsapp: v.optional(v.string()),
+    email: v.optional(v.string()),
+    logoStorageId: v.optional(v.id("_storage")),
+  }),
+
   veiculos: defineTable({
     placa: v.string(),
     modelo: v.optional(v.string()),
