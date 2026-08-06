@@ -1,18 +1,21 @@
 import { dataHoraComprovante } from "./data.ts";
-import { formatarPeso } from "./formato.ts";
+import { formatarPacotes, formatarPeso, parPacotesPeso } from "./formato.ts";
 
 /*
   Comprovante de saída (venda/patrocínio) — formato único usado pelo operador (na
   tela de sucesso) e pelo Admin (no histórico, para reenviar depois). É um documento
   DERIVADO de uma movimentação já registrada; nada é gravado a partir daqui.
   O "Protocolo" vem da chave de idempotência (UUID do cliente), nunca do _id (RNF13).
+
+  Correção "pacote prevalece, quilo agrega" (tarefa 5): cada item carrega a
+  quantidade em pacotes como NÚMERO (`quantidadePacotes`), não mais pré-formatada
+  — quem renderiza decide o destaque (visual) ou monta a linha de texto (plano).
+  `null` = formato de peso variável, que não tem "pacote".
 */
-// Um item do carregamento. Um comprovante tem 1+ itens; uma saída de um produto
-// só é o caso itens.length === 1.
 export type ItemComprovante = {
   produtoNome: string;
   formatoNome: string;
-  quantidadeLabel: string; // vazio quando peso variável (o peso já é o total)
+  quantidadePacotes: number | null;
   pesoKg: number;
 };
 
@@ -29,74 +32,50 @@ export type DadosComprovante = {
   protocolo: string;
 };
 
-// Rótulo do item usado quando há mais de um produto no carregamento.
-function itemLabel(it: ItemComprovante): string {
-  const qtd = it.quantidadeLabel ? `${it.quantidadeLabel} · ` : "";
+// Total de pacotes do carregamento — soma só os itens de formato fixo (peso
+// variável não tem "pacote"). 0 quando é só granel: aí não existe "0 pacotes"
+// pra mostrar, só o peso total.
+export function totalPacotesComprovante(d: DadosComprovante): number {
+  return d.itens.reduce((acc, it) => acc + (it.quantidadePacotes ?? 0), 0);
+}
+
+// Rótulo de UM item em texto puro (sem hierarquia visual — usado no texto
+// copiado e no WhatsApp): quantidade antes do peso, como em toda a correção.
+function itemLabelTexto(it: ItemComprovante): string {
+  const qtd = it.quantidadePacotes !== null ? `${formatarPacotes(it.quantidadePacotes)} · ` : "";
   return `${it.produtoNome} · ${it.formatoNome} — ${qtd}${formatarPeso(it.pesoKg)}`;
 }
 
-// Uma linha do cartão do comprovante. `forte` marca a linha do peso — o número
-// protagonista, destacado maior/mono; `mono` alinha valores numéricos.
-export type LinhaComprovante = { rotulo: string; valor: string; mono?: boolean; forte?: boolean };
+function linhaTotalTexto(d: DadosComprovante): string {
+  const totalPacotes = totalPacotesComprovante(d);
+  return `Total: ${totalPacotes > 0 ? parPacotesPeso(totalPacotes, d.pesoTotalKg) : formatarPeso(d.pesoTotalKg)}`;
+}
 
-// Linhas exibidas no cartão do comprovante. Cada item é uma linha com o
-// nome à esquerda e o peso em mono à direita (não embrulha numa frase longa);
-// o "Peso total" é a linha forte, o número que o cliente confere.
-export function linhasComprovante(d: DadosComprovante): LinhaComprovante[] {
-  const contexto: LinhaComprovante[] = [
+// Linhas de CONTEXTO do cartão visual (rótulo/valor simples) — cliente,
+// veículo, motorista, câmara, registrado por. Itens e total têm layout
+// próprio (quantidade + peso lado a lado, ver ComprovanteSaida / ComprovanteModal)
+// porque não cabem num par rótulo/valor.
+export type LinhaComprovante = { rotulo: string; valor: string; mono?: boolean };
+export function linhasContexto(d: DadosComprovante): LinhaComprovante[] {
+  return [
+    { rotulo: "Cliente", valor: d.cliente || "—" },
     { rotulo: "Veículo", valor: d.veiculoLabel },
     ...(d.motorista ? [{ rotulo: "Motorista", valor: d.motorista }] : []),
     { rotulo: "Câmara", valor: d.camaraNome },
     { rotulo: "Registrado por", valor: d.operadorNome },
   ];
-
-  if (d.itens.length === 1) {
-    const it = d.itens[0];
-    return [
-      { rotulo: "Cliente", valor: d.cliente || "—" },
-      { rotulo: "Produto", valor: it.produtoNome },
-      { rotulo: "Formato", valor: it.formatoNome },
-      ...(it.quantidadeLabel ? [{ rotulo: "Quantidade", valor: it.quantidadeLabel, mono: true }] : []),
-      { rotulo: "Peso", valor: formatarPeso(it.pesoKg), mono: true, forte: true },
-      ...contexto,
-    ];
-  }
-
-  return [
-    { rotulo: "Cliente", valor: d.cliente || "—" },
-    ...d.itens.map((it) => ({
-      rotulo: `${it.produtoNome} · ${it.formatoNome}${it.quantidadeLabel ? ` · ${it.quantidadeLabel}` : ""}`,
-      valor: formatarPeso(it.pesoKg),
-      mono: true,
-    })),
-    { rotulo: "Peso total", valor: formatarPeso(d.pesoTotalKg), mono: true, forte: true },
-    ...contexto,
-  ];
 }
 
 // Texto pronto para WhatsApp / copiar. Usa *negrito* no título (sintaxe do WhatsApp).
 export function textoComprovante(d: DadosComprovante): string {
-  const umItem = d.itens.length === 1;
-  const it0 = d.itens[0];
-  const blocoItens = umItem
-    ? [
-        `Produto: ${it0.produtoNome}`,
-        `Formato: ${it0.formatoNome}`,
-        ...(it0.quantidadeLabel ? [`Quantidade: ${it0.quantidadeLabel}`] : []),
-        `Peso: ${formatarPeso(it0.pesoKg)}`,
-      ]
-    : [
-        "Itens:",
-        ...d.itens.map((it) => `- ${itemLabel(it)}`),
-        `Peso total: ${formatarPeso(d.pesoTotalKg)}`,
-      ];
-
   return [
     "*Comprovante de saída — 065 Gelo*",
     `${d.rotulo} · ${dataHoraComprovante(d.quandoMs)}`,
     "",
     `Cliente: ${d.cliente || "—"}`,
-    ...blocoItens,
+    "Itens:",
+    ...d.itens.map((it) => `- ${itemLabelTexto(it)}`),
+    linhaTotalTexto(d),
     `Veículo: ${d.veiculoLabel}`,
     ...(d.motorista ? [`Motorista: ${d.motorista}`] : []),
     `Câmara: ${d.camaraNome}`,

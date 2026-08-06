@@ -5,14 +5,20 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
-import type { FormatoGrid, LinhaResumo, ProdutoGrid } from "./ui.tsx";
+import type { FormatoGrid, ItemResumo, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer, BotaoDesfazerCarregamento } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
 import { dataHoraComprovante } from "../lib/data.ts";
-import { linhasComprovante, linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../lib/comprovante.ts";
+import {
+  linhasContexto,
+  linkWhatsappComprovante,
+  textoComprovante,
+  totalPacotesComprovante,
+  type DadosComprovante,
+} from "../lib/comprovante.ts";
 
 /*
   Lançar saída (RF28–RF35) e ponto de entrada do retorno (RF38–RF41). Tipos:
@@ -94,10 +100,6 @@ type PassoCarr = "itens" | "produto" | "formato" | "quantidade" | "contexto" | "
 function pesoDoItem(it: ItemCarrinho): number {
   const n = Number(it.valor);
   return kgDe(it.formato, n, n);
-}
-function labelQtdItem(it: ItemCarrinho): string {
-  if (it.formato.pesoVariavel) return "";
-  return formatarPacotes(Number(it.valor));
 }
 
 function SaidaCarregamento({
@@ -308,7 +310,7 @@ function SaidaCarregamento({
       itens: itens.map((it) => ({
         produtoNome: it.produto.nome,
         formatoNome: rotuloFormato(it.formato),
-        quantidadeLabel: labelQtdItem(it),
+        quantidadePacotes: it.formato.pesoVariavel ? null : Number(it.valor),
         pesoKg: pesoDoItem(it),
       })),
       pesoTotalKg: pesoTotal,
@@ -410,20 +412,28 @@ function SaidaCarregamento({
                 {itens.map((it, i) => (
                   <LinhaItem
                     key={it.chave}
-                    titulo={it.produto.nome}
-                    detalhe={`${rotuloFormato(it.formato)}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`}
-                    peso={pesoDoItem(it)}
+                    produtoNome={it.produto.nome}
+                    formatoNome={rotuloFormato(it.formato)}
+                    quantidadePacotes={it.formato.pesoVariavel ? null : Number(it.valor)}
+                    pesoKg={pesoDoItem(it)}
                     onEditar={() => editarItem(i)}
                     onRemover={() => removerItem(i)}
                   />
                 ))}
               </div>
-              {/* Quantidade primeiro (tarefa 5): quem carrega a van conta
-                  pacotes; o peso é o dado do romaneio, mostrado ao lado. */}
+              {/* Quantidade em destaque (tarefa 5): quem carrega a van conta
+                  pacotes; o peso é derivado, em corpo menor ao lado. */}
               <div className="flex items-baseline justify-between border-t border-borda px-1 pt-3">
-                <span className="text-base text-texto-suave">Total</span>
-                <span className="font-mono text-lg font-semibold text-texto">
-                  {totalPacotes > 0 ? `${formatarPacotes(totalPacotes)} · ${formatarPeso(pesoTotal)}` : formatarPeso(pesoTotal)}
+                <span className="text-base font-medium text-texto">Total</span>
+                <span className="text-right">
+                  {totalPacotes > 0 ? (
+                    <>
+                      <span className="font-mono text-lg font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
+                      <span className="ml-2 font-mono text-sm text-texto-suave">{formatarPeso(pesoTotal)}</span>
+                    </>
+                  ) : (
+                    <span className="font-mono text-lg font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
+                  )}
                 </span>
               </div>
             </>
@@ -587,13 +597,16 @@ function SaidaCarregamento({
 
   // -------- Revisar --------
   if (passo === "revisar") {
+    // Cada produto vira um item de verdade (tarefa 5) — nunca uma string
+    // "produto · formato · quantidade" concatenada numa linha genérica.
+    const itensResumo: ItemResumo[] = itens.map((it) => ({
+      produtoNome: it.produto.nome,
+      formatoNome: rotuloFormato(it.formato),
+      quantidadePacotes: it.formato.pesoVariavel ? null : Number(it.valor),
+      pesoKg: pesoDoItem(it),
+    }));
     const linhas: LinhaResumo[] = [
       { rotulo: "Tipo", valor: `${rotulo} (saída)` },
-      ...itens.map((it) => ({
-        rotulo: `${it.produto.nome} · ${rotuloFormato(it.formato)}${labelQtdItem(it) ? ` · ${labelQtdItem(it)}` : ""}`,
-        valor: formatarPeso(pesoDoItem(it)),
-        mono: true,
-      })),
       { rotulo: "Cliente", valor: cliente.trim() },
       { rotulo: "Veículo", valor: rotularVeiculo() },
       ...(motorista.trim() ? [{ rotulo: "Motorista", valor: motorista.trim() }] : []),
@@ -617,6 +630,7 @@ function SaidaCarregamento({
         <ResumoLancamento
           pesoKg={pesoTotal}
           quantidadePacotes={totalPacotes > 0 ? totalPacotes : null}
+          itens={itensResumo}
           linhas={linhas}
         />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
@@ -630,17 +644,21 @@ function SaidaCarregamento({
 // Linha de item no carrinho: toca para editar a quantidade; lixeira para remover.
 // A lixeira nunca remove com um toque só (tarefa 5): com luva e celular
 // molhado, é fácil apagar sem querer — confirmação inline nomeando o item
-// antes de tirar do carregamento.
+// antes de tirar do carregamento. Produto e formato em linhas separadas
+// (produto é a âncora, formato é metadado — nunca uma string concatenada);
+// quantidade em pacotes é o destaque à direita, peso derivado abaixo dela.
 function LinhaItem({
-  titulo,
-  detalhe,
-  peso,
+  produtoNome,
+  formatoNome,
+  quantidadePacotes,
+  pesoKg,
   onEditar,
   onRemover,
 }: {
-  titulo: string;
-  detalhe: string;
-  peso: number;
+  produtoNome: string;
+  formatoNome: string;
+  quantidadePacotes: number | null;
+  pesoKg: number;
   onEditar: () => void;
   onRemover: () => void;
 }) {
@@ -650,7 +668,7 @@ function LinhaItem({
     return (
       <div className="flex flex-col gap-2 rounded-xl border border-borda bg-superficie p-3">
         <p className="text-base text-texto">
-          Remover <span className="font-medium">{titulo}</span>?
+          Remover <span className="font-medium">{produtoNome}</span>?
         </p>
         <div className="flex gap-2">
           <BotaoGrande variante="neutro" onClick={() => setConfirmando(false)} className="flex-1">
@@ -665,21 +683,35 @@ function LinhaItem({
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-xl border border-borda bg-superficie">
+    <div className="flex items-stretch gap-1 rounded-xl border border-borda bg-superficie">
       <button
         onClick={onEditar}
-        aria-label={`Editar ${titulo}`}
-        className="flex min-h-[56px] min-w-0 flex-1 items-center gap-3 rounded-l-xl px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acento"
+        aria-label={`Editar ${produtoNome}`}
+        className="flex min-h-[56px] min-w-0 flex-1 items-start justify-between gap-3 rounded-l-xl px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acento"
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-medium text-texto">{titulo}</span>
-          <span className="block truncate text-sm text-texto-suave">{detalhe}</span>
+          <span className="block truncate text-base font-medium text-texto">{produtoNome}</span>
+          <span className="block truncate text-sm text-texto-suave">{formatoNome}</span>
         </span>
-        <span className="shrink-0 font-mono text-base text-texto">{formatarPeso(peso)}</span>
+        <span className="shrink-0 text-right whitespace-nowrap">
+          {quantidadePacotes !== null ? (
+            <>
+              <span className="block font-mono text-base font-semibold text-texto">
+                {quantidadePacotes}
+                <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
+                  {quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                </span>
+              </span>
+              <span className="block font-mono text-sm text-texto-suave">{formatarPeso(pesoKg)}</span>
+            </>
+          ) : (
+            <span className="block font-mono text-base font-semibold text-texto">{formatarPeso(pesoKg)}</span>
+          )}
+        </span>
       </button>
       <button
         onClick={() => setConfirmando(true)}
-        aria-label={`Remover ${titulo}`}
+        aria-label={`Remover ${produtoNome}`}
         className="mr-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
       >
         <Trash2 size={20} aria-hidden="true" />
@@ -1072,7 +1104,8 @@ function ComprovanteSaida({
     }
   }
 
-  const linhas = linhasComprovante(dados);
+  const contexto = linhasContexto(dados);
+  const totalPacotes = totalPacotesComprovante(dados);
 
   return (
     <div className="flex flex-col gap-3">
@@ -1086,26 +1119,60 @@ function ComprovanteSaida({
             <span className="font-mono text-sm font-normal text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
           </div>
         </div>
-        <dl>
-          {linhas.map((l, i) =>
-            l.forte ? (
-              <div
-                key={i}
-                className="flex items-baseline justify-between gap-3 border-y border-borda bg-superficie-fria/40 px-4 py-3"
-              >
-                <dt className="text-base font-medium text-texto">{l.rotulo}</dt>
-                <dd className="text-right font-mono text-2xl font-semibold text-texto">{l.valor}</dd>
+
+        {/* Cada produto é a âncora da sua linha; formato é metadado abaixo dele.
+            Quantidade em pacotes é o destaque à direita, peso derivado abaixo
+            (tarefa 5 — nunca uma string concatenada produto/formato/quantidade). */}
+        <div className="border-b border-borda">
+          {dados.itens.map((it, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base text-texto">{it.produtoNome}</p>
+                <p className="truncate text-sm text-texto-suave">{it.formatoNome}</p>
               </div>
+              <div className="shrink-0 text-right whitespace-nowrap">
+                {it.quantidadePacotes !== null ? (
+                  <>
+                    <p className="font-mono text-base font-semibold text-texto">
+                      {it.quantidadePacotes}
+                      <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
+                        {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                      </span>
+                    </p>
+                    <p className="font-mono text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
+                  </>
+                ) : (
+                  <p className="font-mono text-base font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-baseline justify-between gap-3 border-b border-borda bg-superficie-fria/40 px-4 py-3">
+          <dt className="text-base font-medium text-texto">Total</dt>
+          <dd className="text-right">
+            {totalPacotes > 0 ? (
+              <>
+                <span className="font-mono text-2xl font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
+                <span className="ml-2 font-mono text-sm text-texto-suave">{formatarPeso(dados.pesoTotalKg)}</span>
+              </>
             ) : (
-              <div
-                key={i}
-                className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0"
-              >
-                <dt className="min-w-0 flex-1 text-base text-texto-suave">{l.rotulo}</dt>
-                <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
-              </div>
-            ),
-          )}
+              <span className="font-mono text-2xl font-semibold text-texto">{formatarPeso(dados.pesoTotalKg)}</span>
+            )}
+          </dd>
+        </div>
+
+        <dl>
+          {contexto.map((l, i) => (
+            <div
+              key={i}
+              className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0"
+            >
+              <dt className="min-w-0 flex-1 text-base text-texto-suave">{l.rotulo}</dt>
+              <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+            </div>
+          ))}
         </dl>
         <div className="flex items-center justify-between border-t border-borda px-4 py-2.5">
           <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">

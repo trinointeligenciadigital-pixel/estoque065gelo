@@ -10,9 +10,10 @@ import { dataHora, dataHoraComprovante } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import {
-  linhasComprovante,
+  linhasContexto,
   linkWhatsappComprovante,
   textoComprovante,
+  totalPacotesComprovante,
   type DadosComprovante,
 } from "../../lib/comprovante.ts";
 
@@ -182,7 +183,7 @@ export function HistoricoPage() {
         pesoVariavel: x.formatoPesoVariavel,
         unidadesPorPacote: x.formatoUnidadesPorPacote,
       }),
-      quantidadeLabel: x.formatoPesoVariavel ? "" : formatarPacotes(x.quantidade),
+      quantidadePacotes: x.formatoPesoVariavel ? null : x.quantidade,
       pesoKg: x.pesoKg,
     }));
     return {
@@ -571,7 +572,8 @@ function Filtro({ label, children }: { label: string; children: ReactNode }) {
 function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const texto = textoComprovante(dados);
-  const linhas = linhasComprovante(dados);
+  const contexto = linhasContexto(dados);
+  const totalPacotes = totalPacotesComprovante(dados);
 
   async function copiar() {
     try {
@@ -591,26 +593,59 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
             <span className="text-sm font-semibold text-texto">{dados.rotulo}</span>{" "}
             <span className="font-mono text-xs text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
           </div>
-          <dl>
-            {linhas.map((l, i) =>
-              l.forte ? (
-                <div
-                  key={i}
-                  className="flex items-baseline justify-between gap-3 border-y border-borda bg-superficie-fria/40 px-3 py-2"
-                >
-                  <dt className="text-sm font-medium text-texto">{l.rotulo}</dt>
-                  <dd className="text-right font-mono text-xl font-semibold text-texto">{l.valor}</dd>
+
+          {/* Produto é a âncora da linha, formato é metadado (tarefa 5) —
+              quantidade em pacotes é o destaque à direita, peso derivado abaixo. */}
+          <div className="border-b border-borda">
+            {dados.itens.map((it, i) => (
+              <div key={i} className="flex items-start justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-texto">{it.produtoNome}</p>
+                  <p className="truncate text-xs text-texto-suave">{it.formatoNome}</p>
                 </div>
+                <div className="shrink-0 text-right whitespace-nowrap">
+                  {it.quantidadePacotes !== null ? (
+                    <>
+                      <p className="font-mono text-sm font-semibold text-texto">
+                        {it.quantidadePacotes}
+                        <span className="ml-1 text-xs font-normal text-texto-suave">
+                          {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                        </span>
+                      </p>
+                      <p className="font-mono text-xs text-texto-suave">{formatarPeso(it.pesoKg)}</p>
+                    </>
+                  ) : (
+                    <p className="font-mono text-sm font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-baseline justify-between gap-3 border-y border-borda bg-superficie-fria/40 px-3 py-2">
+            <dt className="text-sm font-medium text-texto">Total</dt>
+            <dd className="text-right">
+              {totalPacotes > 0 ? (
+                <>
+                  <span className="font-mono text-xl font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
+                  <span className="ml-2 font-mono text-xs text-texto-suave">{formatarPeso(dados.pesoTotalKg)}</span>
+                </>
               ) : (
-                <div
-                  key={i}
-                  className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0"
-                >
-                  <dt className="min-w-0 flex-1 text-sm text-texto-suave">{l.rotulo}</dt>
-                  <dd className={`shrink-0 text-right text-sm text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
-                </div>
-              ),
-            )}
+                <span className="font-mono text-xl font-semibold text-texto">{formatarPeso(dados.pesoTotalKg)}</span>
+              )}
+            </dd>
+          </div>
+
+          <dl>
+            {contexto.map((l, i) => (
+              <div
+                key={i}
+                className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0"
+              >
+                <dt className="min-w-0 flex-1 text-sm text-texto-suave">{l.rotulo}</dt>
+                <dd className={`shrink-0 text-right text-sm text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+              </div>
+            ))}
           </dl>
           <div className="flex items-center justify-between border-t border-borda px-3 py-1.5">
             <span className="font-mono text-[10px] font-medium tracking-[0.1em] text-texto-fraco uppercase">

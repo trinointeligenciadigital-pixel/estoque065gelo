@@ -222,18 +222,33 @@ export function Kg({ valor }: { valor: number }) {
 // RF34). Cada linha é rótulo à esquerda, valor à direita; números em mono.
 export type LinhaResumo = { rotulo: string; valor: string; mono?: boolean };
 
+// Um item de carregamento (venda/patrocínio com vários produtos) — layout
+// próprio de 2 colunas × 2 alturas (correção "pacote prevalece, quilo agrega",
+// tarefa 5): nome do produto é a âncora da linha, formato é metadado; nunca
+// vira uma string concatenada "produto · formato · quantidade".
+export type ItemResumo = {
+  produtoNome: string;
+  formatoNome: string;
+  quantidadePacotes: number | null; // null = peso variável, não tem "pacote"
+  pesoKg: number;
+};
+
 // O destaque grande é o que o operador CONTOU com as próprias mãos — pacotes,
 // não quilos derivados (tarefa 4 do sprint PWA: a tela existe pra pegar erro
 // de digitação, e ninguém confere um número contra a realidade física
 // olhando pro peso calculado). Peso variável não tem "pacotes": aí o peso
 // digitado É a contagem, e continua sendo o destaque, como sempre foi.
+// `itens`, quando presente (carregamento de vários produtos), lista cada
+// produto na linha de 2 alturas em vez de misturar tudo em `linhas`.
 export function ResumoLancamento({
   pesoKg,
   quantidadePacotes,
+  itens,
   linhas,
 }: {
   pesoKg: number;
   quantidadePacotes?: number | null;
+  itens?: ItemResumo[];
   linhas: LinhaResumo[];
 }) {
   return (
@@ -262,6 +277,33 @@ export function ResumoLancamento({
           </div>
         )}
       </div>
+      {itens && itens.length > 0 ? (
+        <div className="border-b border-borda">
+          {itens.map((it, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-base text-texto">{it.produtoNome}</p>
+                <p className="truncate text-sm text-texto-suave">{it.formatoNome}</p>
+              </div>
+              <div className="shrink-0 text-right whitespace-nowrap">
+                {it.quantidadePacotes !== null ? (
+                  <>
+                    <p className="font-mono text-base font-semibold text-texto">
+                      {it.quantidadePacotes}
+                      <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
+                        {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                      </span>
+                    </p>
+                    <p className="font-mono text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
+                  </>
+                ) : (
+                  <p className="font-mono text-base font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <dl>
         {linhas.map((l, i) => (
           <div

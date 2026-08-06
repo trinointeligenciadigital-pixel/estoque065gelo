@@ -43,3 +43,10 @@ export function rotuloFormato(f: FormatoRotulo): string {
   const unidades = f.unidadesPorPacote ? ` · ${f.unidadesPorPacote} un` : "";
   return `${f.nome} ${formatarPeso(f.pesoKg)}${unidades}`;
 }
+
+// "21 pacotes · 119,7 kg" — o par padrão pacote+peso, nesta ordem, em texto
+// puro (correção "pacote prevalece, quilo agrega"). Usado onde não há
+// diferenciação visual de tamanho (texto copiado, WhatsApp, rótulos simples).
+export function parPacotesPeso(qtdPacotes: number, pesoKg: number): string {
+  return `${formatarPacotes(qtdPacotes)} · ${formatarPeso(pesoKg)}`;
+}
