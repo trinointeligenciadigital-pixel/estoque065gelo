@@ -24,6 +24,7 @@ export const listar = query({
         v.literal("perda"),
         v.literal("ajuste"),
         v.literal("estorno"),
+        v.literal("transferencia"),
       ),
     ),
     operadorId: v.optional(v.id("operadores")),

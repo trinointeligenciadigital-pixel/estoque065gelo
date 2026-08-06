@@ -23,7 +23,15 @@ import {
   excluir — nem existe endpoint para isso. Filtros por câmara, produto, tipo,
   período e autor.
 */
-type Tipo = "producao" | "venda" | "patrocinio" | "retornoPatrocinio" | "perda" | "ajuste" | "estorno";
+type Tipo =
+  | "producao"
+  | "venda"
+  | "patrocinio"
+  | "retornoPatrocinio"
+  | "perda"
+  | "ajuste"
+  | "estorno"
+  | "transferencia";
 const rotuloTipo: Record<Tipo, string> = {
   producao: "Produção",
   venda: "Venda",
@@ -32,6 +40,7 @@ const rotuloTipo: Record<Tipo, string> = {
   perda: "Perda",
   ajuste: "Ajuste",
   estorno: "Estorno",
+  transferencia: "Transferência",
 };
 const rotuloMotivoAjuste: Record<string, string> = {
   contagem: "Contagem",
@@ -134,6 +143,7 @@ export function HistoricoPage() {
   const [protocolo, setProtocolo] = useState("");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
   const [estornando, setEstornando] = useState<MovRow | null>(null);
+  const [estornandoTransferLote, setEstornandoTransferLote] = useState<string | null>(null);
 
   const movs = useQuery(api.admin.historico.listar, {
     camaraId: camaraId || undefined,
@@ -314,6 +324,7 @@ export function HistoricoPage() {
                 itens={l.itens}
                 onComprovante={(m) => setComprovante(montarComprovante(m))}
                 onEstornar={(m) => setEstornando(m)}
+                onEstornarTransferencia={(loteId) => setEstornandoTransferLote(loteId)}
               />
             ),
           )
@@ -326,6 +337,9 @@ export function HistoricoPage() {
       {estornando ? (
         <ModalEstorno m={estornando} onFechar={() => setEstornando(null)} />
       ) : null}
+      {estornandoTransferLote ? (
+        <ModalEstornoTransferencia loteId={estornandoTransferLote} onFechar={() => setEstornandoTransferLote(null)} />
+      ) : null}
     </>
   );
 }
@@ -337,8 +351,11 @@ export function HistoricoPage() {
 // um estorno (não se estorna um estorno) e ainda não foi estornado. O servidor
 // revalida tudo de novo (inclusive o bloqueio de contagem já reconciliada, que
 // a UI não checa aqui) — isto só decide se o botão aparece.
+// Transferência não estorna por linha — as duas pernas juntas, pelo botão da
+// linha agrupada (ver LinhaGrupo). motivoBloqueio no servidor bloqueia de
+// qualquer forma; isto só evita mostrar um botão que ia dar erro na certa.
 function podeEstornar(m: MovRow): boolean {
-  return m.tipo !== "ajuste" && m.tipo !== "estorno" && !m.estornado;
+  return m.tipo !== "ajuste" && m.tipo !== "estorno" && m.tipo !== "transferencia" && !m.estornado;
 }
 
 function LinhaMov({
@@ -390,6 +407,11 @@ function LinhaMov({
             {m.estornoDeProtocolo ? `Estorno de ${m.estornoDeProtocolo}` : "Estorno"}
             {m.motivoTexto ? ` · ${m.motivoTexto}` : ""}
           </>
+        ) : m.tipo === "transferencia" ? (
+          <>
+            {m.sinal > 0 ? "Entrada por transferência" : "Saída por transferência"}
+            {m.observacao ? ` · ${m.observacao}` : ""}
+          </>
         ) : (
           <>
             {m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}
@@ -419,21 +441,38 @@ function LinhaMov({
   );
 }
 
-// Linha-resumo de um lote de ajustes (tarefa 5): "Ajuste de contagem ·
-// Saborizado · 15 itens · −250,4 kg · Alisson Sousa", expansível. Lotes
-// reconstruídos por migração (loteInferido) não linkam para contagem nenhuma
-// — não dá pra provar qual contagem gerou aquele lote antigo.
+// Linha-resumo de um lote (tarefa 5 do P0: ajustes de contagem; tarefa 5 desta
+// correção: transferência entre câmaras) — expansível para ver as linhas
+// individuais. Lotes de ajuste reconstruídos por migração (loteInferido) não
+// linkam para contagem nenhuma — não dá pra provar qual contagem gerou aquele
+// lote antigo.
 function LinhaGrupo({
   itens,
   onComprovante,
   onEstornar,
+  onEstornarTransferencia,
 }: {
   itens: MovRow[];
   onComprovante: (m: MovRow) => void;
   onEstornar: (m: MovRow) => void;
+  onEstornarTransferencia: (loteId: string) => void;
 }) {
   const [aberto, setAberto] = useState(false);
   const primeiro = itens[0];
+
+  if (primeiro.tipo === "transferencia") {
+    return (
+      <LinhaGrupoTransferencia
+        itens={itens}
+        aberto={aberto}
+        onToggle={() => setAberto((v) => !v)}
+        onComprovante={onComprovante}
+        onEstornar={onEstornar}
+        onEstornarTransferencia={onEstornarTransferencia}
+      />
+    );
+  }
+
   const pesoTotal = itens.reduce((acc, it) => acc + it.sinal * it.pesoKg, 0);
   const rotulo = primeiro.loteInferido ? "Ajuste em lote (agrupamento inferido)" : "Ajuste de contagem";
 
@@ -475,6 +514,78 @@ function LinhaGrupo({
               onEstornar={() => onEstornar(m)}
               indentado
             />
+          ))
+        : null}
+    </>
+  );
+}
+
+// Linha-resumo de uma transferência (tarefa 5): "Transferência · Cubo/Escama →
+// Conteiner · 120 pacotes · 240,0 kg", expansível para as duas pernas. O
+// estorno é da transferência inteira (as duas pernas juntas), nunca de uma
+// perna isolada — por isso o botão vive aqui, não em LinhaMov.
+function LinhaGrupoTransferencia({
+  itens,
+  aberto,
+  onToggle,
+  onComprovante,
+  onEstornar,
+  onEstornarTransferencia,
+}: {
+  itens: MovRow[];
+  aberto: boolean;
+  onToggle: () => void;
+  onComprovante: (m: MovRow) => void;
+  onEstornar: (m: MovRow) => void;
+  onEstornarTransferencia: (loteId: string) => void;
+}) {
+  const origem = itens.find((it) => it.sinal < 0) ?? itens[0];
+  const destino = itens.find((it) => it.sinal > 0) ?? itens[1];
+  const estornado = itens.some((it) => it.estornado);
+  const loteId = origem.loteId ?? destino.loteId;
+
+  return (
+    <>
+      <tr className={`border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria ${estornado ? "opacity-60" : ""}`}>
+        <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(origem.registradoEm)}</td>
+        <td colSpan={6} className="px-3 py-2.5">
+          <button
+            onClick={onToggle}
+            aria-expanded={aberto}
+            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          >
+            <ChevronRight
+              size={14}
+              className={`shrink-0 text-texto-suave transition-transform ${aberto ? "rotate-90" : ""}`}
+              aria-hidden="true"
+            />
+            <span>
+              Transferência · {origem.camaraNome} → {destino.camaraNome} ·{" "}
+              <span className="font-mono font-medium">
+                {origem.formatoPesoVariavel
+                  ? formatarPeso(origem.pesoKg)
+                  : `${formatarPacotes(origem.quantidade)} · ${formatarPeso(origem.pesoKg)}`}
+              </span>{" "}
+              · {origem.autor}
+            </span>
+            {estornado ? (
+              <span className="ml-1.5 rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+                estornado
+              </span>
+            ) : null}
+          </button>
+        </td>
+        <td className="px-3 py-2.5 text-right" colSpan={2}>
+          {!estornado && loteId ? (
+            <Botao variante="neutro" onClick={() => onEstornarTransferencia(loteId)}>
+              <Undo2 size={14} aria-hidden="true" /> Estornar
+            </Botao>
+          ) : null}
+        </td>
+      </tr>
+      {aberto
+        ? itens.map((m) => (
+            <LinhaMov key={m._id} m={m} onComprovante={() => onComprovante(m)} onEstornar={() => onEstornar(m)} indentado />
           ))
         : null}
     </>
@@ -549,6 +660,82 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
               {!preview.bloqueio ? (
                 <Botao variante="perigo" onClick={confirmar} disabled={!motivoValido || enviando}>
                   {enviando ? "Estornando…" : "Confirmar estorno"}
+                </Botao>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// Modal de estorno de uma transferência inteira (tarefa 5): mostra as DUAS
+// pernas (o que sai da origem, o que entra no destino) antes de confirmar —
+// estornar desfaz as duas juntas, nunca uma sozinha.
+function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFechar: () => void }) {
+  const preview = useQuery(api.admin.estorno.previewTransferencia, { loteId });
+  const estornar = useMutation(api.admin.estorno.estornarTransferencia);
+  const [motivoTexto, setMotivoTexto] = useState("");
+  const [erro, setErro] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  async function confirmar() {
+    setErro("");
+    setEnviando(true);
+    try {
+      await estornar({ loteId, motivoTexto });
+      onFechar();
+    } catch (e) {
+      setErro(mensagemErro(e));
+      setEnviando(false);
+    }
+  }
+
+  const motivoValido = motivoTexto.trim().length >= 5;
+
+  return (
+    <Modal titulo="Estornar transferência" onFechar={onFechar}>
+      <div className="flex flex-col gap-3">
+        {preview === undefined ? (
+          <p className="text-sm text-texto-suave">Carregando…</p>
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 rounded-lg border border-borda bg-superficie-fria/40 p-3">
+              {preview.pernas.map((p, i) => (
+                <p key={i} className="text-sm text-texto">
+                  <span className="text-texto-suave">{p.sentido === "origem" ? "Saiu de" : "Entrou em"} {p.camaraNome} · </span>
+                  {p.produtoNome}{" "}
+                  <span className="text-texto-suave">
+                    / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.formatoPesoVariavel, unidadesPorPacote: p.formatoUnidadesPorPacote })}
+                  </span>
+                  <span className="ml-2 font-mono font-medium">
+                    {p.formatoPesoVariavel ? formatarPeso(p.pesoKg) : `${formatarPacotes(p.quantidade)} · ${formatarPeso(p.pesoKg)}`}
+                  </span>
+                </p>
+              ))}
+            </div>
+
+            {preview.bloqueio ? (
+              <Aviso>{preview.bloqueio}</Aviso>
+            ) : (
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-texto-suave">Motivo do estorno (obrigatório)</span>
+                <textarea
+                  value={motivoTexto}
+                  onChange={(e) => setMotivoTexto(e.target.value)}
+                  rows={3}
+                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
+                  placeholder="ex.: transferi pro lugar errado"
+                />
+              </label>
+            )}
+            {erro ? <Aviso>{erro}</Aviso> : null}
+            <div className="flex justify-end gap-2">
+              <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+              {!preview.bloqueio ? (
+                <Botao variante="perigo" onClick={confirmar} disabled={!motivoValido || enviando}>
+                  {enviando ? "Estornando…" : "Confirmar estorno das duas pernas"}
                 </Botao>
               ) : null}
             </div>

@@ -15,7 +15,7 @@ import { rotuloProduto } from "../../lib/produto.ts";
   Produção e perda seguem um item por vez. A chave/carregamento é renovada após
   cada sucesso, para evitar duplicação por duplo-clique.
 */
-type Tipo = "producao" | "venda" | "patrocinio" | "perda";
+type Tipo = "producao" | "venda" | "patrocinio" | "perda" | "transferencia";
 type MotivoPerda = "derreteu" | "danificado" | "descarte" | "outro";
 
 const rotuloMotivo: Record<MotivoPerda, string> = {
@@ -40,9 +40,11 @@ type ItemCarregamento = {
 export function LancamentoPage() {
   const produtos = useQuery(api.admin.lancamentos.produtosParaLancamento);
   const veiculos = useQuery(api.admin.veiculos.listar);
+  const camaras = useQuery(api.admin.camaras.listar);
   const lancarProducao = useMutation(api.admin.lancamentos.lancarProducao);
   const lancarSaida = useMutation(api.admin.lancamentos.lancarSaida);
   const lancarSaidaMultipla = useMutation(api.admin.lancamentos.lancarSaidaMultipla);
+  const transferir = useMutation(api.admin.transferencias.transferir);
 
   const [tipo, setTipo] = useState<Tipo>("producao");
   const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">("");
@@ -61,6 +63,12 @@ export function LancamentoPage() {
   const [msg, setMsg] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  // Transferência entre câmaras (tarefa 5) — origem usa os mesmos campos
+  // Produto/Formato/Quantidade do resto do formulário; só o destino é próprio.
+  const [camaraDestinoId, setCamaraDestinoId] = useState<Id<"camaras"> | "">("");
+  const [observacaoTransferencia, setObservacaoTransferencia] = useState("");
+  const [chaveTransferencia, setChaveTransferencia] = useState(() => crypto.randomUUID());
+
   // Agrupado por câmara — produtos homônimos em câmaras diferentes (ex.: dois
   // "Cubo") ficam em grupos separados, e o rótulo de cada opção leva a câmara
   // junto (necessário porque um <select> fechado só mostra o texto da opção
@@ -78,10 +86,23 @@ export function LancamentoPage() {
   const produto = produtos?.find((p) => p._id === produtoId);
   const formato = produto?.formatos.find((f) => f._id === formatoId);
   const ehCarregamento = tipo === "venda" || tipo === "patrocinio";
+  const ehTransferencia = tipo === "transferencia";
 
-  // Ao trocar de produto, limpa o formato. Ao trocar de tipo, esvazia o carrinho.
+  // Ao trocar de produto, limpa o formato. Ao trocar de tipo, esvazia o carrinho
+  // e a câmara de destino (evita levar uma escolha de uma transferência
+  // anterior para a próxima, com outro produto de origem).
   useEffect(() => { setFormatoId(""); }, [produtoId]);
-  useEffect(() => { setItens([]); }, [tipo]);
+  useEffect(() => { setItens([]); setCamaraDestinoId(""); }, [tipo]);
+
+  // Produto+formato de mesmo nome/peso na câmara de destino — nunca cria nada;
+  // null bloqueia o envio com a mensagem de cadastro pendente (tarefa 5).
+  const equivalente = useQuery(
+    api.admin.transferencias.equivalente,
+    ehTransferencia && produtoId && formatoId && camaraDestinoId
+      ? { produtoOrigemId: produtoId, formatoOrigemId: formatoId, camaraDestinoId }
+      : "skip",
+  );
+  const camaraDestinoNome = camaras?.find((c) => c._id === camaraDestinoId)?.nome ?? "—";
 
   const pesoPrevisto = useMemo(() => {
     if (!formato) return null;
@@ -106,7 +127,9 @@ export function LancamentoPage() {
       ? true
       : tipo === "perda"
         ? motivo !== "" && (motivo !== "outro" || observacao.trim() !== "")
-        : cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
+        : tipo === "transferencia"
+          ? camaraDestinoId !== "" && !!equivalente
+          : cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
 
   // Itens que entram no carregamento: os já anexados + o em edição, se válido.
   function itemDoStaged(): ItemCarregamento | null {
@@ -148,6 +171,7 @@ export function LancamentoPage() {
   function limparTudo() {
     setChave(crypto.randomUUID());
     setCarregamentoId(crypto.randomUUID());
+    setChaveTransferencia(crypto.randomUUID());
     setProdutoId("");
     setFormatoId("");
     setValor("");
@@ -158,6 +182,8 @@ export function LancamentoPage() {
     setMotivo("");
     setObservacao("");
     setItens([]);
+    setCamaraDestinoId("");
+    setObservacaoTransferencia("");
   }
 
   async function confirmar() {
@@ -183,6 +209,23 @@ export function LancamentoPage() {
           motorista: motorista.trim() || undefined,
         });
         setMsg(`Carregamento registrado · ${itensParaEnviar.length} ${itensParaEnviar.length === 1 ? "produto" : "produtos"}.`);
+        limparTudo();
+        return;
+      }
+
+      if (tipo === "transferencia") {
+        if (!produto || !formato || !camaraDestinoId || !equivalente) return;
+        await transferir({
+          chaveIdempotencia: chaveTransferencia,
+          produtoOrigemId: produto._id,
+          formatoOrigemId: formato._id,
+          produtoDestinoId: equivalente.produtoId,
+          formatoDestinoId: equivalente.formatoId,
+          quantidade: formato.pesoVariavel ? undefined : numVal,
+          pesoKgVariavel: formato.pesoVariavel ? numVal : undefined,
+          observacao: observacaoTransferencia.trim() || undefined,
+        });
+        setMsg("Transferência registrada.");
         limparTudo();
         return;
       }
@@ -226,6 +269,7 @@ export function LancamentoPage() {
             <option value="venda">Venda (saída)</option>
             <option value="patrocinio">Patrocínio (saída)</option>
             <option value="perda">Perda (saída)</option>
+            <option value="transferencia">Transferência (entre câmaras)</option>
           </Selecao>
 
           {/* Itens já anexados ao carregamento (venda/patrocínio) */}
@@ -328,12 +372,63 @@ export function LancamentoPage() {
             </div>
           ) : null}
 
+          {ehTransferencia ? (
+            <div className="flex flex-col gap-3">
+              <Selecao
+                label="Câmara de destino"
+                value={camaraDestinoId}
+                onChange={(e) => setCamaraDestinoId(e.target.value as Id<"camaras">)}
+                disabled={!produto}
+              >
+                <option value="">— escolha —</option>
+                {(camaras ?? [])
+                  .filter((c) => c.ativo && c.nome !== produto?.camaraNome)
+                  .map((c) => (
+                    <option key={c._id} value={c._id}>{c.nome}</option>
+                  ))}
+              </Selecao>
+
+              {produto && formato && camaraDestinoId ? (
+                equivalente === undefined ? (
+                  <p className="text-sm text-texto-suave">Verificando produto equivalente na câmara de destino…</p>
+                ) : equivalente === null ? (
+                  <Aviso>
+                    Não há "{produto.nome} · {rotuloFormato(formato)}" cadastrado na câmara {camaraDestinoNome}.
+                    Cadastre o produto antes de transferir.
+                  </Aviso>
+                ) : (
+                  <div className="rounded-lg border border-borda bg-superficie-fria/40 p-3 text-sm text-texto">
+                    <p>
+                      {produto.nome}{" "}
+                      <span className="text-texto-suave">
+                        · {produto.camaraNome} → {camaraDestinoNome}
+                      </span>
+                    </p>
+                    {valorValido ? (
+                      <p className="mt-1 font-mono font-medium">
+                        {formato.pesoVariavel
+                          ? formatarPeso(numVal)
+                          : `${formatarPacotes(numVal)} · ${formatarPeso(pesoPrevisto ?? 0)}`}
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              ) : null}
+
+              <Campo
+                label="Observação (opcional)"
+                value={observacaoTransferencia}
+                onChange={(e) => setObservacaoTransferencia(e.target.value)}
+              />
+            </div>
+          ) : null}
+
           {erro ? <Aviso>{erro}</Aviso> : null}
           {msg ? <Aviso tom="info">{msg}</Aviso> : null}
 
           <div className="flex justify-end">
             <Botao onClick={confirmar} disabled={!podeEnviar}>
-              {enviando ? "Enviando…" : ehCarregamento ? "Lançar carregamento" : "Lançar"}
+              {enviando ? "Enviando…" : ehCarregamento ? "Lançar carregamento" : ehTransferencia ? "Transferir" : "Lançar"}
             </Botao>
           </div>
         </div>
