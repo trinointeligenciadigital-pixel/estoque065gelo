@@ -231,11 +231,13 @@ export const resumo = query({
         formatoPesoKg: formatoPorId.get(m.formatoId)?.pesoKg ?? 0,
         formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
         formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
-        veiculo: m.veiculoId
-          ? placaVeiculo.get(m.veiculoId) ?? "—"
-          : m.veiculoTerceiro
-            ? "Terceiro"
-            : "—",
+        // Veículo próprio: placa. Terceiro: a identificação digitada (nunca o
+        // rótulo genérico "Terceiro" — quem separou a carga quer saber QUAL
+        // terceiro). Nenhum dos dois: null — a tela decide o texto (ex.:
+        // perda não tem veículo; venda/patrocínio sem nada = "não identificado").
+        veiculoPlaca: m.veiculoId ? placaVeiculo.get(m.veiculoId) ?? "—" : null,
+        veiculoTerceiro: m.veiculoId ? null : m.veiculoTerceiro ?? null,
+        quantidade: m.quantidade,
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,
       }));

@@ -289,18 +289,27 @@ function PainelConteudo() {
           <Vazio>Nenhuma saída registrada nos últimos dias.</Vazio>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <Th cols={["Cliente / motivo", "Produto", "Veículo", "Hora", "Peso", ""]} />
+              <Th cols={["Cliente / motivo", "Produto", "Veículo", "Hora", "Qtd · Peso", ""]} />
             </thead>
             <tbody>
               {r.saidasRecentes.map((m, i) => (
                 <tr key={i} className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
                   <td className="py-2.5 pr-3 text-texto">{m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}</td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
-                  <td className="py-2.5 pr-3 text-texto-suave">{m.veiculo}</td>
+                  <td className="py-2.5 pr-3 text-texto-suave">{veiculoRotulo(m)}</td>
                   <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
-                  <td className="py-2.5 pr-3 text-right font-mono text-texto">{formatarPeso(m.pesoKg)}</td>
+                  <td className="py-2.5 pr-3 text-right">
+                    {m.formatoPesoVariavel ? (
+                      <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
+                    ) : (
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="font-mono font-semibold text-texto">{formatarPacotes(m.quantidade)}</span>
+                        <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="py-2.5 text-right"><Pill tom={m.tipo === "patrocinio" ? "patroc" : m.tipo === "perda" ? "perda" : "venda"}>{rotuloTipo(m.tipo)}</Pill></td>
                 </tr>
               ))}
@@ -319,6 +328,18 @@ function hora(ms: number): string {
 }
 function rotuloTipo(t: string): string {
   return t === "venda" ? "venda" : t === "patrocinio" ? "patrocínio" : "perda";
+}
+
+// Veículo próprio: placa. Terceiro: a identificação que o operador digitou,
+// com o marcador "(terceiro)" — nunca o rótulo genérico "Terceiro" sozinho,
+// que não dizia qual terceiro levou a carga. Terceiro escolhido sem texto
+// (registro antigo ou campo deixado em branco) cai no aviso, em cor
+// secundária — não é erro, é ausência de dado.
+function veiculoRotulo(m: { veiculoPlaca: string | null; veiculoTerceiro: string | null; motivoPerda: string | null }): ReactNode {
+  if (m.veiculoPlaca) return m.veiculoPlaca;
+  if (m.veiculoTerceiro) return `${m.veiculoTerceiro} (terceiro)`;
+  if (m.motivoPerda) return "—";
+  return <span className="text-texto-fraco">Terceiro — não identificado</span>;
 }
 
 function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) => void }) {
