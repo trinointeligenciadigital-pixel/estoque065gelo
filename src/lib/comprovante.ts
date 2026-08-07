@@ -1,5 +1,6 @@
 import { dataHoraComprovante } from "./data.ts";
 import { formatarPacotes, formatarPeso, parPacotesPeso } from "./formato.ts";
+import { mascaraCnpj, mascaraTelefone } from "./mascaras.ts";
 
 /*
   Comprovante de saída (venda/patrocínio) — formato único usado pelo operador (na
@@ -102,10 +103,22 @@ export type CabecalhoEmpresa = {
 export function cabecalhoEmpresaEstruturado(empresa: DadosEmpresaComprovante | null): CabecalhoEmpresa {
   if (!empresa) return { nome: null, linhaCnpj: null, endereco: null, linhaContato: null };
   const nome = empresa.nomeFantasia || empresa.razaoSocial || null;
+  // CNPJ e telefone/WhatsApp sempre com máscara na EXIBIÇÃO, nunca dependendo
+  // de como foi gravado — um registro salvo antes da máscara existir (ou nunca
+  // resalvo depois) tinha só dígitos, e o comprovante saía sem pontuação
+  // nenhuma. mascaraCnpj/mascaraTelefone só extraem dígitos e reformatam, então
+  // aplicar de novo em cima de um valor já formatado não muda nada.
   const linhaCnpj =
-    [empresa.cnpj, empresa.inscricaoEstadual ? `IE ${empresa.inscricaoEstadual}` : null].filter(Boolean).join(" · ") ||
-    null;
-  const linhaContato = [empresa.telefone, empresa.whatsapp].filter(Boolean).join(" · ") || null;
+    [
+      empresa.cnpj ? mascaraCnpj(empresa.cnpj) : null,
+      empresa.inscricaoEstadual ? `IE ${empresa.inscricaoEstadual}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
+  const linhaContato =
+    [empresa.telefone ? mascaraTelefone(empresa.telefone) : null, empresa.whatsapp ? mascaraTelefone(empresa.whatsapp) : null]
+      .filter(Boolean)
+      .join(" · ") || null;
   return { nome, linhaCnpj, endereco: empresa.endereco || null, linhaContato };
 }
 
