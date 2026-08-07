@@ -16,9 +16,15 @@ export const dadosComprovante = query({
     const logoUrl = registro.logoStorageId ? await ctx.storage.getUrl(registro.logoStorageId) : null;
     return {
       nomeFantasia: registro.nomeFantasia ?? null,
+      // Cabeçalho completo (correção "quatro ajustes pontuais", tarefa 2): sem
+      // razão social o nome cai por completo se o fantasia estiver vazio; sem
+      // IE e WhatsApp o cabeçalho ficava incompleto contra o pedido do cliente.
+      razaoSocial: registro.razaoSocial ?? null,
       cnpj: registro.cnpj ?? null,
+      inscricaoEstadual: registro.inscricaoEstadual ?? null,
       endereco: registro.endereco ?? null,
       telefone: registro.telefone ?? null,
+      whatsapp: registro.whatsapp ?? null,
       logoUrl,
     };
   },

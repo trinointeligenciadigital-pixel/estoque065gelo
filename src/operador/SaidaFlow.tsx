@@ -13,6 +13,7 @@ import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
 import { dataHoraComprovante } from "../lib/data.ts";
 import {
+  cabecalhoEmpresaEstruturado,
   linhasContexto,
   linkWhatsappComprovante,
   SELO_NAO_FISCAL,
@@ -1113,24 +1114,25 @@ function ComprovanteSaida({
   const totalPacotes = totalPacotesComprovante(dados);
 
   const empresa = dados.empresa;
+  const cabecalho = cabecalhoEmpresaEstruturado(empresa);
 
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
-        {/* De quem → pra quem → o quê (tarefa 7): o único documento que sai da
-            empresa e chega ao cliente por WhatsApp não pode chegar anônimo. */}
-        {empresa?.nomeFantasia ? (
-          <div className="flex items-center gap-3 border-b border-borda px-4 py-3">
-            {empresa.logoUrl ? (
+        {/* De quem → pra quem → o quê (tarefa 7), em quatro blocos fixos que
+            nunca truncam (correção "quatro ajustes pontuais", tarefa 2): o
+            único documento que sai da empresa e chega ao cliente por
+            WhatsApp não pode chegar anônimo, nem cortado no telefone. */}
+        {cabecalho.nome ? (
+          <div className="flex items-start gap-3 border-b border-borda px-4 py-3">
+            {empresa?.logoUrl ? (
               <img src={empresa.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-contain" />
             ) : null}
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-texto">{empresa.nomeFantasia}</p>
-              {empresa.cnpj || empresa.endereco || empresa.telefone ? (
-                <p className="truncate text-xs text-texto-suave">
-                  {[empresa.cnpj, empresa.endereco, empresa.telefone].filter(Boolean).join(" · ")}
-                </p>
-              ) : null}
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-medium text-texto">{cabecalho.nome}</p>
+              {cabecalho.linhaCnpj ? <p className="mt-0.5 text-sm text-texto-suave">{cabecalho.linhaCnpj}</p> : null}
+              {cabecalho.endereco ? <p className="text-sm text-texto-suave">{cabecalho.endereco}</p> : null}
+              {cabecalho.linhaContato ? <p className="text-sm text-texto-suave">{cabecalho.linhaContato}</p> : null}
             </div>
           </div>
         ) : null}

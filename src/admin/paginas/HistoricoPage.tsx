@@ -10,6 +10,7 @@ import { dataHora, dataHoraComprovante } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import {
+  cabecalhoEmpresaEstruturado,
   linhasContexto,
   linkWhatsappComprovante,
   SELO_NAO_FISCAL,
@@ -777,25 +778,26 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
   }
 
   const empresa = dados.empresa;
+  const cabecalho = cabecalhoEmpresaEstruturado(empresa);
 
   return (
     <Modal titulo="Comprovante de saída" onFechar={onFechar}>
       <div className="flex flex-col gap-4">
         <div className="overflow-hidden rounded-lg border border-borda">
-          {/* De quem → pra quem → o quê (tarefa 7) — sem isto o único
-              documento que sai da empresa chega anônimo ao cliente. */}
-          {empresa?.nomeFantasia ? (
-            <div className="flex items-center gap-2.5 border-b border-borda px-3 py-2">
-              {empresa.logoUrl ? (
-                <img src={empresa.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain" />
+          {/* De quem → pra quem → o quê (tarefa 7), em quatro blocos fixos que
+              nunca truncam (correção "quatro ajustes pontuais", tarefa 2) —
+              sem isto o único documento que sai da empresa chega anônimo ou
+              cortado no meio do telefone. */}
+          {cabecalho.nome ? (
+            <div className="flex items-start gap-2.5 border-b border-borda px-3 py-2.5">
+              {empresa?.logoUrl ? (
+                <img src={empresa.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded object-contain" />
               ) : null}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-texto">{empresa.nomeFantasia}</p>
-                {empresa.cnpj || empresa.endereco || empresa.telefone ? (
-                  <p className="truncate text-[11px] text-texto-suave">
-                    {[empresa.cnpj, empresa.endereco, empresa.telefone].filter(Boolean).join(" · ")}
-                  </p>
-                ) : null}
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-medium text-texto">{cabecalho.nome}</p>
+                {cabecalho.linhaCnpj ? <p className="mt-0.5 text-xs text-texto-suave">{cabecalho.linhaCnpj}</p> : null}
+                {cabecalho.endereco ? <p className="text-xs text-texto-suave">{cabecalho.endereco}</p> : null}
+                {cabecalho.linhaContato ? <p className="text-xs text-texto-suave">{cabecalho.linhaContato}</p> : null}
               </div>
             </div>
           ) : null}

@@ -54,3 +54,18 @@ export function telefoneCompleto(telefone: string): boolean {
   const d = telefone.replace(/\D/g, "");
   return d.length === 10 || d.length === 11;
 }
+
+// CNPJ: 00.000.000/0000-00 (14 dígitos). Correção "quatro ajustes pontuais",
+// tarefa 2 — o cabeçalho do comprovante saía sem máscara nenhuma.
+export function mascaraCnpj(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+export function cnpjCompleto(cnpj: string): boolean {
+  return cnpj.replace(/\D/g, "").length === 14;
+}

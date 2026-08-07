@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
+import { mascaraCnpj, mascaraTelefone } from "../../lib/mascaras.ts";
 
 /*
   Dados da empresa emissora do comprovante (tarefa 7) — registro único,
@@ -38,11 +39,14 @@ export function EmpresaPage() {
     if (empresa !== null) {
       setRazaoSocial(empresa.razaoSocial ?? "");
       setNomeFantasia(empresa.nomeFantasia ?? "");
-      setCnpj(empresa.cnpj ?? "");
+      // mascaraCnpj/mascaraTelefone só extraem dígitos e reformatam — reaplicar
+      // aqui corrige de graça um registro salvo antes desta correção, sem
+      // precisar de migração.
+      setCnpj(mascaraCnpj(empresa.cnpj ?? ""));
       setInscricaoEstadual(empresa.inscricaoEstadual ?? "");
       setEndereco(empresa.endereco ?? "");
-      setTelefone(empresa.telefone ?? "");
-      setWhatsapp(empresa.whatsapp ?? "");
+      setTelefone(mascaraTelefone(empresa.telefone ?? ""));
+      setWhatsapp(mascaraTelefone(empresa.whatsapp ?? ""));
       setEmail(empresa.email ?? "");
     }
     setCarregado(true);
@@ -107,15 +111,15 @@ export function EmpresaPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Campo label="Razão social" value={razaoSocial} onChange={(e) => setRazaoSocial(e.target.value)} />
           <Campo label="Nome fantasia" value={nomeFantasia} onChange={(e) => setNomeFantasia(e.target.value)} />
-          <Campo label="CNPJ" value={cnpj} onChange={(e) => setCnpj(e.target.value)} mono />
+          <Campo label="CNPJ" value={cnpj} onChange={(e) => setCnpj(mascaraCnpj(e.target.value))} placeholder="00.000.000/0000-00" mono />
           <Campo
             label="Inscrição estadual (opcional)"
             value={inscricaoEstadual}
             onChange={(e) => setInscricaoEstadual(e.target.value)}
             mono
           />
-          <Campo label="Telefone" value={telefone} onChange={(e) => setTelefone(e.target.value)} />
-          <Campo label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+          <Campo label="Telefone" value={telefone} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} placeholder="(65) 3333-4444" />
+          <Campo label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(mascaraTelefone(e.target.value))} placeholder="(65) 99999-9999" />
           <Campo label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
           <Campo label="Endereço completo" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
         </div>

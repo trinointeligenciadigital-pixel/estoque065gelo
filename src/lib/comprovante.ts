@@ -19,15 +19,19 @@ export type ItemComprovante = {
   pesoKg: number;
 };
 
-// Dados da empresa emissora (tarefa 7) — só os campos que vão pro cabeçalho
+// Dados da empresa emissora (tarefa 7; cabeçalho reestruturado na correção
+// "quatro ajustes pontuais", tarefa 2) — só os campos que vão pro cabeçalho
 // do comprovante. `null` = ainda não cadastrada; cada campo individual pode
 // faltar mesmo com o registro existindo (Admin ainda não preencheu tudo) —
 // nesse caso a linha correspondente simplesmente não aparece.
 export type DadosEmpresaComprovante = {
   nomeFantasia: string | null;
+  razaoSocial: string | null;
   cnpj: string | null;
+  inscricaoEstadual: string | null;
   endereco: string | null;
   telefone: string | null;
+  whatsapp: string | null;
   logoUrl: string | null;
 };
 
@@ -81,16 +85,38 @@ export function linhasContexto(d: DadosComprovante): LinhaComprovante[] {
   ];
 }
 
-// Cabeçalho com a identidade de quem emitiu (tarefa 7.3) — sem isto o único
-// documento que sai da empresa e chega ao cliente por WhatsApp chegava
-// anônimo. Sem nome fantasia cadastrado, cai no genérico (nunca inventa CNPJ,
-// telefone nem nome).
+// Cabeçalho com a identidade de quem emitiu (tarefa 7.3), em quatro blocos
+// fixos (correção "quatro ajustes pontuais", tarefa 2) — nome (fantasia, ou
+// razão social se o fantasia estiver vazio), CNPJ + inscrição estadual,
+// endereço, telefone + WhatsApp. Mesma estrutura nas três saídas (tela, texto
+// copiado, WhatsApp) — aqui é a fonte usada pelas duas versões em texto;
+// `cabecalhoEmpresaEstruturado` abaixo é a mesma lógica pras versões visuais
+// (HistoricoPage, SaidaFlow), pra não duas grafias diferentes do mesmo dado.
+// Campo vazio nunca vira rótulo órfão: a linha inteira some.
+export type CabecalhoEmpresa = {
+  nome: string | null; // null = empresa não cadastrada (nem fantasia, nem razão social)
+  linhaCnpj: string | null; // "CNPJ · IE", o que houver
+  endereco: string | null;
+  linhaContato: string | null; // "telefone · whatsapp", o que houver
+};
+export function cabecalhoEmpresaEstruturado(empresa: DadosEmpresaComprovante | null): CabecalhoEmpresa {
+  if (!empresa) return { nome: null, linhaCnpj: null, endereco: null, linhaContato: null };
+  const nome = empresa.nomeFantasia || empresa.razaoSocial || null;
+  const linhaCnpj =
+    [empresa.cnpj, empresa.inscricaoEstadual ? `IE ${empresa.inscricaoEstadual}` : null].filter(Boolean).join(" · ") ||
+    null;
+  const linhaContato = [empresa.telefone, empresa.whatsapp].filter(Boolean).join(" · ") || null;
+  return { nome, linhaCnpj, endereco: empresa.endereco || null, linhaContato };
+}
+
 function linhasCabecalhoEmpresa(empresa: DadosEmpresaComprovante | null): string[] {
-  if (!empresa || !empresa.nomeFantasia) return ["*Comprovante de saída*"];
+  const h = cabecalhoEmpresaEstruturado(empresa);
+  if (!h.nome) return ["*Comprovante de saída*"];
   return [
-    `*${empresa.nomeFantasia}*`,
-    ...(empresa.cnpj ? [`CNPJ: ${empresa.cnpj}`] : []),
-    ...(empresa.telefone ? [`Tel: ${empresa.telefone}`] : []),
+    `*${h.nome}*`,
+    ...(h.linhaCnpj ? [h.linhaCnpj] : []),
+    ...(h.endereco ? [h.endereco] : []),
+    ...(h.linhaContato ? [h.linhaContato] : []),
   ];
 }
 
