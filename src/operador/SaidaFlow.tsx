@@ -105,6 +105,24 @@ function pesoDoItem(it: ItemCarrinho): number {
   return kgDe(it.formato, n, n);
 }
 
+// Cancelar o carregamento inteiro (tarefa 4 da correção "quatro ajustes
+// pontuais") — texto simples, nunca do tamanho/peso do botão de avançar, e
+// longe dele na tela (topo do conteúdo, não colado ao rodapé) pra não virar
+// um toque errado por confundir os dois. `onClick` é sempre `tentarSair`:
+// confirma antes de descartar quando há itens, sai direto quando não há.
+function BotaoCancelarFluxo({ rotulo, onClick }: { rotulo: string; onClick: () => void }) {
+  return (
+    <div className="mb-3 flex justify-end">
+      <button
+        onClick={onClick}
+        className="min-h-[44px] px-1 text-base font-medium text-texto-suave underline-offset-4 outline-none transition hover:text-alerta hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+      >
+        Cancelar {rotulo.toLowerCase()}
+      </button>
+    </div>
+  );
+}
+
 function SaidaCarregamento({
   tipo,
   token,
@@ -395,8 +413,7 @@ function SaidaCarregamento({
         }
       >
         <AvisoOperador>
-          Você tem {itens.length} {itens.length === 1 ? "produto" : "produtos"} neste carregamento.
-          Se sair agora, eles serão perdidos.
+          Descartar a {rotulo.toLowerCase()} em andamento? {itens.length === 1 ? "O produto adicionado será perdido." : `Os ${itens.length} produtos adicionados serão perdidos.`}
         </AvisoOperador>
       </Tela>
     );
@@ -416,6 +433,7 @@ function SaidaCarregamento({
           </BotaoGrande>
         }
       >
+        <BotaoCancelarFluxo rotulo={rotulo} onClick={tentarSair} />
         <div className="flex flex-col gap-3">
           {itens.length === 0 ? (
             <p className="text-base text-texto-suave">Nenhum produto ainda. Adicione o primeiro.</p>
@@ -577,6 +595,7 @@ function SaidaCarregamento({
           </BotaoGrande>
         }
       >
+        <BotaoCancelarFluxo rotulo={rotulo} onClick={tentarSair} />
         <div className="flex flex-col gap-4">
           <Texto label="Cliente" value={cliente} onChange={setCliente} placeholder="Nome do cliente" />
 
@@ -660,6 +679,7 @@ function SaidaCarregamento({
           </BotaoGrande>
         }
       >
+        {!enviando ? <BotaoCancelarFluxo rotulo={rotulo} onClick={tentarSair} /> : null}
         {/* Mesma hierarquia da produção (tarefa 5): quantidade em destaque,
             peso derivado abaixo — não o contrário. */}
         <ResumoLancamento
