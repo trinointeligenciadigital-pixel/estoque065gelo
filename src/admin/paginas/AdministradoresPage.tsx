@@ -1,23 +1,24 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Aviso, Botao, Campo, Cartao, Etiqueta, LinhaMensagem, LinhaTabela, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, Cartao, Etiqueta, LinhaMensagem, LinhaTabela, Tabela, TituloPagina, Toast } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { data } from "../../lib/data.ts";
 
 /*
   Administradores — o cliente gerencia quem acessa o painel sem depender do Clerk.
   Convidar cria o convite no Clerk (a pessoa cria a senha e vira Admin no 1º login).
-  A lista de quem já entrou é reativa; os convites pendentes vêm de uma action (não
-  reativa), recarregada após cada convite/revogação.
+  Convites pendentes vêm de `listarPendentes`, reativa (tabela `convitesAdmin` —
+  ver convex/admin/administradores.ts): cada reenvio troca o token no Clerk e
+  atualiza a data, sem perder quando o convite nasceu.
 */
-type Pendente = { id: string; email: string; criadoEm: number };
 
 export function AdministradoresPage() {
   const admins = useQuery(api.admin.administradores.listar);
+  const pendentes = useQuery(api.admin.administradores.listarPendentes);
   const definirAtivo = useMutation(api.admin.administradores.definirAtivo);
   const convidarAction = useAction(api.admin.administradores.convidar);
-  const listarPendentesAction = useAction(api.admin.administradores.listarPendentes);
+  const reenviarAction = useAction(api.admin.administradores.reenviarConvite);
   const revogarAction = useAction(api.admin.administradores.revogarConvite);
 
   // Convite
@@ -26,27 +27,21 @@ export function AdministradoresPage() {
   const [msgConvite, setMsgConvite] = useState<{ ok: boolean; texto: string } | null>(null);
 
   // Pendentes
-  const [pendentes, setPendentes] = useState<Pendente[]>([]);
   const [pendMsg, setPendMsg] = useState("");
+  const [reenviando, setReenviando] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
 
   // Ativar/desativar
   const [confirmando, setConfirmando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
 
-  const recarregarPendentes = useCallback(async () => {
-    setPendMsg("");
-    try {
-      const r = await listarPendentesAction();
-      if (r.ok) setPendentes(r.convites);
-      else setPendMsg(r.mensagem ?? "Não foi possível carregar os convites pendentes.");
-    } catch (e) {
-      setPendMsg(mensagemErro(e));
-    }
-  }, [listarPendentesAction]);
-
+  // Só pra reavaliar o texto "restam Xs" do cooldown a cada segundo — não
+  // busca nada de novo no servidor, que é quem de fato manda na regra.
+  const [, forcarRelogio] = useState(0);
   useEffect(() => {
-    void recarregarPendentes();
-  }, [recarregarPendentes]);
+    const t = setInterval(() => forcarRelogio((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   async function convidar() {
     setConvidando(true);
@@ -56,7 +51,6 @@ export function AdministradoresPage() {
       if (r.ok) {
         setMsgConvite({ ok: true, texto: `Convite enviado para ${email.trim()}.` });
         setEmail("");
-        void recarregarPendentes();
       } else {
         setMsgConvite({ ok: false, texto: r.mensagem ?? "Não foi possível convidar." });
       }
@@ -77,12 +71,25 @@ export function AdministradoresPage() {
     }
   }
 
-  async function revogar(id: string) {
+  async function reenviar(alvoEmail: string) {
+    setPendMsg("");
+    setReenviando(alvoEmail);
+    try {
+      const r = await reenviarAction({ email: alvoEmail });
+      if (r.ok) setToast(`Convite reenviado para ${alvoEmail}.`);
+      else setPendMsg(r.mensagem ?? "Não foi possível reenviar o convite.");
+    } catch (e) {
+      setPendMsg(mensagemErro(e));
+    } finally {
+      setReenviando(null);
+    }
+  }
+
+  async function revogar(alvoEmail: string) {
     setPendMsg("");
     try {
-      const r = await revogarAction({ id });
-      if (r.ok) void recarregarPendentes();
-      else setPendMsg(r.mensagem ?? "Não foi possível revogar o convite.");
+      const r = await revogarAction({ email: alvoEmail });
+      if (!r.ok) setPendMsg(r.mensagem ?? "Não foi possível revogar o convite.");
     } catch (e) {
       setPendMsg(mensagemErro(e));
     }
@@ -126,22 +133,53 @@ export function AdministradoresPage() {
       </Cartao>
 
       {/* Convites pendentes */}
-      {pendentes.length > 0 || pendMsg ? (
+      {(pendentes && pendentes.length > 0) || pendMsg ? (
         <Cartao className="mb-4 p-4">
           <h2 className="mb-2.5 font-titulo text-[15px] font-semibold tracking-[0.02em] text-texto uppercase">
             Convites pendentes
           </h2>
           {pendMsg ? <Aviso>{pendMsg}</Aviso> : null}
           <div className="flex flex-col gap-2">
-            {pendentes.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded border border-borda bg-fundo px-3 py-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm text-texto">{p.email}</div>
-                  <div className="text-xs text-texto-fraco">Aguardando primeiro acesso · convidado em {data(p.criadoEm)}</div>
+            {(pendentes ?? []).map((p) => {
+              const restanteMs = p.cooldownAteMs - Date.now();
+              const emCooldown = restanteMs > 0;
+              return (
+                <div key={p.email} className="flex items-center justify-between gap-3 rounded border border-borda bg-fundo px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm text-texto">{p.email}</span>
+                      {p.expirado ? (
+                        <span className="shrink-0 rounded-full border border-alerta/40 bg-alerta/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-alerta uppercase">
+                          expirado
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-xs text-texto-fraco">
+                      {p.expirado
+                        ? "Expirado — reenvie para gerar um novo link."
+                        : "Aguardando primeiro acesso"}
+                      {" · convidado em "}
+                      {data(p.criadoEm)}
+                      {p.ultimoEnvioEm !== p.criadoEm ? ` · reenviado em ${data(p.ultimoEnvioEm)}` : ""}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Botao
+                      variante="neutro"
+                      onClick={() => void reenviar(p.email)}
+                      disabled={emCooldown || reenviando === p.email}
+                    >
+                      {reenviando === p.email
+                        ? "Enviando…"
+                        : emCooldown
+                          ? `Aguarde ${Math.ceil(restanteMs / 1000)}s`
+                          : "Reenviar"}
+                    </Botao>
+                    <Botao variante="perigo" onClick={() => void revogar(p.email)}>Revogar</Botao>
+                  </div>
                 </div>
-                <Botao variante="perigo" onClick={() => void revogar(p.id)}>Revogar</Botao>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Cartao>
       ) : null}
@@ -185,6 +223,8 @@ export function AdministradoresPage() {
           ))
         )}
       </Tabela>
+
+      {toast ? <Toast texto={toast} onFechar={() => setToast("")} /> : null}
     </>
   );
 }

@@ -156,6 +156,29 @@ export function Cartao({ children, className = "" }: { children: ReactNode; clas
   );
 }
 
+// Confirmação passageira, não bloqueante (ex.: "convite reenviado") — ao
+// contrário de um alerta, não exige clique pra sumir: fecha sozinha. Quem
+// chama guarda só a mensagem em estado; o componente cuida do timer.
+export function Toast({ texto, onFechar }: { texto: string; onFechar: () => void }) {
+  const fecharRef = useRef(onFechar);
+  fecharRef.current = onFechar;
+  useEffect(() => {
+    const t = setTimeout(() => fecharRef.current(), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-auto rounded-lg border border-borda bg-texto px-4 py-2.5 text-sm font-medium text-fundo shadow-sm"
+      >
+        {texto}
+      </div>
+    </div>
+  );
+}
+
 /*
   Kit de tabela do Admin — mesmo acabamento "instrumento" do Painel: cabeçalho
   em IBM Plex Mono maiúsculo (rótulo de mostrador), linhas com realce ao passar

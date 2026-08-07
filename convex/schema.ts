@@ -119,6 +119,22 @@ export default defineSchema({
     logoStorageId: v.optional(v.id("_storage")),
   }),
 
+  // Rastreio de convites de Admin (correção "quatro ajustes pontuais", tarefa
+  // 1) — o Clerk é quem de fato manda o e-mail e guarda o convite, mas cada
+  // reenvio cria um invitation NOVO lá (id diferente), então a data do
+  // primeiro convite se perderia sem isto. `criadoEm` nunca muda; `ultimoEnvioEm`
+  // avança a cada reenvio e é a base do rate limit (5 min) e da validade (7
+  // dias) — ambos DERIVADOS na leitura, nunca um campo "expirado" cacheado.
+  // Linha desaparece quando o convite é aceito (email passa a existir em
+  // `usuarios`) ou revogado — não é histórico permanente, é só "o que está
+  // pendente agora".
+  convitesAdmin: defineTable({
+    email: v.string(),
+    clerkInvitationId: v.string(),
+    criadoEm: v.number(),
+    ultimoEnvioEm: v.number(),
+  }).index("by_email", ["email"]),
+
   veiculos: defineTable({
     placa: v.string(),
     modelo: v.optional(v.string()),

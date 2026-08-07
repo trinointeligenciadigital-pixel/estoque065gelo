@@ -1,7 +1,7 @@
 import { v, ConvexError } from "convex/values";
-import { action, mutation, query } from "../_generated/server";
+import { action, internalAction, internalMutation, internalQuery, mutation, query } from "../_generated/server";
 import type { ActionCtx } from "../_generated/server";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { exigirAdmin } from "../lib/auth";
 
 /*
@@ -100,6 +100,82 @@ async function mensagemErroClerk(resp: Response): Promise<string> {
   }
 }
 
+async function revogarNoClerk(chave: string, clerkInvitationId: string): Promise<void> {
+  // Best-effort: se o convite já não existe mais no Clerk (aceito, expirado por
+  // lá, já revogado), não há o que fazer — segue em frente mesmo assim.
+  await fetch(`${CLERK_API}/invitations/${clerkInvitationId}/revoke`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+  }).catch(() => {});
+}
+
+async function criarNoClerk(chave: string, email: string): Promise<{ ok: true; id: string } | { ok: false; mensagem: string }> {
+  const resp = await fetch(`${CLERK_API}/invitations`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email_address: email, redirect_url: APP_URL }),
+  });
+  if (!resp.ok) return { ok: false, mensagem: await mensagemErroClerk(resp) };
+  const corpo = (await resp.json()) as { id: string };
+  return { ok: true, id: corpo.id };
+}
+
+// Rate limit do reenvio — 1 a cada 5 minutos, por convite. Validade do link —
+// 7 dias desde o ÚLTIMO envio (original ou reenvio); passado isso, o convite
+// aparece com o badge "expirado" e um cron diário revoga o token antigo no
+// Clerk (convex/crons.ts) — "Reenviar" continua funcionando, o link não.
+const RATE_LIMIT_MS = 5 * 60 * 1000;
+const VALIDADE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// -----------------------------------------------------------------------------
+// Escrita em `convitesAdmin` — só chamada de dentro das actions acima (via
+// runMutation/runQuery), nunca exposta ao cliente.
+// -----------------------------------------------------------------------------
+
+export const _porEmail = internalQuery({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    return await ctx.db.query("convitesAdmin").withIndex("by_email", (q) => q.eq("email", email)).first();
+  },
+});
+
+export const _registrarConvite = internalMutation({
+  args: { email: v.string(), clerkInvitationId: v.string() },
+  handler: async (ctx, { email, clerkInvitationId }) => {
+    const existente = await ctx.db.query("convitesAdmin").withIndex("by_email", (q) => q.eq("email", email)).first();
+    if (existente) await ctx.db.delete(existente._id);
+    const agora = Date.now();
+    await ctx.db.insert("convitesAdmin", { email, clerkInvitationId, criadoEm: agora, ultimoEnvioEm: agora });
+  },
+});
+
+// Revalida o rate limit aqui dentro (defesa em profundidade — a action já
+// checou antes de gastar a chamada ao Clerk, mas quem manda é o servidor).
+export const _registrarReenvio = internalMutation({
+  args: { email: v.string(), clerkInvitationId: v.string() },
+  handler: async (ctx, { email, clerkInvitationId }) => {
+    const existente = await ctx.db.query("convitesAdmin").withIndex("by_email", (q) => q.eq("email", email)).first();
+    if (existente === null) throw new ConvexError("Convite não encontrado.");
+    const agora = Date.now();
+    if (agora - existente.ultimoEnvioEm < RATE_LIMIT_MS) {
+      throw new ConvexError("Aguarde antes de reenviar de novo.");
+    }
+    await ctx.db.patch(existente._id, { clerkInvitationId, ultimoEnvioEm: agora });
+  },
+});
+
+export const _removerConvite = internalMutation({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const existente = await ctx.db.query("convitesAdmin").withIndex("by_email", (q) => q.eq("email", email)).first();
+    if (existente) await ctx.db.delete(existente._id);
+  },
+});
+
+// -----------------------------------------------------------------------------
+// Actions expostas ao painel
+// -----------------------------------------------------------------------------
+
 // Convida um e-mail. O Clerk manda o link; ao aceitar, a pessoa cria a senha e, no
 // primeiro login, vira Admin (garantirUsuario).
 export const convidar = action({
@@ -112,55 +188,124 @@ export const convidar = action({
     const alvo = email.trim().toLowerCase();
     if (!alvo || !alvo.includes("@")) return { ok: false, mensagem: "E-mail inválido." };
 
-    const resp = await fetch(`${CLERK_API}/invitations`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ email_address: alvo, redirect_url: APP_URL }),
+    const criado = await criarNoClerk(chave, alvo);
+    if (!criado.ok) return criado;
+
+    await ctx.runMutation(internal.admin.administradores._registrarConvite, {
+      email: alvo,
+      clerkInvitationId: criado.id,
     });
-    if (!resp.ok) return { ok: false, mensagem: await mensagemErroClerk(resp) };
     return { ok: true };
   },
 });
 
-type ConvitePendente = { id: string; email: string; criadoEm: number };
-
-// Convites ainda não aceitos (pessoas convidadas que não fizeram o primeiro login).
-export const listarPendentes = action({
+// Convites ainda não aceitos (pessoas convidadas que não fizeram o primeiro
+// login) — query reativa de verdade: `expirado` é derivado na leitura (regra
+// arquitetural 1, embora esta tabela não seja o ledger — mesmo princípio de
+// nunca cachear o que dá pra calcular), nunca um campo gravado.
+export const listarPendentes = query({
   args: {},
-  handler: async (ctx): Promise<{ ok: boolean; mensagem?: string; convites: ConvitePendente[] }> => {
+  handler: async (ctx) => {
+    await exigirAdmin(ctx);
+    const linhas = await ctx.db.query("convitesAdmin").collect();
+
+    // Convite aceito = a pessoa já tem registro em `usuarios` — some da lista
+    // (não é revogação, é sucesso; a linha fica pra trás sem problema).
+    const usuarios = await ctx.db.query("usuarios").collect();
+    const aceitos = new Set(usuarios.map((u) => u.email.trim().toLowerCase()));
+
+    const agora = Date.now();
+    return linhas
+      .filter((r) => !aceitos.has(r.email.trim().toLowerCase()))
+      .map((r) => ({
+        email: r.email,
+        criadoEm: r.criadoEm,
+        ultimoEnvioEm: r.ultimoEnvioEm,
+        expirado: agora - r.ultimoEnvioEm > VALIDADE_MS,
+        cooldownAteMs: r.ultimoEnvioEm + RATE_LIMIT_MS,
+      }))
+      .sort((a, b) => b.ultimoEnvioEm - a.ultimoEnvioEm);
+  },
+});
+
+// Reenvia um convite parado: gera um token NOVO no Clerk e invalida o
+// anterior — um link antigo que vaze não continua valendo depois do reenvio.
+// O rate limit (5 min) é checado duas vezes: aqui (evita gastar a chamada ao
+// Clerk à toa) e de novo dentro de `_registrarReenvio` (quem manda de
+// verdade é o servidor, nunca o botão desabilitado do cliente).
+export const reenviarConvite = action({
+  args: { email: v.string() },
+  handler: async (ctx, { email }): Promise<Resultado> => {
     await exigirAdminNaAction(ctx);
     const chave = chaveClerk();
-    if (!chave) return { ok: false, mensagem: SEM_CHAVE, convites: [] };
+    if (!chave) return { ok: false, mensagem: SEM_CHAVE };
 
-    const resp = await fetch(`${CLERK_API}/invitations?status=pending&limit=100`, {
-      headers: { Authorization: `Bearer ${chave}` },
-    });
-    if (!resp.ok) return { ok: false, mensagem: await mensagemErroClerk(resp), convites: [] };
+    const atual = await ctx.runQuery(internal.admin.administradores._porEmail, { email });
+    if (atual === null) return { ok: false, mensagem: "Convite não encontrado." };
 
-    const dados = (await resp.json()) as unknown;
-    const lista = (Array.isArray(dados) ? dados : ((dados as { data?: unknown[] })?.data ?? [])) as Array<{
-      id: string;
-      email_address: string;
-      created_at: number;
-    }>;
-    const convites = lista.map((i) => ({ id: i.id, email: i.email_address, criadoEm: i.created_at }));
-    return { ok: true, convites };
+    const restanteMs = RATE_LIMIT_MS - (Date.now() - atual.ultimoEnvioEm);
+    if (restanteMs > 0) {
+      return { ok: false, mensagem: `Aguarde ${Math.ceil(restanteMs / 1000)}s antes de reenviar.` };
+    }
+
+    await revogarNoClerk(chave, atual.clerkInvitationId);
+
+    const criado = await criarNoClerk(chave, email);
+    if (!criado.ok) return criado;
+
+    try {
+      await ctx.runMutation(internal.admin.administradores._registrarReenvio, {
+        email,
+        clerkInvitationId: criado.id,
+      });
+    } catch {
+      return { ok: false, mensagem: "Aguarde antes de reenviar de novo." };
+    }
+    return { ok: true };
   },
 });
 
 // Cancela um convite pendente.
 export const revogarConvite = action({
-  args: { id: v.string() },
-  handler: async (ctx, { id }): Promise<Resultado> => {
+  args: { email: v.string() },
+  handler: async (ctx, { email }): Promise<Resultado> => {
     await exigirAdminNaAction(ctx);
     const chave = chaveClerk();
     if (!chave) return { ok: false, mensagem: SEM_CHAVE };
 
-    const resp = await fetch(`${CLERK_API}/invitations/${id}/revoke`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${chave}`, "Content-Type": "application/json" },
-    });
-    if (!resp.ok) return { ok: false, mensagem: await mensagemErroClerk(resp) };
+    const atual = await ctx.runQuery(internal.admin.administradores._porEmail, { email });
+    if (atual !== null) await revogarNoClerk(chave, atual.clerkInvitationId);
+
+    await ctx.runMutation(internal.admin.administradores._removerConvite, { email });
     return { ok: true };
+  },
+});
+
+export const _todosConvites = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("convitesAdmin").collect();
+  },
+});
+
+// Cron diário (convex/crons.ts): revoga no Clerk o token de todo convite cujo
+// último envio passou dos 7 dias — sem isto, "expirado" seria só um rótulo na
+// tela e o link antigo continuaria funcionando de verdade até o Clerk expirá-lo
+// sozinho (bem mais tarde). Não apaga a linha: o convite continua na lista,
+// com o badge, até o Admin reenviar. É internalAction (não internalMutation)
+// porque revogar no Clerk é uma chamada de rede.
+export const expirarConvitesAntigos = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const chave = chaveClerk();
+    if (!chave) return; // sem chave configurada, nada a fazer
+
+    const linhas = await ctx.runQuery(internal.admin.administradores._todosConvites, {});
+    const agora = Date.now();
+    for (const r of linhas) {
+      if (agora - r.ultimoEnvioEm > VALIDADE_MS) {
+        await revogarNoClerk(chave, r.clerkInvitationId);
+      }
+    }
   },
 });

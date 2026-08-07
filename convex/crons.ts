@@ -16,4 +16,13 @@ crons.daily(
   internal.manutencao.limparSessoesExpiradas,
 );
 
+// Convites de Admin com mais de 7 dias desde o último envio (correção "quatro
+// ajustes pontuais", tarefa 1): revoga o token antigo no Clerk. O convite
+// continua na lista com o badge "expirado" — só o link para de funcionar.
+crons.daily(
+  "expirar convites de admin antigos",
+  { hourUTC: 8, minuteUTC: 5 },
+  internal.admin.administradores.expirarConvitesAntigos,
+);
+
 export default crons;
