@@ -8,6 +8,7 @@ import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, pesoLiquidoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 import { protocoloDe } from "../lib/protocolo";
+import { veiculoTerceiroValidado } from "../lib/placa";
 
 /*
   Lançamento manual pelo Admin (RF63). MESMAS regras do colaborador: saldo,
@@ -116,6 +117,7 @@ export const lancarSaida = mutation({
     clienteNome: v.optional(v.string()),
     veiculoId: v.optional(v.id("veiculos")),
     veiculoTerceiro: v.optional(v.string()),
+    veiculoTerceiroModelo: v.optional(v.string()),
     motorista: v.optional(v.string()),
     motivoPerda: v.optional(
       v.union(v.literal("derreteu"), v.literal("danificado"), v.literal("descarte"), v.literal("outro")),
@@ -136,6 +138,8 @@ export const lancarSaida = mutation({
         throw new ConvexError("Descreva o motivo da perda.");
       }
     }
+
+    const veiculoTerceiro = veiculoTerceiroValidado(args.tipo !== "perda", args.veiculoTerceiro, args.veiculoTerceiroModelo);
 
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
     if (existente !== null) {
@@ -165,7 +169,8 @@ export const lancarSaida = mutation({
       pesoKg,
       clienteNome: args.tipo === "perda" ? undefined : args.clienteNome?.trim() || undefined,
       veiculoId: args.tipo === "perda" ? undefined : args.veiculoId,
-      veiculoTerceiro: args.tipo === "perda" ? undefined : args.veiculoTerceiro?.trim() || undefined,
+      veiculoTerceiro: veiculoTerceiro.veiculoTerceiro,
+      veiculoTerceiroModelo: veiculoTerceiro.veiculoTerceiroModelo,
       motorista: args.tipo === "perda" ? undefined : args.motorista?.trim() || undefined,
       motivoPerda: args.tipo === "perda" ? args.motivoPerda : undefined,
       observacao: args.observacao?.trim() || undefined,
@@ -198,6 +203,7 @@ export const lancarSaidaMultipla = mutation({
     clienteNome: v.string(),
     veiculoId: v.optional(v.id("veiculos")),
     veiculoTerceiro: v.optional(v.string()),
+    veiculoTerceiroModelo: v.optional(v.string()),
     motorista: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -205,6 +211,8 @@ export const lancarSaidaMultipla = mutation({
 
     if (args.itens.length === 0) throw new ConvexError("Adicione ao menos um produto.");
     if (args.clienteNome.trim() === "") throw new ConvexError("Informe o nome do cliente.");
+
+    const veiculoTerceiro = veiculoTerceiroValidado(true, args.veiculoTerceiro, args.veiculoTerceiroModelo);
 
     const jaGravadas = await ctx.db
       .query("movimentacoes")
@@ -236,7 +244,6 @@ export const lancarSaidaMultipla = mutation({
     await validarSaldoLote(ctx, linhas);
 
     const cliente = args.clienteNome.trim() || undefined;
-    const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
     const motorista = args.motorista?.trim() || undefined;
     const protocolo = protocoloDe(args.carregamentoId);
 
@@ -256,7 +263,8 @@ export const lancarSaidaMultipla = mutation({
         pesoKg: linha.pesoKg,
         clienteNome: cliente,
         veiculoId: args.veiculoId,
-        veiculoTerceiro,
+        veiculoTerceiro: veiculoTerceiro.veiculoTerceiro,
+        veiculoTerceiroModelo: veiculoTerceiro.veiculoTerceiroModelo,
         motorista,
         registradoPorTipo: "admin",
         clerkId: usuario.clerkId,

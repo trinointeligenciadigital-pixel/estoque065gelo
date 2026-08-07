@@ -236,7 +236,11 @@ export const resumo = query({
         // terceiro). Nenhum dos dois: null — a tela decide o texto (ex.:
         // perda não tem veículo; venda/patrocínio sem nada = "não identificado").
         veiculoPlaca: m.veiculoId ? placaVeiculo.get(m.veiculoId) ?? "—" : null,
+        // Placa NORMALIZADA (tarefa 3) — a tela aplica a máscara de exibição
+        // (com/sem hífen conforme o padrão); registro anterior a esta correção
+        // pode ter texto que não é placa nenhuma, e a tela mostra como veio.
         veiculoTerceiro: m.veiculoId ? null : m.veiculoTerceiro ?? null,
+        veiculoTerceiroModelo: m.veiculoId ? null : m.veiculoTerceiroModelo ?? null,
         quantidade: m.quantidade,
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query } from "../_generated/server";
 import { exigirAdmin } from "../lib/auth";
+import { rotuloPlacaOuTexto } from "../lib/placa";
 
 /*
   Histórico de movimentações do Admin (RF61). Somente leitura — não existe nenhuma
@@ -93,11 +94,17 @@ export const listar = query({
         const formato = await ctx.db.get(m.formatoId);
         const camara = await ctx.db.get(m.camaraId);
         const operador = m.operadorId ? await ctx.db.get(m.operadorId) : null;
-        // Veículo para o comprovante: próprio (placa · modelo) ou terceiro (texto).
+        // Veículo para o comprovante: próprio (placa · modelo) ou terceiro
+        // (placa normalizada com máscara de exibição + modelo, marcado como
+        // terceiro — tarefa 3). Registro anterior a esta correção pode ter
+        // texto livre que não é placa nenhuma; rotuloPlacaOuTexto devolve
+        // como veio, sem inventar uma placa que não existe.
         const veiculoProprio = m.veiculoId ? await ctx.db.get(m.veiculoId) : null;
         const veiculo = veiculoProprio
           ? `${veiculoProprio.placa}${veiculoProprio.modelo ? ` · ${veiculoProprio.modelo}` : ""}`
-          : m.veiculoTerceiro ?? null;
+          : m.veiculoTerceiro
+            ? `${rotuloPlacaOuTexto(m.veiculoTerceiro)} (terceiro)${m.veiculoTerceiroModelo ? ` · ${m.veiculoTerceiroModelo}` : ""}`
+            : null;
         // Se ESTA linha é um estorno, busca o protocolo do original pra
         // referenciar ("Estorno de ABCD1234") — o estorno em si não tem
         // motivoPerda/clienteNome, então o Detalhe mostra isto no lugar.

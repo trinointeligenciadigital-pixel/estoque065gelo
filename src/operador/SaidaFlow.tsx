@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
+import { mascaraPlaca, placaCompleta, rotuloPlacaOuTexto } from "../lib/mascaras.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ItemResumo, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
@@ -145,6 +146,7 @@ function SaidaCarregamento({
   const [cliente, setCliente] = useState("");
   const [veiculoSel, setVeiculoSel] = useState(""); // "" | id | "terceiro"
   const [veiculoTerceiro, setVeiculoTerceiro] = useState("");
+  const [veiculoTerceiroModelo, setVeiculoTerceiroModelo] = useState("");
   const [motorista, setMotorista] = useState("");
 
   const [erro, setErro] = useState("");
@@ -186,7 +188,11 @@ function SaidaCarregamento({
 
   function rotularVeiculo(): string {
     if (veiculoSel === "") return "sem veículo";
-    if (veiculoSel === "terceiro") return veiculoTerceiro.trim() || "terceiro";
+    if (veiculoSel === "terceiro") {
+      if (!veiculoTerceiro) return "terceiro";
+      const placa = rotuloPlacaOuTexto(veiculoTerceiro);
+      return `${placa} (terceiro)${veiculoTerceiroModelo.trim() ? ` · ${veiculoTerceiroModelo.trim()}` : ""}`;
+    }
     const v = veiculos?.find((x) => x._id === veiculoSel);
     return v ? `${v.placa}${v.modelo ? ` · ${v.modelo}` : ""}` : "—";
   }
@@ -291,7 +297,8 @@ function SaidaCarregamento({
         })),
         clienteNome: cliente.trim(),
         veiculoId: veiculoSel && veiculoSel !== "terceiro" ? (veiculoSel as Id<"veiculos">) : undefined,
-        veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro.trim() || undefined : undefined,
+        veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro || undefined : undefined,
+        veiculoTerceiroModelo: veiculoSel === "terceiro" ? veiculoTerceiroModelo.trim() || undefined : undefined,
         motorista: motorista.trim() || undefined,
       });
       setProtocolo(r.protocolo);
@@ -557,7 +564,7 @@ function SaidaCarregamento({
 
   // -------- Contexto compartilhado --------
   if (passo === "contexto") {
-    const podeConfirmar = cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
+    const podeConfirmar = cliente.trim() !== "" && (veiculoSel !== "terceiro" || placaCompleta(veiculoTerceiro));
     return (
       <Tela
         titulo="Detalhes"
@@ -591,7 +598,29 @@ function SaidaCarregamento({
           </div>
 
           {veiculoSel === "terceiro" ? (
-            <Texto label="Veículo terceiro" value={veiculoTerceiro} onChange={setVeiculoTerceiro} placeholder="Placa / descrição" />
+            <>
+              <label className="flex flex-col gap-1">
+                <span className="text-base font-medium text-texto">Placa do terceiro</span>
+                <input
+                  value={veiculoTerceiro}
+                  onChange={(e) => setVeiculoTerceiro(mascaraPlaca(e.target.value))}
+                  placeholder="ABC1D23"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  maxLength={7}
+                  className="min-h-[56px] rounded-xl border border-borda bg-superficie px-4 font-mono text-base text-texto outline-none focus:border-acento"
+                />
+                {veiculoTerceiro !== "" && !placaCompleta(veiculoTerceiro) ? (
+                  <span className="text-sm text-alerta">Formato: ABC-1234 ou ABC1D23.</span>
+                ) : null}
+              </label>
+              <Texto
+                label="Modelo / descrição (opcional)"
+                value={veiculoTerceiroModelo}
+                onChange={setVeiculoTerceiroModelo}
+                placeholder="Van baú branca"
+              />
+            </>
           ) : null}
 
           <Texto label="Motorista (opcional)" value={motorista} onChange={setMotorista} placeholder="Nome do motorista" />

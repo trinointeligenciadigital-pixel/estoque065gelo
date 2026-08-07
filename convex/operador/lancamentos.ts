@@ -8,6 +8,7 @@ import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 import { protocoloDe } from "../lib/protocolo";
+import { veiculoTerceiroValidado } from "../lib/placa";
 
 /*
   Lançamentos do colaborador. Regras invioláveis aplicadas aqui:
@@ -104,6 +105,7 @@ export const lancarSaida = mutation({
     clienteNome: v.optional(v.string()),
     veiculoId: v.optional(v.id("veiculos")),
     veiculoTerceiro: v.optional(v.string()),
+    veiculoTerceiroModelo: v.optional(v.string()),
     motorista: v.optional(v.string()),
     motivoPerda: v.optional(
       v.union(v.literal("derreteu"), v.literal("danificado"), v.literal("descarte"), v.literal("outro")),
@@ -130,6 +132,15 @@ export const lancarSaida = mutation({
         throw new ConvexError("Descreva o motivo da perda.");
       }
     }
+
+    // Placa de terceiro: validada no servidor (não só na máscara da tela) —
+    // lança ANTES de gravar qualquer coisa se não bater com nenhum dos dois
+    // padrões brasileiros (tarefa 3).
+    const veiculoTerceiro = veiculoTerceiroValidado(
+      args.tipo !== "perda",
+      args.veiculoTerceiro,
+      args.veiculoTerceiroModelo,
+    );
 
     // Idempotência antes de qualquer efeito (RF34).
     const existente = await movimentacaoExistente(ctx, args.chaveIdempotencia);
@@ -162,8 +173,8 @@ export const lancarSaida = mutation({
       clienteNome:
         args.tipo === "perda" ? undefined : args.clienteNome?.trim() || undefined,
       veiculoId: args.tipo === "perda" ? undefined : args.veiculoId,
-      veiculoTerceiro:
-        args.tipo === "perda" ? undefined : args.veiculoTerceiro?.trim() || undefined,
+      veiculoTerceiro: veiculoTerceiro.veiculoTerceiro,
+      veiculoTerceiroModelo: veiculoTerceiro.veiculoTerceiroModelo,
       motorista: args.tipo === "perda" ? undefined : args.motorista?.trim() || undefined,
       motivoPerda: args.tipo === "perda" ? args.motivoPerda : undefined,
       observacao: args.observacao?.trim() || undefined,
@@ -198,6 +209,7 @@ export const lancarSaidaMultipla = mutation({
     clienteNome: v.string(),
     veiculoId: v.optional(v.id("veiculos")),
     veiculoTerceiro: v.optional(v.string()),
+    veiculoTerceiroModelo: v.optional(v.string()),
     motorista: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -206,6 +218,10 @@ export const lancarSaidaMultipla = mutation({
 
     if (args.itens.length === 0) throw new ConvexError("Adicione ao menos um produto.");
     if (args.clienteNome.trim() === "") throw new ConvexError("Informe o nome do cliente.");
+
+    // Placa de terceiro validada no servidor (tarefa 3) — antes de qualquer
+    // efeito, junto com as outras validações de contexto do lote.
+    const veiculoTerceiroDados = veiculoTerceiroValidado(true, args.veiculoTerceiro, args.veiculoTerceiroModelo);
 
     // Idempotência do lote: se já existe qualquer linha com este carregamentoId, o
     // lote já rodou (a escrita é atômica) — devolve sem inserir de novo (RF34).
@@ -244,7 +260,6 @@ export const lancarSaidaMultipla = mutation({
     await validarSaldoLote(ctx, linhas);
 
     const cliente = args.clienteNome.trim() || undefined;
-    const veiculoTerceiro = args.veiculoTerceiro?.trim() || undefined;
     const motorista = args.motorista?.trim() || undefined;
     // Um recibo só por carregamento: todas as linhas do grupo compartilham o
     // mesmo protocolo, derivado do carregamentoId (não da chaveIdempotencia de
@@ -267,7 +282,8 @@ export const lancarSaidaMultipla = mutation({
         pesoKg: linha.pesoKg,
         clienteNome: cliente,
         veiculoId: args.veiculoId,
-        veiculoTerceiro,
+        veiculoTerceiro: veiculoTerceiroDados.veiculoTerceiro,
+        veiculoTerceiroModelo: veiculoTerceiroDados.veiculoTerceiroModelo,
         motorista,
         registradoPorTipo: "operador",
         operadorId: operador._id,

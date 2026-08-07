@@ -191,7 +191,15 @@ export default defineSchema({
     // Contexto por tipo
     clienteNome: v.optional(v.string()), // venda, patrocínio — texto livre
     veiculoId: v.optional(v.id("veiculos")), // veículo próprio
-    veiculoTerceiro: v.optional(v.string()), // terceiro — texto livre
+    // Terceiro: placa normalizada (maiúscula, sem hífen, 7 caracteres),
+    // validada no servidor contra os dois padrões brasileiros (correção
+    // "quatro ajustes pontuais", tarefa 3 — convex/lib/placa.ts). Registros
+    // gravados ANTES desta correção podem ter texto livre não validado
+    // (ex.: "zxfsfsfsfas") — não são corrigidos retroativamente.
+    veiculoTerceiro: v.optional(v.string()),
+    // Modelo/descrição do terceiro (opcional, texto livre) — ajuda a
+    // identificar o veículo sem afrouxar a validação da placa.
+    veiculoTerceiroModelo: v.optional(v.string()),
     motorista: v.optional(v.string()),
     motivoPerda: v.optional(
       v.union(

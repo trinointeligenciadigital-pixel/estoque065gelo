@@ -8,6 +8,7 @@ import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { mesmoTexto, nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
 import { pluralizar } from "../../lib/plural.ts";
+import { rotuloPlacaOuTexto } from "../../lib/mascaras.ts";
 
 /*
   Painel do Admin (RF57–RF60) — "painel de instrumentos de câmara fria". KPIs em
@@ -359,9 +360,17 @@ function rotuloTipo(t: string): string {
 // que não dizia qual terceiro levou a carga. Terceiro escolhido sem texto
 // (registro antigo ou campo deixado em branco) cai no aviso, em cor
 // secundária — não é erro, é ausência de dado.
-function veiculoRotulo(m: { veiculoPlaca: string | null; veiculoTerceiro: string | null; motivoPerda: string | null }): ReactNode {
+function veiculoRotulo(m: {
+  veiculoPlaca: string | null;
+  veiculoTerceiro: string | null;
+  veiculoTerceiroModelo: string | null;
+  motivoPerda: string | null;
+}): ReactNode {
   if (m.veiculoPlaca) return m.veiculoPlaca;
-  if (m.veiculoTerceiro) return `${m.veiculoTerceiro} (terceiro)`;
+  if (m.veiculoTerceiro) {
+    const placa = rotuloPlacaOuTexto(m.veiculoTerceiro);
+    return `${placa} (terceiro)${m.veiculoTerceiroModelo ? ` · ${m.veiculoTerceiroModelo}` : ""}`;
+  }
   if (m.motivoPerda) return "—";
   return <span className="text-texto-fraco">Terceiro — não identificado</span>;
 }

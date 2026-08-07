@@ -7,6 +7,7 @@ import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
+import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
 
 /*
   Lançamento manual pelo Admin (RF63). Mesmas validações do colaborador: saldo,
@@ -53,6 +54,7 @@ export function LancamentoPage() {
   const [cliente, setCliente] = useState("");
   const [veiculoSel, setVeiculoSel] = useState("");
   const [veiculoTerceiro, setVeiculoTerceiro] = useState("");
+  const [veiculoTerceiroModelo, setVeiculoTerceiroModelo] = useState("");
   const [motorista, setMotorista] = useState("");
   const [motivo, setMotivo] = useState<MotivoPerda | "">("");
   const [observacao, setObservacao] = useState("");
@@ -129,7 +131,7 @@ export function LancamentoPage() {
         ? motivo !== "" && (motivo !== "outro" || observacao.trim() !== "")
         : tipo === "transferencia"
           ? camaraDestinoId !== "" && !!equivalente
-          : cliente.trim() !== "" && (veiculoSel !== "terceiro" || veiculoTerceiro.trim() !== "");
+          : cliente.trim() !== "" && (veiculoSel !== "terceiro" || placaCompleta(veiculoTerceiro));
 
   // Itens que entram no carregamento: os já anexados + o em edição, se válido.
   function itemDoStaged(): ItemCarregamento | null {
@@ -178,6 +180,7 @@ export function LancamentoPage() {
     setCliente("");
     setVeiculoSel("");
     setVeiculoTerceiro("");
+    setVeiculoTerceiroModelo("");
     setMotorista("");
     setMotivo("");
     setObservacao("");
@@ -205,7 +208,8 @@ export function LancamentoPage() {
           })),
           clienteNome: cliente.trim(),
           veiculoId: veiculoSel && veiculoSel !== "terceiro" ? (veiculoSel as Id<"veiculos">) : undefined,
-          veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro.trim() || undefined : undefined,
+          veiculoTerceiro: veiculoSel === "terceiro" ? veiculoTerceiro || undefined : undefined,
+          veiculoTerceiroModelo: veiculoSel === "terceiro" ? veiculoTerceiroModelo.trim() || undefined : undefined,
           motorista: motorista.trim() || undefined,
         });
         setMsg(`Carregamento registrado · ${itensParaEnviar.length} ${itensParaEnviar.length === 1 ? "produto" : "produtos"}.`);
@@ -352,7 +356,27 @@ export function LancamentoPage() {
                 <option value="terceiro">Terceiro (digitar)</option>
               </Selecao>
               {veiculoSel === "terceiro" ? (
-                <Campo label="Veículo terceiro" value={veiculoTerceiro} onChange={(e) => setVeiculoTerceiro(e.target.value)} placeholder="Placa / descrição" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Campo
+                      label="Placa do terceiro"
+                      mono
+                      value={veiculoTerceiro}
+                      onChange={(e) => setVeiculoTerceiro(mascaraPlaca(e.target.value))}
+                      placeholder="ABC1D23"
+                      maxLength={7}
+                    />
+                    {veiculoTerceiro !== "" && !placaCompleta(veiculoTerceiro) ? (
+                      <p className="mt-1 text-xs text-alerta">Formato: ABC-1234 ou ABC1D23.</p>
+                    ) : null}
+                  </div>
+                  <Campo
+                    label="Modelo / descrição (opcional)"
+                    value={veiculoTerceiroModelo}
+                    onChange={(e) => setVeiculoTerceiroModelo(e.target.value)}
+                    placeholder="Van baú branca"
+                  />
+                </div>
               ) : null}
               <Campo label="Motorista (opcional)" value={motorista} onChange={(e) => setMotorista(e.target.value)} />
             </div>

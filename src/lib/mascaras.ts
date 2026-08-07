@@ -35,6 +35,20 @@ export function placaCompleta(placa: string): boolean {
   return placa.length === 7;
 }
 
+const RE_PLACA_ANTIGA = /^[A-Z]{3}\d{4}$/;
+const RE_PLACA_MERCOSUL = /^[A-Z]{3}\d[A-Z]\d{2}$/;
+
+// Exibição normalizada: ABC-1234 (padrão antigo, com hífen) ou ABC1D23
+// (Mercosul, sem hífen) — mesma regra do lado do servidor (convex/lib/placa.ts).
+// Texto que não bate com nenhum padrão (registro anterior à validação, tarefa
+// 3) volta como veio: não dá pra normalizar o que nunca foi placa de verdade.
+export function rotuloPlacaOuTexto(raw: string): string {
+  const normalizada = mascaraPlaca(raw);
+  if (RE_PLACA_ANTIGA.test(normalizada)) return `${normalizada.slice(0, 3)}-${normalizada.slice(3)}`;
+  if (RE_PLACA_MERCOSUL.test(normalizada)) return normalizada;
+  return raw;
+}
+
 // Telefone/WhatsApp brasileiro: (DD) 99999-9999 (celular, 11 dígitos) ou
 // (DD) 9999-9999 (fixo, 10 dígitos). Só dígitos entram; o DDI 55 é adicionado
 // na hora de montar o link do wa.me, não aqui.
