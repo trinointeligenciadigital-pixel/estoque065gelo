@@ -7,7 +7,7 @@ import { exigirSessaoOperadorMutavel, exigirPermissao, exigirCamaraDoProduto } f
 import { movimentacaoExistente } from "../lib/idempotencia";
 import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
-import { protocoloDe } from "../lib/protocolo";
+import { protocoloDe, proximoNumeroComprovante } from "../lib/protocolo";
 import { veiculoTerceiroValidado } from "../lib/placa";
 
 /*
@@ -234,6 +234,7 @@ export const lancarSaidaMultipla = mutation({
         movimentacaoIds: jaGravadas.map((m) => m._id),
         duplicado: true,
         protocolo: jaGravadas[0].protocolo ?? protocoloDe(args.carregamentoId),
+        numeroComprovante: jaGravadas[0].numeroComprovante ?? null,
       };
     }
 
@@ -263,8 +264,9 @@ export const lancarSaidaMultipla = mutation({
     const motorista = args.motorista?.trim() || undefined;
     // Um recibo só por carregamento: todas as linhas do grupo compartilham o
     // mesmo protocolo, derivado do carregamentoId (não da chaveIdempotencia de
-    // cada item, que é por linha).
+    // cada item, que é por linha) — e o mesmo número sequencial do comprovante.
     const protocolo = protocoloDe(args.carregamentoId);
+    const numeroComprovante = await proximoNumeroComprovante(ctx);
 
     const movimentacaoIds = [];
     for (let i = 0; i < linhas.length; i++) {
@@ -272,6 +274,7 @@ export const lancarSaidaMultipla = mutation({
       const id = await ctx.db.insert("movimentacoes", {
         chaveIdempotencia: args.itens[i].chaveIdempotencia,
         protocolo,
+        numeroComprovante,
         carregamentoId: args.carregamentoId,
         tipo: args.tipo,
         sinal: -1,
@@ -292,7 +295,7 @@ export const lancarSaidaMultipla = mutation({
       });
       movimentacaoIds.push(id);
     }
-    return { movimentacaoIds, duplicado: false, protocolo };
+    return { movimentacaoIds, duplicado: false, protocolo, numeroComprovante };
   },
 });
 

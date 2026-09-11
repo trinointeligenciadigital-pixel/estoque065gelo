@@ -153,6 +153,8 @@ export const listar = query({
           // chars da chaveIdempotencia) só pra nunca ficar em branco — a
           // migração migrarProtocoloLegado preenche todo mundo de verdade.
           protocolo: m.protocolo ?? m.chaveIdempotencia.slice(0, 8).toUpperCase(),
+          // Número sequencial do comprovante (só carregamento tem — ver schema.ts).
+          numeroComprovante: m.numeroComprovante ?? null,
         };
       }),
     );

@@ -47,8 +47,18 @@ export type DadosComprovante = {
   camaraNome: string;
   operadorNome: string;
   protocolo: string;
+  // Número sequencial do comprovante (talão de papel: 1, 2, 3…), gerado no
+  // servidor uma vez por carregamento. `null` = carregamento anterior a este
+  // campo — não existe número pra ele, e a UI nunca inventa um.
+  numeroComprovante: number | null;
   empresa: DadosEmpresaComprovante | null;
 };
+
+// "Nº 000123" — sempre com 6 dígitos, como um talão. Cresce sozinho depois
+// disso (nunca trunca o número, só o preenchimento de zeros).
+export function rotuloNumeroComprovante(n: number): string {
+  return `Nº ${String(n).padStart(6, "0")}`;
+}
 
 export const SELO_NAO_FISCAL = "Documento não fiscal · controle interno de saída";
 
@@ -137,6 +147,7 @@ function linhasCabecalhoEmpresa(empresa: DadosEmpresaComprovante | null): string
 export function textoComprovante(d: DadosComprovante): string {
   return [
     ...linhasCabecalhoEmpresa(d.empresa),
+    ...(d.numeroComprovante !== null ? [`Comprovante ${rotuloNumeroComprovante(d.numeroComprovante)}`] : []),
     `${d.rotulo} · ${dataHoraComprovante(d.quandoMs)}`,
     "",
     `Cliente: ${d.cliente || "—"}`,

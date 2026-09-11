@@ -12,16 +12,8 @@ import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer, BotaoDesfazerCarregamento } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
-import { dataHoraComprovante } from "../lib/data.ts";
-import {
-  cabecalhoEmpresaEstruturado,
-  linhasContexto,
-  linkWhatsappComprovante,
-  SELO_NAO_FISCAL,
-  textoComprovante,
-  totalPacotesComprovante,
-  type DadosComprovante,
-} from "../lib/comprovante.ts";
+import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../lib/comprovante.ts";
+import { ComprovanteCartao } from "../shared/ComprovanteCartao.tsx";
 
 /*
   Lançar saída (RF28–RF35) e ponto de entrada do retorno (RF38–RF41). Tipos:
@@ -172,6 +164,7 @@ function SaidaCarregamento({
   const [enviando, setEnviando] = useState(false);
   const [quandoMs, setQuandoMs] = useState(0);
   const [protocolo, setProtocolo] = useState("");
+  const [numeroComprovante, setNumeroComprovante] = useState<number | null>(null);
   // Desfazer do carregamento (tarefa 4 do adendo): fecha assim que o
   // comprovante é enviado/copiado — ver ComprovanteSaida mais abaixo.
   const [compartilhado, setCompartilhado] = useState(false);
@@ -320,6 +313,7 @@ function SaidaCarregamento({
         motorista: motorista.trim() || undefined,
       });
       setProtocolo(r.protocolo);
+      setNumeroComprovante(r.numeroComprovante);
       setQuandoMs(Date.now());
       setPasso("sucesso");
     } catch (e) {
@@ -349,6 +343,7 @@ function SaidaCarregamento({
       camaraNome,
       operadorNome,
       protocolo: protocolo || "—",
+      numeroComprovante,
       empresa: empresa ?? null,
     };
 
@@ -476,6 +471,10 @@ function SaidaCarregamento({
   }
 
   // -------- Adicionar item: produto --------
+  // Mesma barra de progresso "Passo X de 3" da Produção (tarefa: telas de
+  // lançamento com o mesmo layout) — sem ela, escolher produto pra um
+  // carregamento parecia uma tela diferente de escolher produto pra produção,
+  // sendo visualmente a mesma coisa.
   if (passo === "produto") {
     return (
       <Tela
@@ -483,6 +482,8 @@ function SaidaCarregamento({
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={itens.length > 0 ? () => setPasso("itens") : onVoltar}
+        etapa={1}
+        totalEtapas={3}
       >
         <ListaProdutos
           produtos={produtos}
@@ -497,7 +498,14 @@ function SaidaCarregamento({
   // -------- Adicionar item: formato --------
   if (passo === "formato" && produto) {
     return (
-      <Tela titulo="Formato" camaraNome={produto.nome} operadorNome={nome} onVoltar={() => setPasso("produto")}>
+      <Tela
+        titulo="Formato"
+        camaraNome={produto.nome}
+        operadorNome={nome}
+        onVoltar={() => setPasso("produto")}
+        etapa={2}
+        totalEtapas={3}
+      >
         <ListaFormatos
           produto={produto}
           onEscolher={(f) => { setFormato(f); setValor(""); setPasso("quantidade"); }}
@@ -512,6 +520,7 @@ function SaidaCarregamento({
     const validoBasico = formato.pesoVariavel ? num > 0 : Number.isInteger(num) && num > 0;
     const editando = editIdx !== null;
     const pulouFormato = produto.formatos.length === 1;
+    const totalEtapasItem = pulouFormato ? 2 : 3;
 
     // Saldo disponível já descontando o que este carregamento reserva do mesmo
     // formato (o servidor revalida no Confirmar; aqui é para não montar em falso).
@@ -544,6 +553,8 @@ function SaidaCarregamento({
             ? () => { limparRascunho(); setPasso("itens"); }
             : () => setPasso(pulouFormato ? "produto" : "formato")
         }
+        etapa={totalEtapasItem}
+        totalEtapas={totalEtapasItem}
         rodape={
           mensagemAviso ? (
             <div className="flex flex-col gap-3">
@@ -589,6 +600,8 @@ function SaidaCarregamento({
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={() => setPasso("itens")}
+        etapa={1}
+        totalEtapas={2}
         rodape={
           <BotaoGrande variante="primario" onClick={() => setPasso("revisar")} disabled={!podeConfirmar}>
             Continuar
@@ -673,6 +686,8 @@ function SaidaCarregamento({
         camaraNome={camaraNome}
         operadorNome={nome}
         onVoltar={enviando ? undefined : () => setPasso("contexto")}
+        etapa={2}
+        totalEtapas={2}
         rodape={
           <BotaoGrande variante="primario" onClick={confirmar} disabled={enviando}>
             {enviando ? "Enviando…" : erroDeRede ? "Tentar de novo" : `Confirmar ${rotulo.toLowerCase()}`}
@@ -1159,104 +1174,9 @@ function ComprovanteSaida({
     }
   }
 
-  const contexto = linhasContexto(dados);
-  const totalPacotes = totalPacotesComprovante(dados);
-
-  const empresa = dados.empresa;
-  const cabecalho = cabecalhoEmpresaEstruturado(empresa);
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-hidden rounded-xl border border-borda bg-superficie">
-        {/* De quem → pra quem → o quê (tarefa 7), em quatro blocos fixos que
-            nunca truncam (correção "quatro ajustes pontuais", tarefa 2): o
-            único documento que sai da empresa e chega ao cliente por
-            WhatsApp não pode chegar anônimo, nem cortado no telefone. */}
-        {cabecalho.nome ? (
-          <div className="flex items-start gap-3 border-b border-borda px-4 py-3">
-            {empresa?.logoUrl ? (
-              <img src={empresa.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded object-contain" />
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium text-texto">{cabecalho.nome}</p>
-              {cabecalho.linhaCnpj ? <p className="mt-0.5 text-sm text-texto-suave">{cabecalho.linhaCnpj}</p> : null}
-              {cabecalho.endereco ? <p className="text-sm text-texto-suave">{cabecalho.endereco}</p> : null}
-              {cabecalho.linhaContato ? <p className="text-sm text-texto-suave">{cabecalho.linhaContato}</p> : null}
-            </div>
-          </div>
-        ) : null}
-        <div className="border-b border-borda px-4 py-3">
-          <div className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
-            Comprovante de saída
-          </div>
-          <div className="mt-0.5 text-base font-semibold text-texto">
-            {dados.rotulo}{" "}
-            <span className="font-mono text-sm font-normal text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
-          </div>
-        </div>
-
-        {/* Cada produto é a âncora da sua linha; formato é metadado abaixo dele.
-            Quantidade em pacotes é o destaque à direita, peso derivado abaixo
-            (tarefa 5 — nunca uma string concatenada produto/formato/quantidade). */}
-        <div className="border-b border-borda">
-          {dados.itens.map((it, i) => (
-            <div key={i} className="flex items-start justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-base text-texto">{it.produtoNome}</p>
-                <p className="truncate text-sm text-texto-suave">{it.formatoNome}</p>
-              </div>
-              <div className="shrink-0 text-right whitespace-nowrap">
-                {it.quantidadePacotes !== null ? (
-                  <>
-                    <p className="font-mono text-base font-semibold text-texto">
-                      {it.quantidadePacotes}
-                      <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
-                        {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
-                      </span>
-                    </p>
-                    <p className="font-mono text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
-                  </>
-                ) : (
-                  <p className="font-mono text-base font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-baseline justify-between gap-3 border-b border-borda bg-superficie-fria/40 px-4 py-3">
-          <dt className="text-base font-medium text-texto">Total</dt>
-          <dd className="text-right">
-            {totalPacotes > 0 ? (
-              <>
-                <span className="font-mono text-2xl font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
-                <span className="ml-2 font-mono text-sm text-texto-suave">{formatarPeso(dados.pesoTotalKg)}</span>
-              </>
-            ) : (
-              <span className="font-mono text-2xl font-semibold text-texto">{formatarPeso(dados.pesoTotalKg)}</span>
-            )}
-          </dd>
-        </div>
-
-        <dl>
-          {contexto.map((l, i) => (
-            <div
-              key={i}
-              className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0"
-            >
-              <dt className="min-w-0 flex-1 text-base text-texto-suave">{l.rotulo}</dt>
-              <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
-            </div>
-          ))}
-        </dl>
-        <div className="flex items-center justify-between border-t border-borda px-4 py-2.5">
-          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
-            Protocolo
-          </span>
-          <span className="font-mono text-sm text-texto">{dados.protocolo}</span>
-        </div>
-        <p className="border-t border-borda px-4 py-2 text-center text-[11px] text-texto-fraco">{SELO_NAO_FISCAL}</p>
-      </div>
+      <ComprovanteCartao dados={dados} />
 
       <BotaoGrande variante="primario" onClick={abrirWhatsapp}>
         <MessageCircle size={20} aria-hidden="true" /> Enviar comprovante no WhatsApp

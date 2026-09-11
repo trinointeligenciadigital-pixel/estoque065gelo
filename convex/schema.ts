@@ -160,6 +160,16 @@ export default defineSchema({
     // o protocolo do grupo — é um recibo só. Ausente = lançamento anterior a
     // esta tarefa; migrarProtocoloLegado (convex/migracoes.ts) preenche.
     protocolo: v.optional(v.string()),
+    // Número sequencial do comprovante de saída (venda/patrocínio), tipo talão
+    // de papel: 1, 2, 3… Só existe em carregamento (nunca produção, perda,
+    // retorno, ajuste, estorno ou transferência — nenhum destes tem
+    // "comprovante de saída"). Gerado uma vez por carregamento, em
+    // proximoNumeroComprovante (convex/lib/protocolo.ts) — lê o maior já
+    // emitido pelo índice by_numero_comprovante e soma 1; linhas do mesmo
+    // carregamento compartilham o número, igual ao protocolo. Ausente =
+    // carregamento anterior a este campo (sem número retroativo — não dá pra
+    // provar em que ordem ele teria saído perto dos gerados de verdade).
+    numeroComprovante: v.optional(v.number()),
 
     tipo: v.union(
       v.literal("producao"), // entrada
@@ -269,7 +279,8 @@ export default defineSchema({
     .index("by_lote", ["loteId"])
     .index("by_estorno_de", ["estornoDe"])
     .index("by_registrado_em", ["registradoEm"])
-    .index("by_protocolo", ["protocolo"]),
+    .index("by_protocolo", ["protocolo"])
+    .index("by_numero_comprovante", ["numeroComprovante"]),
 
   // Registro de que o comprovante de um carregamento (venda/patrocínio) foi
   // enviado por WhatsApp ou copiado (adendo PWA, tarefa 4). Tabela À PARTE de
