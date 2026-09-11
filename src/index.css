@@ -38,6 +38,11 @@
 
   /* Movimento — reforço tátil quando o PIN erra. */
   --animate-tremor: tremor 0.4s ease;
+  /* Entrada de cada página do Admin ao trocar de rota — assinatura de
+     movimento única do painel (RNF: nada de efeito espalhado por elemento). */
+  --animate-conteudo-entra: conteudo-entra 0.22s ease-out;
+  /* Painel do dropdown de seleção (Selecao/SelecaoInline) ao abrir. */
+  --animate-menu-entra: menu-entra 0.12s ease-out;
 }
 
 /* Tremor curto das bolinhas do PIN ao errar (RNF: acessibilidade — respeita
@@ -58,6 +63,28 @@
   }
   80% {
     transform: translateX(4px);
+  }
+}
+
+@keyframes conteudo-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes menu-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -90,4 +117,11 @@ body {
   color: var(--color-texto);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Clerk aplica a própria sombra ao cartão de login por CSS interno, mais forte
+   que a classe Tailwind passada em `appearance.elements.card` — a Regra do
+   Sem-Sombra do sistema vale pro widget também. */
+.cl-card {
+  box-shadow: none !important;
 }

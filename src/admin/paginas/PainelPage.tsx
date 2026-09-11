@@ -2,7 +2,7 @@ import { Component, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Cartao, TituloPagina } from "../../shared/ui.tsx";
+import { Cartao, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
@@ -47,6 +47,11 @@ function PainelConteudo() {
   // prevalece, quilo agrega") — muda qual unidade aparece grande na linha de
   // formato E a ordenação da lista. Padrão pacotes: é o que alguém separa.
   const [unidadeDestaque, setUnidadeDestaque] = useState<"pacotes" | "kg">("pacotes");
+  // Filtro por câmara fria e por tipo de produto — só o bloco "Estoque por
+  // produto"; os KPIs e o gráfico continuam somando a fábrica inteira, porque
+  // é o número que responde "quanto tem, no total, agora".
+  const [camaraFiltro, setCamaraFiltro] = useState("");
+  const [categoriaFiltro, setCategoriaFiltro] = useState("");
 
   if (r === undefined) return <PainelSkeleton />;
 
@@ -64,10 +69,19 @@ function PainelConteudo() {
     return p.formatos.reduce((acc, f) => acc + (f.pesoVariavel ? 0 : f.saldo), 0);
   }
 
+  // Câmaras disponíveis pro filtro — direto dos produtos que já vieram no
+  // resumo (evita uma query à parte só pra preencher um <select>).
+  const camarasDisponiveis = [...new Map(r.produtos.map((p) => [p.camaraId, p.camaraNome])).entries()].sort(
+    (a, b) => a[1].localeCompare(b[1]),
+  );
+
   // Abaixo do mínimo primeiro — o que importa fica no topo da lista (que rola
   // por dentro quando há muitos produtos). Dentro disso, a ordem segue a
   // unidade em destaque.
-  const produtos = (soAbaixo ? r.produtos.filter((p) => p.abaixoMinimo) : r.produtos)
+  const produtos = r.produtos
+    .filter((p) => (soAbaixo ? p.abaixoMinimo : true))
+    .filter((p) => (camaraFiltro ? p.camaraId === camaraFiltro : true))
+    .filter((p) => (categoriaFiltro ? p.categoria === categoriaFiltro : true))
     .slice()
     .sort((a, b) => {
       const abaixoDiff = Number(b.abaixoMinimo) - Number(a.abaixoMinimo);
@@ -100,7 +114,7 @@ function PainelConteudo() {
       />
 
       {/* Filtro de período — governa só os cartões de Movimento e o gráfico */}
-      <div className="mb-3 flex items-center justify-end gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
         <span className="text-[11.5px] text-texto-fraco">Movimento nos últimos:</span>
         <SegPeriodo dias={dias} onChange={setDias} />
       </div>
@@ -110,8 +124,10 @@ function PainelConteudo() {
         <Kpi rotulo="Estoque total" valor={formatarPeso(r.kpis.estoqueTotalKg)} rodape="soma por peso · agora" />
         <button
           onClick={() => r.qtdAbaixoMinimo > 0 && setSoAbaixo((v) => !v)}
-          className={`flex flex-col gap-2.5 rounded-[10px] border p-4 text-left ${
-            r.qtdAbaixoMinimo > 0 ? "border-alerta bg-alerta/5" : "border-borda bg-superficie"
+          className={`flex flex-col gap-2.5 rounded-[10px] border p-4 text-left transition-colors ${
+            r.qtdAbaixoMinimo > 0
+              ? "border-alerta bg-alerta/5 hover:bg-alerta/10"
+              : "cursor-default border-borda bg-superficie"
           }`}
         >
           <Eyebrow>Abaixo do mínimo</Eyebrow>
@@ -201,6 +217,39 @@ function PainelConteudo() {
 
         {/* Estoque por produto */}
         <Cartao className="p-5">
+          {/* Filtro por câmara fria e por tipo de produto — só este bloco;
+              os KPIs acima somam a fábrica inteira de propósito. */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-[11px] text-texto-fraco">Filtrar:</span>
+            <SelecaoInline
+              value={camaraFiltro}
+              onChange={(e) => setCamaraFiltro(e.target.value)}
+              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[11.5px]"
+            >
+              <option value="">Todas as câmaras</option>
+              {camarasDisponiveis.map(([id, nome]) => (
+                <option key={id} value={id}>{nome}</option>
+              ))}
+            </SelecaoInline>
+            <SelecaoInline
+              value={categoriaFiltro}
+              onChange={(e) => setCategoriaFiltro(e.target.value)}
+              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[11.5px]"
+            >
+              <option value="">Todos os tipos</option>
+              {Object.entries(rotuloCat).map(([k, rot]) => (
+                <option key={k} value={k}>{rot}</option>
+              ))}
+            </SelecaoInline>
+            {camaraFiltro || categoriaFiltro ? (
+              <button
+                onClick={() => { setCamaraFiltro(""); setCategoriaFiltro(""); }}
+                className="text-[11px] font-medium text-acento hover:text-acento-escuro"
+              >
+                Limpar
+              </button>
+            ) : null}
+          </div>
           <PanelHead
             titulo="Estoque por produto"
             extra={
@@ -214,7 +263,13 @@ function PainelConteudo() {
             }
           />
           {produtos.length === 0 ? (
-            <Vazio>{soAbaixo ? "Nenhum formato abaixo do mínimo." : "Nenhum produto ativo. Cadastre em Produtos."}</Vazio>
+            <Vazio>
+              {camaraFiltro || categoriaFiltro
+                ? "Nenhum produto para este filtro."
+                : soAbaixo
+                  ? "Nenhum formato abaixo do mínimo."
+                  : "Nenhum produto ativo. Cadastre em Produtos."}
+            </Vazio>
           ) : (
             <div className="flex max-h-[460px] flex-col gap-2.5 overflow-y-auto pr-1">
               {produtos.map((p) => (
@@ -459,7 +514,7 @@ function Kpi({ rotulo, valor, unidade, cor = "text-texto", rodape }: { rotulo: s
 
 function PanelHead({ titulo, extra }: { titulo: string; extra?: ReactNode }) {
   return (
-    <div className="mb-3.5 flex items-center justify-between">
+    <div className="mb-3.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
       <h2 className="font-titulo text-[15px] font-semibold tracking-[0.02em] text-texto uppercase">{titulo}</h2>
       {extra}
     </div>

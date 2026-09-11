@@ -1,11 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-} from "react";
-import { X } from "lucide-react";
+import { Children, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { Check, ChevronDown, X } from "lucide-react";
 
 /*
   Kit de UI do painel do Admin — denso (RNF12). Inter no texto; números em
@@ -54,24 +49,243 @@ export function Campo({
   );
 }
 
+/*
+  Caixa de seleção — dropdown próprio (não o <select> nativo do sistema
+  operacional), pra ter movimento: painel que surge com transição, seta que
+  gira, item marcado com check. O <select> nativo não dá nenhum controle
+  sobre a abertura — é por isso que precisa ser um componente à parte.
+
+  A API imita a de um <select> de propósito: `children` continuam sendo
+  <option>/<optgroup> de verdade (o componente só os lê, nunca renderiza),
+  e `onChange` recebe um objeto no formato `{ target: { value } }` — todo
+  código que já fazia `onChange={(e) => set(e.target.value)}` continua
+  funcionando sem mudar uma linha.
+
+  Só o Admin usa isto (RNF12, densidade). As telas do colaborador mantêm o
+  <select> nativo de propósito — no celular ele abre o seletor do sistema,
+  que é mais rápido de operar com uma mão fria do que qualquer painel customizado.
+*/
+type OpcaoItem = { tipo: "opcao"; value: string; label: string; disabled?: boolean };
+type GrupoItem = { tipo: "grupo"; label: string; opcoes: OpcaoItem[] };
+type ItemLista = OpcaoItem | GrupoItem;
+
+function analisarOpcoes(children: ReactNode): ItemLista[] {
+  return Children.toArray(children).flatMap((child): ItemLista[] => {
+    if (!isValidElement(child)) return [];
+    if (child.type === "option") {
+      const props = child.props as { value?: string; children?: ReactNode; disabled?: boolean };
+      return [{ tipo: "opcao", value: String(props.value ?? ""), label: String(props.children ?? ""), disabled: props.disabled }];
+    }
+    if (child.type === "optgroup") {
+      const props = child.props as { label?: string; children?: ReactNode };
+      const opcoes = Children.toArray(props.children).flatMap((sub): OpcaoItem[] => {
+        if (!isValidElement(sub) || sub.type !== "option") return [];
+        const p = sub.props as { value?: string; children?: ReactNode; disabled?: boolean };
+        return [{ tipo: "opcao", value: String(p.value ?? ""), label: String(p.children ?? ""), disabled: p.disabled }];
+      });
+      return [{ tipo: "grupo", label: props.label ?? "", opcoes }];
+    }
+    return [];
+  });
+}
+
+function opcoesPlanas(itens: ItemLista[]): OpcaoItem[] {
+  return itens.flatMap((i) => (i.tipo === "opcao" ? [i] : i.opcoes));
+}
+
+type ChangeShim = { target: { value: string } };
+
+function SelectBase({
+  value,
+  onChange,
+  disabled,
+  className = "",
+  children,
+}: {
+  value?: string;
+  onChange?: (e: ChangeShim) => void;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const buscaRef = useRef<HTMLInputElement>(null);
+
+  const itens = useMemo(() => analisarOpcoes(children), [children]);
+  const planas = useMemo(() => opcoesPlanas(itens), [itens]);
+  const atual = planas.find((o) => o.value === (value ?? ""));
+  const buscavel = planas.length > 6;
+
+  useEffect(() => {
+    if (!aberto) {
+      setBusca("");
+      return;
+    }
+    const t = setTimeout(() => buscaRef.current?.focus(), 0);
+    function aoClicarFora(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setAberto(false);
+    }
+    function aoTeclarEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setAberto(false);
+    }
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclarEsc);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclarEsc);
+    };
+  }, [aberto]);
+
+  function escolher(v: string) {
+    onChange?.({ target: { value: v } });
+    setAberto(false);
+  }
+
+  const buscaNorm = busca.trim().toLowerCase();
+  const filtrados: ItemLista[] =
+    buscaNorm === ""
+      ? itens
+      : itens
+          .map((i): ItemLista | null =>
+            i.tipo === "opcao"
+              ? i.label.toLowerCase().includes(buscaNorm)
+                ? i
+                : null
+              : { ...i, opcoes: i.opcoes.filter((o) => o.label.toLowerCase().includes(buscaNorm)) },
+          )
+          .filter((i): i is ItemLista => i !== null && (i.tipo === "opcao" || i.opcoes.length > 0));
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setAberto((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={aberto}
+        className={`flex w-full items-center justify-between gap-2 rounded border border-borda bg-superficie px-2 py-1.5 text-left text-sm text-texto outline-none transition-colors hover:border-borda-forte focus-visible:border-acento disabled:cursor-not-allowed disabled:bg-fundo disabled:text-texto-fraco ${className}`}
+      >
+        <span className={`truncate ${!atual ? "text-texto-fraco" : ""}`}>{atual?.label ?? "—"}</span>
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-texto-fraco transition-transform duration-150 ${aberto ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      {aberto ? (
+        <div
+          role="listbox"
+          className="animate-menu-entra absolute z-50 mt-1 max-h-72 w-full min-w-[180px] overflow-auto rounded-md border border-borda bg-superficie p-1 shadow-none"
+        >
+          {buscavel ? (
+            <div className="sticky top-0 -mx-1 -mt-1 mb-1 bg-superficie p-1">
+              <input
+                ref={buscaRef}
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar…"
+                className="w-full rounded border border-borda bg-fundo px-2 py-1 text-xs text-texto outline-none focus:border-acento"
+              />
+            </div>
+          ) : null}
+          {filtrados.length === 0 ? (
+            <div className="px-2 py-2 text-center text-xs text-texto-fraco">Nada encontrado.</div>
+          ) : (
+            filtrados.map((item, i) =>
+              item.tipo === "grupo" ? (
+                <div key={i}>
+                  <div className="px-2 pt-1.5 pb-0.5 font-mono text-[10px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
+                    {item.label}
+                  </div>
+                  {item.opcoes.map((o) => (
+                    <OpcaoListbox key={o.value} opcao={o} selecionado={o.value === (value ?? "")} onEscolher={escolher} />
+                  ))}
+                </div>
+              ) : (
+                <OpcaoListbox key={item.value} opcao={item} selecionado={item.value === (value ?? "")} onEscolher={escolher} />
+              ),
+            )
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OpcaoListbox({
+  opcao,
+  selecionado,
+  onEscolher,
+}: {
+  opcao: OpcaoItem;
+  selecionado: boolean;
+  onEscolher: (v: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selecionado}
+      disabled={opcao.disabled}
+      onClick={() => onEscolher(opcao.value)}
+      className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-texto-fraco disabled:opacity-60 ${
+        selecionado ? "bg-superficie-fria-2 font-medium text-acento" : "text-texto hover:bg-superficie-fria"
+      }`}
+    >
+      <span className="truncate">{opcao.label}</span>
+      {selecionado ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}
+    </button>
+  );
+}
+
 export function Selecao({
   label,
   children,
-  ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & {
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
   label: string;
   children: ReactNode;
+  value?: string;
+  onChange?: (e: ChangeShim) => void;
+  disabled?: boolean;
+  className?: string;
 }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-texto-suave">{label}</span>
-      <select
-        className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
-        {...props}
-      >
+      <SelectBase value={value} onChange={onChange} disabled={disabled} className={className}>
         {children}
-      </select>
+      </SelectBase>
     </label>
+  );
+}
+
+// Mesma caixa, sem rótulo — pra filtros densos (Histórico, Contagens) que já
+// têm o próprio rótulo por fora.
+export function SelecaoInline({
+  children,
+  value,
+  onChange,
+  disabled,
+  className,
+}: {
+  children: ReactNode;
+  value?: string;
+  onChange?: (e: ChangeShim) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <SelectBase value={value} onChange={onChange} disabled={disabled} className={className}>
+      {children}
+    </SelectBase>
   );
 }
 
@@ -237,8 +451,8 @@ export function LinhaMensagem({ colSpan, children }: { colSpan: number; children
 
 export function TituloPagina({ titulo, subtitulo, acao }: { titulo: string; subtitulo?: string; acao?: ReactNode }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-4">
-      <div>
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
         <h1 className="font-titulo text-xl font-semibold tracking-[0.02em] text-texto uppercase">{titulo}</h1>
         {subtitulo ? <p className="text-sm text-texto-suave">{subtitulo}</p> : null}
       </div>

@@ -210,7 +210,8 @@ O sistema é **plano por princípio**. Não há sombras decorativas — nenhuma.
 - **Disabled:** fundo gelo-claro, texto suave (ex.: campo de câmara fixa no produto, que nunca se edita).
 
 ### Navigation
-- **Admin:** barra lateral fixa de 224px, branca, com a marca da 065 no topo e o crédito da Trino no rodapé. Item ativo = fundo superfície-fria-2 (`#dce6e8`), texto ciano, com um losango sólido de 7px de marca; inativo = texto tinta-suave, hover preenche com superfície fria. Seções ("Cadastros") são rótulos-mostrador em Plex versalete.
+- **Admin (desktop, ≥1024px):** barra lateral de 224px, branca, com a marca da 065 no topo e o crédito da Trino no rodapé. Item ativo = fundo superfície-fria-2 (`#dce6e8`), texto ciano, com um losango sólido de 7px de marca; inativo = texto tinta-suave, hover preenche com superfície fria. Seções ("Cadastros") são rótulos-mostrador em Plex versalete. Recolhível pelo próprio Admin (botão no rodapé da barra) para uma régua de ícones de 72px — rótulos viram tooltip; a preferência persiste no aparelho.
+- **Admin (celular/tablet, <1024px):** a barra vira uma gaveta fora da tela, aberta por um botão de menu num cabeçalho fixo no topo. Um véu translúcido de tinta (`#16232a` a ~40%, mesmo tratamento do Modal) escurece o conteúdo atrás dela — a única elevação real do sistema fora do modal. Fecha ao navegar, ao tocar fora ou em Esc.
 - **Colaborador:** sem nav persistente — um cabeçalho por tela com título e botão "‹ voltar" grande; a navegação é o próprio fluxo.
 
 ### Régua de nível (componente-assinatura)

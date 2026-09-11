@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, type LucideIcon } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
 import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
@@ -149,6 +149,52 @@ export function BotaoGrande({
       {...props}
     >
       {children}
+    </button>
+  );
+}
+
+// Azulejo do menu da câmara (Produção, Saída, Saldo, Contar) — ícone e rótulo
+// alinhados à esquerda, não mais centralizados como ícone de app: lê como um
+// cartão de ação, não um launcher. Profundidade vem de duas camadas de tom —
+// o selo atrás do ícone, a borda inferior um tom mais escura nas variantes
+// cheias — nunca de sombra (Regra do Sem-Sombra). O tremor de toque
+// (active:scale) e a entrada escalonada (atraso por azulejo) são o movimento.
+export function AzulejoAcao({
+  rotulo,
+  Icone,
+  variante,
+  largo = false,
+  atraso = 0,
+  onClick,
+}: {
+  rotulo: string;
+  Icone: LucideIcon;
+  variante: "entrada" | "primario" | "neutro";
+  largo?: boolean;
+  atraso?: number;
+  onClick: () => void;
+}) {
+  const tileClasses = {
+    entrada: "border-b-[3px] border-black/15 bg-entrada text-white",
+    primario: "border-b-[3px] border-black/15 bg-acento text-white",
+    neutro: "border border-borda bg-superficie text-texto",
+  }[variante];
+  const chipClasses = {
+    entrada: "bg-white/20",
+    primario: "bg-white/20",
+    neutro: "bg-acento/10 text-acento",
+  }[variante];
+
+  return (
+    <button
+      onClick={onClick}
+      style={{ animationDelay: `${atraso}ms` }}
+      className={`animate-conteudo-entra flex min-h-[108px] flex-col justify-between gap-5 rounded-2xl p-4 text-left transition-all duration-150 outline-none hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:scale-[0.97] active:brightness-95 ${tileClasses} ${largo ? "col-span-2" : ""}`}
+    >
+      <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${chipClasses}`}>
+        <Icone size={22} aria-hidden="true" />
+      </span>
+      <span className="text-balance text-lg leading-tight font-semibold">{rotulo}</span>
     </button>
   );
 }

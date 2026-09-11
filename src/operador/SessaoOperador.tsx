@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ClipboardList, Gauge, PackagePlus, Truck } from "lucide-react";
 import { api } from "../../convex/_generated/api";
-import { BotaoGrande, Tela } from "./ui.tsx";
+import { AzulejoAcao, Tela } from "./ui.tsx";
 import { ProducaoFlow } from "./ProducaoFlow.tsx";
 import { SaidaFlow } from "./SaidaFlow.tsx";
 import { SaldoView } from "./SaldoView.tsx";
@@ -138,19 +138,20 @@ export function SessaoOperador({
 
       <div className="grid grid-cols-2 gap-3">
         {acoes.map(({ chave, rotulo, Icone, variante }, i) => {
-          // Contagem ímpar: o último azulejo ocupa a linha inteira (bloco largo mais
-          // baixo), sem deixar uma célula vazia solta.
+          // Contagem ímpar: o último azulejo ocupa a linha inteira, sem deixar
+          // uma célula vazia solta. Entrada escalonada (tarefa: profundidade e
+          // movimento) — cada azulejo "chega" um pouco depois do anterior.
           const ultimoImpar = impar && i === acoes.length - 1;
           return (
-            <BotaoGrande
+            <AzulejoAcao
               key={chave}
+              rotulo={rotulo}
+              Icone={Icone}
               variante={variante}
+              largo={ultimoImpar}
+              atraso={i * 60}
               onClick={() => setTela(chave)}
-              className={`flex-col gap-3 text-lg ${ultimoImpar ? "col-span-2 min-h-[7rem]" : "aspect-square"}`}
-            >
-              <Icone size={32} aria-hidden="true" />
-              <span className="text-balance leading-tight">{rotulo}</span>
-            </BotaoGrande>
+            />
           );
         })}
       </div>

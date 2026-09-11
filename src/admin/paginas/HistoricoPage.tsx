@@ -4,20 +4,13 @@ import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, SelecaoInline, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { ComprovanteCartao } from "../../shared/ComprovanteCartao.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { dataHora, dataHoraComprovante } from "../../lib/data.ts";
+import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
-import {
-  cabecalhoEmpresaEstruturado,
-  linhasContexto,
-  linkWhatsappComprovante,
-  SELO_NAO_FISCAL,
-  textoComprovante,
-  totalPacotesComprovante,
-  type DadosComprovante,
-} from "../../lib/comprovante.ts";
+import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../../lib/comprovante.ts";
 
 /*
   Histórico (RF61, RF62). Somente leitura: nenhuma linha tem ação de editar ou
@@ -88,6 +81,7 @@ type MovRow = {
   estornado: boolean;
   estornoDeProtocolo: string | null;
   protocolo: string;
+  numeroComprovante: number | null;
 };
 
 type LinhaAgrupada =
@@ -213,6 +207,7 @@ export function HistoricoPage() {
       // Todas as linhas do mesmo carregamento já saem do servidor com o
       // mesmo protocolo (protocoloDe do carregamentoId) — não precisa recalcular aqui.
       protocolo: m.protocolo,
+      numeroComprovante: m.numeroComprovante,
       empresa: empresa ?? null,
     };
   }
@@ -233,17 +228,17 @@ export function HistoricoPage() {
             />
           </Filtro>
           <Filtro label="Câmara">
-            <select
+            <SelecaoInline
               value={camaraId}
               onChange={(e) => { setCamaraId(e.target.value as Id<"camaras">); setProdutoId(""); }}
               className={inputCls}
             >
               <option value="">Todas</option>
               {(opcoes?.camaras ?? []).map((c) => <option key={c._id} value={c._id}>{c.nome}</option>)}
-            </select>
+            </SelecaoInline>
           </Filtro>
           <Filtro label="Produto">
-            <select value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
+            <SelecaoInline value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
               <option value="">Todos</option>
               {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
                 <optgroup key={camaraNome} label={camaraNome}>
@@ -252,16 +247,16 @@ export function HistoricoPage() {
                   ))}
                 </optgroup>
               ))}
-            </select>
+            </SelecaoInline>
           </Filtro>
           <Filtro label="Tipo">
-            <select value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className={inputCls}>
+            <SelecaoInline value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className={inputCls}>
               <option value="">Todos</option>
               {Object.entries(rotuloTipo).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
-            </select>
+            </SelecaoInline>
           </Filtro>
           <Filtro label="Autor">
-            <select
+            <SelecaoInline
               value={operadorId ? `op:${operadorId}` : autorClerkId ? `admin:${autorClerkId}` : ""}
               onChange={(e) => {
                 const v = e.target.value;
@@ -282,7 +277,7 @@ export function HistoricoPage() {
                   <option key={o._id} value={`op:${o._id}`}>{o.nome}</option>
                 ))}
               </optgroup>
-            </select>
+            </SelecaoInline>
           </Filtro>
           <Filtro label="De">
             <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={inputCls} />
@@ -764,8 +759,6 @@ function Filtro({ label, children }: { label: string; children: ReactNode }) {
 function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const texto = textoComprovante(dados);
-  const contexto = linhasContexto(dados);
-  const totalPacotes = totalPacotesComprovante(dados);
 
   async function copiar() {
     try {
@@ -777,96 +770,10 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
     }
   }
 
-  const empresa = dados.empresa;
-  const cabecalho = cabecalhoEmpresaEstruturado(empresa);
-
   return (
     <Modal titulo="Comprovante de saída" onFechar={onFechar}>
       <div className="flex flex-col gap-4">
-        <div className="overflow-hidden rounded-lg border border-borda">
-          {/* De quem → pra quem → o quê (tarefa 7), em quatro blocos fixos que
-              nunca truncam (correção "quatro ajustes pontuais", tarefa 2) —
-              sem isto o único documento que sai da empresa chega anônimo ou
-              cortado no meio do telefone. */}
-          {cabecalho.nome ? (
-            <div className="flex items-start gap-2.5 border-b border-borda px-3 py-2.5">
-              {empresa?.logoUrl ? (
-                <img src={empresa.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded object-contain" />
-              ) : null}
-              <div className="min-w-0 flex-1">
-                <p className="text-base font-medium text-texto">{cabecalho.nome}</p>
-                {cabecalho.linhaCnpj ? <p className="mt-0.5 text-xs text-texto-suave">{cabecalho.linhaCnpj}</p> : null}
-                {cabecalho.endereco ? <p className="text-xs text-texto-suave">{cabecalho.endereco}</p> : null}
-                {cabecalho.linhaContato ? <p className="text-xs text-texto-suave">{cabecalho.linhaContato}</p> : null}
-              </div>
-            </div>
-          ) : null}
-          <div className="border-b border-borda px-3 py-2">
-            <span className="text-sm font-semibold text-texto">{dados.rotulo}</span>{" "}
-            <span className="font-mono text-xs text-texto-suave">{dataHoraComprovante(dados.quandoMs)}</span>
-          </div>
-
-          {/* Produto é a âncora da linha, formato é metadado (tarefa 5) —
-              quantidade em pacotes é o destaque à direita, peso derivado abaixo. */}
-          <div className="border-b border-borda">
-            {dados.itens.map((it, i) => (
-              <div key={i} className="flex items-start justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm text-texto">{it.produtoNome}</p>
-                  <p className="truncate text-xs text-texto-suave">{it.formatoNome}</p>
-                </div>
-                <div className="shrink-0 text-right whitespace-nowrap">
-                  {it.quantidadePacotes !== null ? (
-                    <>
-                      <p className="font-mono text-sm font-semibold text-texto">
-                        {it.quantidadePacotes}
-                        <span className="ml-1 text-xs font-normal text-texto-suave">
-                          {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
-                        </span>
-                      </p>
-                      <p className="font-mono text-xs text-texto-suave">{formatarPeso(it.pesoKg)}</p>
-                    </>
-                  ) : (
-                    <p className="font-mono text-sm font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-baseline justify-between gap-3 border-y border-borda bg-superficie-fria/40 px-3 py-2">
-            <dt className="text-sm font-medium text-texto">Total</dt>
-            <dd className="text-right">
-              {totalPacotes > 0 ? (
-                <>
-                  <span className="font-mono text-xl font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
-                  <span className="ml-2 font-mono text-xs text-texto-suave">{formatarPeso(dados.pesoTotalKg)}</span>
-                </>
-              ) : (
-                <span className="font-mono text-xl font-semibold text-texto">{formatarPeso(dados.pesoTotalKg)}</span>
-              )}
-            </dd>
-          </div>
-
-          <dl>
-            {contexto.map((l, i) => (
-              <div
-                key={i}
-                className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-3 py-1.5 last:border-0"
-              >
-                <dt className="min-w-0 flex-1 text-sm text-texto-suave">{l.rotulo}</dt>
-                <dd className={`shrink-0 text-right text-sm text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
-              </div>
-            ))}
-          </dl>
-          <div className="flex items-center justify-between border-t border-borda px-3 py-1.5">
-            <span className="font-mono text-[10px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
-              Protocolo
-            </span>
-            <span className="font-mono text-sm text-texto">{dados.protocolo}</span>
-          </div>
-          <p className="border-t border-borda px-3 py-1.5 text-center text-[10.5px] text-texto-fraco">{SELO_NAO_FISCAL}</p>
-        </div>
+        <ComprovanteCartao dados={dados} denso />
         <div className="flex justify-end gap-2">
           <Botao variante="neutro" onClick={copiar}>
             {copiado ? <><Check size={15} aria-hidden="true" /> Copiado</> : "Copiar"}

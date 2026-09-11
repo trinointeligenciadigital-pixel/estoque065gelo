@@ -44,6 +44,10 @@ export function OperadoresPage() {
   }, [camaras]);
 
   const carregando = operadores === undefined || camaras === undefined;
+  // Inativo desce pra baixo dos ativos (quem está trabalhando aparece
+  // primeiro); dentro de cada grupo, mantém a ordem que veio do servidor.
+  const ativos = carregando ? [] : operadores.filter((o) => o.ativo);
+  const inativos = carregando ? [] : operadores.filter((o) => !o.ativo);
 
   return (
     <>
@@ -59,29 +63,23 @@ export function OperadoresPage() {
         ) : operadores.length === 0 ? (
           <LinhaMensagem colSpan={6}>Nenhum colaborador cadastrado ainda. Use “Novo colaborador”, no topo, para adicionar o primeiro.</LinhaMensagem>
         ) : (
-          operadores.map((o) => (
-            <LinhaTabela key={o._id} className="align-top">
-              <td className="px-3 py-2.5 font-medium text-texto">{o.nome}</td>
-              <td className="px-3 py-2.5 text-texto-suave">
-                {o.camarasPermitidas.map((id) => nomeCamara.get(id) ?? "—").join(", ") || "—"}
-              </td>
-              <td className="px-3 py-2.5">
-                <div className="flex flex-wrap gap-1">
-                  {o.podeLancarProducao ? <Tag>Produção</Tag> : null}
-                  {o.podeLancarSaida ? <Tag>Saída</Tag> : null}
-                  {o.podeContar ? <Tag>Contagem</Tag> : null}
-                </div>
-              </td>
-              <td className="px-3 py-2.5 text-texto-suave">{o.temPin ? "definido" : "sem PIN"}</td>
-              <td className="px-3 py-2.5"><Etiqueta ativo={o.ativo} /></td>
-              <td className="px-3 py-2.5 text-right">
-                <div className="flex justify-end gap-2">
-                  <GerarPin operadorId={o._id} temPin={o.temPin} onGerado={setPinGerado} />
-                  <Botao variante="neutro" onClick={() => setEditando(o)}>Editar</Botao>
-                </div>
-              </td>
-            </LinhaTabela>
-          ))
+          <>
+            {ativos.map((o) => (
+              <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} />
+            ))}
+            {inativos.length > 0 ? (
+              <>
+                <tr aria-hidden="true">
+                  <td colSpan={6} className="bg-superficie-fria px-3 py-1.5 font-mono text-[10.5px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+                    Inativos · {inativos.length}
+                  </td>
+                </tr>
+                {inativos.map((o) => (
+                  <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} className="opacity-70" />
+                ))}
+              </>
+            ) : null}
+          </>
         )}
       </Tabela>
 
@@ -102,6 +100,44 @@ export function OperadoresPage() {
 
 function Tag({ children }: { children: ReactNode }) {
   return <span className="rounded bg-acento/10 px-1.5 py-0.5 text-xs text-acento">{children}</span>;
+}
+
+function LinhaOperador({
+  o,
+  nomeCamara,
+  onEditar,
+  onPinGerado,
+  className = "",
+}: {
+  o: Operador;
+  nomeCamara: Map<string, string>;
+  onEditar: () => void;
+  onPinGerado: (d: PinGerado) => void;
+  className?: string;
+}) {
+  return (
+    <LinhaTabela className={`align-top ${className}`}>
+      <td className="px-3 py-2.5 font-medium text-texto">{o.nome}</td>
+      <td className="px-3 py-2.5 text-texto-suave">
+        {o.camarasPermitidas.map((id) => nomeCamara.get(id) ?? "—").join(", ") || "—"}
+      </td>
+      <td className="px-3 py-2.5">
+        <div className="flex flex-wrap gap-1">
+          {o.podeLancarProducao ? <Tag>Produção</Tag> : null}
+          {o.podeLancarSaida ? <Tag>Saída</Tag> : null}
+          {o.podeContar ? <Tag>Contagem</Tag> : null}
+        </div>
+      </td>
+      <td className="px-3 py-2.5 text-texto-suave">{o.temPin ? "definido" : "sem PIN"}</td>
+      <td className="px-3 py-2.5"><Etiqueta ativo={o.ativo} /></td>
+      <td className="px-3 py-2.5 text-right">
+        <div className="flex justify-end gap-2">
+          <GerarPin operadorId={o._id} temPin={o.temPin} onGerado={onPinGerado} />
+          <Botao variante="neutro" onClick={onEditar}>Editar</Botao>
+        </div>
+      </td>
+    </LinhaTabela>
+  );
 }
 
 function GerarPin({

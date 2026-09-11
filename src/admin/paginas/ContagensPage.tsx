@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
@@ -399,19 +399,12 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
           <p className="text-sm text-texto-suave">
             Você vai contar sem ver o saldo do sistema. Ao fechar, outro Admin confere a divergência.
           </p>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-texto-suave">Câmara</span>
-            <select
-              value={camaraId}
-              onChange={(e) => setCamaraId(e.target.value as Id<"camaras">)}
-              className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
-            >
-              <option value="">— escolha —</option>
-              {ativas.map((c) => (
-                <option key={c._id} value={c._id}>{c.nome}</option>
-              ))}
-            </select>
-          </label>
+          <Selecao label="Câmara" value={camaraId} onChange={(e) => setCamaraId(e.target.value as Id<"camaras">)}>
+            <option value="">— escolha —</option>
+            {ativas.map((c) => (
+              <option key={c._id} value={c._id}>{c.nome}</option>
+            ))}
+          </Selecao>
           {erro ? <Aviso>{erro}</Aviso> : null}
           <div className="flex justify-end gap-2">
             <Botao variante="neutro" onClick={aoFechar}>Cancelar</Botao>
