@@ -36,6 +36,7 @@ export function OperadoresPage() {
   const camaras = useQuery(api.admin.camaras.listar);
   const [editando, setEditando] = useState<Operador | "novo" | null>(null);
   const [pinGerado, setPinGerado] = useState<PinGerado | null>(null);
+  const [erro, setErro] = useState("");
 
   const nomeCamara = useMemo(() => {
     const m = new Map<string, string>();
@@ -57,6 +58,8 @@ export function OperadoresPage() {
         acao={<Botao onClick={() => setEditando("novo")}>Novo colaborador</Botao>}
       />
 
+      {erro ? <div className="mb-3"><Aviso>{erro}</Aviso></div> : null}
+
       <Tabela colunas={["Nome", "Câmaras", "Permissões", "PIN", "Status", { rotulo: "Ações", dir: true }]}>
         {carregando ? (
           <LinhaMensagem colSpan={6}>Carregando…</LinhaMensagem>
@@ -65,7 +68,7 @@ export function OperadoresPage() {
         ) : (
           <>
             {ativos.map((o) => (
-              <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} />
+              <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} onErro={setErro} />
             ))}
             {inativos.length > 0 ? (
               <>
@@ -75,7 +78,7 @@ export function OperadoresPage() {
                   </td>
                 </tr>
                 {inativos.map((o) => (
-                  <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} className="opacity-70" />
+                  <LinhaOperador key={o._id} o={o} nomeCamara={nomeCamara} onEditar={() => setEditando(o)} onPinGerado={setPinGerado} onErro={setErro} className="opacity-70" />
                 ))}
               </>
             ) : null}
@@ -107,12 +110,14 @@ function LinhaOperador({
   nomeCamara,
   onEditar,
   onPinGerado,
+  onErro,
   className = "",
 }: {
   o: Operador;
   nomeCamara: Map<string, string>;
   onEditar: () => void;
   onPinGerado: (d: PinGerado) => void;
+  onErro: (msg: string) => void;
   className?: string;
 }) {
   return (
@@ -132,7 +137,7 @@ function LinhaOperador({
       <td className="px-3 py-2.5"><Etiqueta ativo={o.ativo} /></td>
       <td className="px-3 py-2.5 text-right">
         <div className="flex justify-end gap-2">
-          <GerarPin operadorId={o._id} temPin={o.temPin} onGerado={onPinGerado} />
+          <GerarPin operadorId={o._id} temPin={o.temPin} onGerado={onPinGerado} onErro={onErro} />
           <Botao variante="neutro" onClick={onEditar}>Editar</Botao>
         </div>
       </td>
@@ -144,21 +149,24 @@ function GerarPin({
   operadorId,
   temPin,
   onGerado,
+  onErro,
 }: {
   operadorId: Id<"operadores">;
   temPin: boolean;
   onGerado: (d: PinGerado) => void;
+  onErro: (msg: string) => void;
 }) {
   const gerar = useMutation(api.admin.operadores.gerarPinOperador);
   const [gerando, setGerando] = useState(false);
 
   async function acao() {
     setGerando(true);
+    onErro("");
     try {
       const r = await gerar({ id: operadorId });
       onGerado(r);
-    } catch {
-      // erro silencioso aqui; o fluxo normal não falha. Reabrir tenta de novo.
+    } catch (e) {
+      onErro(mensagemErro(e));
     } finally {
       setGerando(false);
     }

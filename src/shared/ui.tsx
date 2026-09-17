@@ -1,5 +1,5 @@
-import { Children, isValidElement, useEffect, useMemo, useRef, useState } from "react";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 
 /*
@@ -110,8 +110,11 @@ function SelectBase({
 }) {
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState("");
+  const [indiceAtivo, setIndiceAtivo] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const gatilhoRef = useRef<HTMLButtonElement>(null);
   const buscaRef = useRef<HTMLInputElement>(null);
+  const idBase = useId();
 
   const itens = useMemo(() => analisarOpcoes(children), [children]);
   const planas = useMemo(() => opcoesPlanas(itens), [itens]);
@@ -127,21 +130,21 @@ function SelectBase({
     function aoClicarFora(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) setAberto(false);
     }
-    function aoTeclarEsc(e: KeyboardEvent) {
-      if (e.key === "Escape") setAberto(false);
-    }
     document.addEventListener("mousedown", aoClicarFora);
-    document.addEventListener("keydown", aoTeclarEsc);
     return () => {
       clearTimeout(t);
       document.removeEventListener("mousedown", aoClicarFora);
-      document.removeEventListener("keydown", aoTeclarEsc);
     };
   }, [aberto]);
 
+  function fechar(devolverFoco: boolean) {
+    setAberto(false);
+    if (devolverFoco) gatilhoRef.current?.focus();
+  }
+
   function escolher(v: string) {
     onChange?.({ target: { value: v } });
-    setAberto(false);
+    fechar(true);
   }
 
   const buscaNorm = busca.trim().toLowerCase();
@@ -158,14 +161,86 @@ function SelectBase({
           )
           .filter((i): i is ItemLista => i !== null && (i.tipo === "opcao" || i.opcoes.length > 0));
 
+  // Navegação por teclado: lista achatada na mesma ordem em que aparece no
+  // painel, pra Setas/Home/End moverem o destaque e Enter escolher — o
+  // dropdown substitui o <select> nativo, então precisa repor o que ele dava
+  // de graça (ver comentário da Caixa de seleção acima).
+  const visiveis = useMemo(() => opcoesPlanas(filtrados), [filtrados]);
+  useEffect(() => {
+    if (!aberto) return;
+    const idxAtual = visiveis.findIndex((o) => o.value === (value ?? "") && !o.disabled);
+    const idxPrimeiraHabilitada = visiveis.findIndex((o) => !o.disabled);
+    setIndiceAtivo(idxAtual >= 0 ? idxAtual : Math.max(idxPrimeiraHabilitada, 0));
+  }, [aberto, busca]);
+
+  function moverDestaque(direcao: 1 | -1) {
+    if (visiveis.length === 0) return;
+    let i = indiceAtivo;
+    for (let passos = 0; passos < visiveis.length; passos++) {
+      i = (i + direcao + visiveis.length) % visiveis.length;
+      if (!visiveis[i].disabled) {
+        setIndiceAtivo(i);
+        return;
+      }
+    }
+  }
+
+  function aoTeclar(e: ReactKeyboardEvent) {
+    if (!aberto) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setAberto(true);
+      }
+      return;
+    }
+    switch (e.key) {
+      case "Escape":
+        e.preventDefault();
+        fechar(true);
+        break;
+      case "ArrowDown":
+        e.preventDefault();
+        moverDestaque(1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        moverDestaque(-1);
+        break;
+      case "Home":
+        e.preventDefault();
+        setIndiceAtivo(visiveis.findIndex((o) => !o.disabled));
+        break;
+      case "End": {
+        e.preventDefault();
+        const ultima = [...visiveis].reverse().findIndex((o) => !o.disabled);
+        if (ultima >= 0) setIndiceAtivo(visiveis.length - 1 - ultima);
+        break;
+      }
+      case "Enter": {
+        const opcao = visiveis[indiceAtivo];
+        if (opcao && !opcao.disabled) {
+          e.preventDefault();
+          escolher(opcao.value);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  const opcaoAtivaId = visiveis[indiceAtivo] ? `${idBase}-opt-${visiveis[indiceAtivo].value}` : undefined;
+
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative" onKeyDown={aoTeclar}>
       <button
+        ref={gatilhoRef}
         type="button"
         disabled={disabled}
         onClick={() => setAberto((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={aberto}
+        aria-activedescendant={opcaoAtivaId}
         className={`flex w-full items-center justify-between gap-2 rounded border border-borda bg-superficie px-2 py-1.5 text-left text-sm text-texto outline-none transition-colors hover:border-borda-forte focus-visible:border-acento disabled:cursor-not-allowed disabled:bg-fundo disabled:text-texto-fraco ${className}`}
       >
         <span className={`truncate ${!atual ? "text-texto-fraco" : ""}`}>{atual?.label ?? "—"}</span>
@@ -179,6 +254,7 @@ function SelectBase({
       {aberto ? (
         <div
           role="listbox"
+          aria-activedescendant={opcaoAtivaId}
           className="animate-menu-entra absolute z-50 mt-1 max-h-72 w-full min-w-[180px] overflow-auto rounded-md border border-borda bg-superficie p-1 shadow-none"
         >
           {buscavel ? (
@@ -187,6 +263,7 @@ function SelectBase({
                 ref={buscaRef}
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
+                aria-activedescendant={opcaoAtivaId}
                 placeholder="Buscar…"
                 className="w-full rounded border border-borda bg-fundo px-2 py-1 text-xs text-texto outline-none focus:border-acento"
               />
@@ -202,11 +279,25 @@ function SelectBase({
                     {item.label}
                   </div>
                   {item.opcoes.map((o) => (
-                    <OpcaoListbox key={o.value} opcao={o} selecionado={o.value === (value ?? "")} onEscolher={escolher} />
+                    <OpcaoListbox
+                      key={o.value}
+                      id={`${idBase}-opt-${o.value}`}
+                      opcao={o}
+                      selecionado={o.value === (value ?? "")}
+                      destacado={visiveis[indiceAtivo]?.value === o.value}
+                      onEscolher={escolher}
+                    />
                   ))}
                 </div>
               ) : (
-                <OpcaoListbox key={item.value} opcao={item} selecionado={item.value === (value ?? "")} onEscolher={escolher} />
+                <OpcaoListbox
+                  key={item.value}
+                  id={`${idBase}-opt-${item.value}`}
+                  opcao={item}
+                  selecionado={item.value === (value ?? "")}
+                  destacado={visiveis[indiceAtivo]?.value === item.value}
+                  onEscolher={escolher}
+                />
               ),
             )
           )}
@@ -217,16 +308,26 @@ function SelectBase({
 }
 
 function OpcaoListbox({
+  id,
   opcao,
   selecionado,
+  destacado,
   onEscolher,
 }: {
+  id: string;
   opcao: OpcaoItem;
   selecionado: boolean;
+  destacado: boolean;
   onEscolher: (v: string) => void;
 }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (destacado) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [destacado]);
   return (
     <button
+      ref={ref}
+      id={id}
       type="button"
       role="option"
       aria-selected={selecionado}
@@ -234,7 +335,7 @@ function OpcaoListbox({
       onClick={() => onEscolher(opcao.value)}
       className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:text-texto-fraco disabled:opacity-60 ${
         selecionado ? "bg-superficie-fria-2 font-medium text-acento" : "text-texto hover:bg-superficie-fria"
-      }`}
+      } ${destacado ? "outline outline-2 outline-offset-[-2px] outline-acento" : ""}`}
     >
       <span className="truncate">{opcao.label}</span>
       {selecionado ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}
