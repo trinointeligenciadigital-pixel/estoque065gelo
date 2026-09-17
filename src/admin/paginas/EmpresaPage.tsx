@@ -124,7 +124,7 @@ export function EmpresaPage() {
           <Campo label="Endereço completo" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
         </div>
 
-        <div className="mt-4 flex flex-col gap-1.5">
+        <label className="mt-4 flex flex-col gap-1.5">
           <span className="text-xs font-medium text-texto-suave">Logo</span>
           {empresa?.logoUrl ? (
             <img
@@ -139,7 +139,7 @@ export function EmpresaPage() {
             onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
             className="text-sm text-texto-suave"
           />
-        </div>
+        </label>
 
         {erro ? (
           <div className="mt-3">

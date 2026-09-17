@@ -2,7 +2,7 @@ import { Component, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Cartao, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
+import { Cartao, LinhaTabela, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
@@ -190,7 +190,7 @@ function PainelConteudo() {
               </thead>
               <tbody>
                 {r.producaoHoje.map((m, i) => (
-                  <tr key={i} className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
+                  <LinhaTabela key={i}>
                     <td className="py-2.5 pr-3 text-texto">
                       {m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span>
                     </td>
@@ -207,7 +207,7 @@ function PainelConteudo() {
                       )}
                     </td>
                     <td className="py-2.5 text-right"><Pill tom="entrada">entrada</Pill></td>
-                  </tr>
+                  </LinhaTabela>
                 ))}
               </tbody>
             </table>
@@ -375,7 +375,7 @@ function PainelConteudo() {
             </thead>
             <tbody>
               {r.saidasRecentes.map((m, i) => (
-                <tr key={i} className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
+                <LinhaTabela key={i}>
                   <td className="py-2.5 pr-3 text-texto">{m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}</td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
                   <td className="py-2.5 pr-3 text-texto-suave">{veiculoRotulo(m)}</td>
@@ -391,7 +391,7 @@ function PainelConteudo() {
                     )}
                   </td>
                   <td className="py-2.5 text-right"><Pill tom={m.tipo === "patrocinio" ? "patroc" : m.tipo === "perda" ? "perda" : "venda"}>{rotuloTipo(m.tipo)}</Pill></td>
-                </tr>
+                </LinhaTabela>
               ))}
             </tbody>
           </table>
