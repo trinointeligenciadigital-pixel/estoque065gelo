@@ -33,6 +33,7 @@ export function AdministradoresPage() {
 
   // Ativar/desativar
   const [confirmando, setConfirmando] = useState<string | null>(null);
+  const [alterando, setAlterando] = useState<string | null>(null);
   const [erro, setErro] = useState("");
 
   // Só pra reavaliar o texto "restam Xs" do cooldown a cada segundo — não
@@ -63,11 +64,14 @@ export function AdministradoresPage() {
 
   async function alterar(alvoEmail: string, ativo: boolean) {
     setErro("");
+    setAlterando(alvoEmail);
     try {
       await definirAtivo({ email: alvoEmail, ativo });
       setConfirmando(null);
     } catch (e) {
       setErro(mensagemErro(e));
+    } finally {
+      setAlterando(null);
     }
   }
 
@@ -207,8 +211,10 @@ export function AdministradoresPage() {
                   confirmando === a.email ? (
                     <span className="inline-flex items-center justify-end gap-2">
                       <span className="text-xs text-texto-suave">Desativar?</span>
-                      <Botao variante="neutro" onClick={() => setConfirmando(null)}>Cancelar</Botao>
-                      <Botao variante="perigo" onClick={() => void alterar(a.email, false)}>Desativar</Botao>
+                      <Botao variante="neutro" onClick={() => setConfirmando(null)} disabled={alterando === a.email}>Cancelar</Botao>
+                      <Botao variante="perigo" onClick={() => void alterar(a.email, false)} disabled={alterando === a.email}>
+                        {alterando === a.email ? "Desativando…" : "Desativar"}
+                      </Botao>
                     </span>
                   ) : (
                     <Botao variante="perigo" onClick={() => { setErro(""); setConfirmando(a.email); }}>
@@ -216,7 +222,9 @@ export function AdministradoresPage() {
                     </Botao>
                   )
                 ) : (
-                  <Botao variante="neutro" onClick={() => void alterar(a.email, true)}>Reativar</Botao>
+                  <Botao variante="neutro" onClick={() => void alterar(a.email, true)} disabled={alterando === a.email}>
+                    {alterando === a.email ? "Reativando…" : "Reativar"}
+                  </Botao>
                 )}
               </td>
             </LinhaTabela>

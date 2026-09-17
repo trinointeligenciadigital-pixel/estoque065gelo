@@ -599,10 +599,29 @@ export function Aviso({ children, tom = "erro" }: { children: ReactNode; tom?: "
   );
 }
 
-export function Modal({ titulo, children, onFechar }: { titulo: string; children: ReactNode; onFechar: () => void }) {
+export function Modal({
+  titulo,
+  children,
+  onFechar,
+  fecharDesabilitado = false,
+}: {
+  titulo: string;
+  children: ReactNode;
+  onFechar: () => void;
+  // Trava X/Esc/clique-fora enquanto uma escrita está em voo — evita que o
+  // admin feche no meio de uma mutação (ex.: cancelar às cegas uma contagem
+  // que está sendo fechada ao mesmo tempo). O formulário decide quando travar;
+  // o Modal só obedece.
+  fecharDesabilitado?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const fecharRef = useRef(onFechar);
   fecharRef.current = onFechar;
+  // Em ref, não estado: `salvando` vira true/false várias vezes com o modal
+  // aberto, e isso não pode reiniciar o efeito de foco abaixo (senão o foco
+  // pula de volta pro primeiro campo bem no meio do clique em Salvar).
+  const fecharDesabilitadoRef = useRef(fecharDesabilitado);
+  fecharDesabilitadoRef.current = fecharDesabilitado;
 
   // Acessibilidade: ao abrir, joga o foco pra dentro; prende o Tab no modal;
   // Esc fecha; ao fechar, devolve o foco pro elemento que estava ativo antes.
@@ -620,6 +639,7 @@ export function Modal({ titulo, children, onFechar }: { titulo: string; children
 
     function aoTeclar(e: KeyboardEvent) {
       if (e.key === "Escape") {
+        if (fecharDesabilitadoRef.current) return;
         e.preventDefault();
         fecharRef.current();
         return;
@@ -649,7 +669,10 @@ export function Modal({ titulo, children, onFechar }: { titulo: string; children
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-4" onClick={onFechar}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-4"
+      onClick={fecharDesabilitado ? undefined : onFechar}
+    >
       <div
         ref={ref}
         role="dialog"
@@ -662,8 +685,9 @@ export function Modal({ titulo, children, onFechar }: { titulo: string; children
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-texto">{titulo}</h2>
           <button
-            className="rounded text-texto-suave transition outline-none hover:text-texto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="rounded text-texto-suave transition outline-none hover:text-texto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40"
             onClick={onFechar}
+            disabled={fecharDesabilitado}
             aria-label="Fechar"
           >
             <X size={18} aria-hidden="true" />

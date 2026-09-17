@@ -517,7 +517,7 @@ function LinhaGrupo({
 
   return (
     <>
-      <tr className="border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria">
+      <LinhaTabela>
         <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(primeiro.registradoEm)}</td>
         <td colSpan={6} className="px-3 py-2.5">
           <button
@@ -543,7 +543,7 @@ function LinhaGrupo({
             </Link>
           ) : null}
         </td>
-      </tr>
+      </LinhaTabela>
       {aberto
         ? itens.map((m) => (
             <LinhaMov
@@ -585,7 +585,7 @@ function LinhaGrupoTransferencia({
 
   return (
     <>
-      <tr className={`border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria ${estornado ? "opacity-60" : ""}`}>
+      <LinhaTabela className={estornado ? "opacity-60" : ""}>
         <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(origem.registradoEm)}</td>
         <td colSpan={6} className="px-3 py-2.5">
           <button
@@ -621,7 +621,7 @@ function LinhaGrupoTransferencia({
             </Botao>
           ) : null}
         </td>
-      </tr>
+      </LinhaTabela>
       {aberto
         ? itens.map((m) => (
             <LinhaMov key={m._id} m={m} onComprovante={() => onComprovante(m)} onEstornar={() => onEstornar(m)} indentado />
@@ -656,7 +656,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
   const motivoValido = motivoTexto.trim().length >= 5;
 
   return (
-    <Modal titulo="Estornar lançamento" onFechar={onFechar}>
+    <Modal titulo="Estornar lançamento" onFechar={onFechar} fecharDesabilitado={enviando}>
       <div className="flex flex-col gap-3">
         {preview === undefined ? (
           <p className="text-sm text-texto-suave">Carregando…</p>
@@ -695,7 +695,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
             )}
             {erro ? <Aviso>{erro}</Aviso> : null}
             <div className="flex justify-end gap-2">
-              <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+              <Botao variante="neutro" onClick={onFechar} disabled={enviando}>Cancelar</Botao>
               {!preview.bloqueio ? (
                 <Botao variante="perigo" onClick={confirmar} disabled={!motivoValido || enviando}>
                   {enviando ? "Estornando…" : "Confirmar estorno"}
@@ -734,7 +734,7 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
   const motivoValido = motivoTexto.trim().length >= 5;
 
   return (
-    <Modal titulo="Estornar transferência" onFechar={onFechar}>
+    <Modal titulo="Estornar transferência" onFechar={onFechar} fecharDesabilitado={enviando}>
       <div className="flex flex-col gap-3">
         {preview === undefined ? (
           <p className="text-sm text-texto-suave">Carregando…</p>
@@ -771,7 +771,7 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
             )}
             {erro ? <Aviso>{erro}</Aviso> : null}
             <div className="flex justify-end gap-2">
-              <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+              <Botao variante="neutro" onClick={onFechar} disabled={enviando}>Cancelar</Botao>
               {!preview.bloqueio ? (
                 <Botao variante="perigo" onClick={confirmar} disabled={!motivoValido || enviando}>
                   {enviando ? "Estornando…" : "Confirmar estorno das duas pernas"}

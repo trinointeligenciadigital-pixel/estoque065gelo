@@ -146,7 +146,7 @@ function FormFormato({
   }
 
   return (
-    <Modal titulo={novo ? "Novo formato" : "Editar formato"} onFechar={onFechar}>
+    <Modal titulo={novo ? "Novo formato" : "Editar formato"} onFechar={onFechar} fecharDesabilitado={salvando}>
       <div className="flex flex-col gap-3">
         <Campo
           label="Nome base (sem peso nem quantidade)"
@@ -201,7 +201,7 @@ function FormFormato({
         ) : null}
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
-          <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="neutro" onClick={onFechar} disabled={salvando}>Cancelar</Botao>
           <Botao onClick={salvar} disabled={salvando || nome.trim() === "" || (!pesoVariavel && Number(pesoKg) <= 0)}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>

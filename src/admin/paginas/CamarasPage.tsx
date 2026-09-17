@@ -88,7 +88,7 @@ function FormCamara({ inicial, onFechar }: { inicial: Camara | null; onFechar: (
   }
 
   return (
-    <Modal titulo={inicial === null ? "Nova câmara" : "Editar câmara"} onFechar={onFechar}>
+    <Modal titulo={inicial === null ? "Nova câmara" : "Editar câmara"} onFechar={onFechar} fecharDesabilitado={salvando}>
       <div className="flex flex-col gap-3">
         <Campo label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Câmara Saborizado" />
         {inicial !== null ? (
@@ -101,7 +101,7 @@ function FormCamara({ inicial, onFechar }: { inicial: Camara | null; onFechar: (
         ) : null}
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
-          <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="neutro" onClick={onFechar} disabled={salvando}>Cancelar</Botao>
           <Botao onClick={salvar} disabled={salvando || nome.trim() === ""}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>

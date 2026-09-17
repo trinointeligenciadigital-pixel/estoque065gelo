@@ -307,7 +307,7 @@ function FormOperador({
   }
 
   return (
-    <Modal titulo={novo ? "Novo colaborador" : "Editar colaborador"} onFechar={onFechar}>
+    <Modal titulo={novo ? "Novo colaborador" : "Editar colaborador"} onFechar={onFechar} fecharDesabilitado={salvando}>
       <div className="flex flex-col gap-4">
         <Campo label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome do colaborador" />
         <Campo
@@ -353,7 +353,7 @@ function FormOperador({
 
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
-          <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="neutro" onClick={onFechar} disabled={salvando}>Cancelar</Botao>
           <Botao onClick={salvar} disabled={salvando || nome.trim() === "" || permitidas.length === 0 || (whatsapp !== "" && !telefoneCompleto(whatsapp))}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>

@@ -254,7 +254,7 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
         {contagem.itens.map((it) => {
           const div = it.divergencia;
           return (
-            <tr key={it._id} className={`border-b border-borda/60 last:border-0 ${div !== 0 ? "bg-alerta/5" : ""}`}>
+            <LinhaTabela key={it._id} className={div !== 0 ? "bg-alerta/5" : ""}>
               <td className="px-3 py-2.5 font-medium text-texto">{it.produtoNome}</td>
               <td className="px-3 py-2.5 text-texto-suave">
                 {rotuloFormato({ nome: it.formatoNome, pesoKg: it.formatoPesoKg, pesoVariavel: it.pesoVariavel, unidadesPorPacote: it.formatoUnidadesPorPacote })}
@@ -264,7 +264,7 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
               <td className={`px-3 py-2.5 text-right font-mono ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
                 {div > 0 ? "+" : ""}{formatarQtd(div, it.pesoVariavel)}
               </td>
-            </tr>
+            </LinhaTabela>
           );
         })}
       </Tabela>
@@ -393,7 +393,11 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
   const ativas = (camaras ?? []).filter((c) => c.ativo);
 
   return (
-    <Modal titulo={retomar ? "Retomar contagem (às cegas)" : "Nova contagem (às cegas)"} onFechar={aoFechar}>
+    <Modal
+      titulo={retomar ? "Retomar contagem (às cegas)" : "Nova contagem (às cegas)"}
+      onFechar={aoFechar}
+      fecharDesabilitado={ocupado}
+    >
       {contagemId === null ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-texto-suave">
@@ -407,7 +411,7 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
           </Selecao>
           {erro ? <Aviso>{erro}</Aviso> : null}
           <div className="flex justify-end gap-2">
-            <Botao variante="neutro" onClick={aoFechar}>Cancelar</Botao>
+            <Botao variante="neutro" onClick={aoFechar} disabled={ocupado}>Cancelar</Botao>
             <Botao onClick={abrirContagem} disabled={ocupado || !camaraId}>
               {ocupado ? "Abrindo…" : "Abrir e contar"}
             </Botao>

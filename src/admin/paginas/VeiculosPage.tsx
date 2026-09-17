@@ -99,7 +99,7 @@ function FormVeiculo({ inicial, onFechar }: { inicial: Veiculo | null; onFechar:
   }
 
   return (
-    <Modal titulo={novo ? "Novo veículo" : "Editar veículo"} onFechar={onFechar}>
+    <Modal titulo={novo ? "Novo veículo" : "Editar veículo"} onFechar={onFechar} fecharDesabilitado={salvando}>
       <div className="flex flex-col gap-3">
         <Campo label="Placa" mono value={placa} onChange={(e) => setPlaca(mascaraPlaca(e.target.value))} placeholder="ABC1D23" maxLength={7} />
         {placa !== "" && !placaCompleta(placa) ? (
@@ -117,7 +117,7 @@ function FormVeiculo({ inicial, onFechar }: { inicial: Veiculo | null; onFechar:
         ) : null}
         {erro ? <Aviso>{erro}</Aviso> : null}
         <div className="flex justify-end gap-2">
-          <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="neutro" onClick={onFechar} disabled={salvando}>Cancelar</Botao>
           <Botao onClick={salvar} disabled={salvando || !placaCompleta(placa)}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>

@@ -179,7 +179,7 @@ function FormProduto({
   }
 
   return (
-    <Modal titulo={novo ? "Novo produto" : "Editar produto"} onFechar={onFechar}>
+    <Modal titulo={novo ? "Novo produto" : "Editar produto"} onFechar={onFechar} fecharDesabilitado={salvando}>
       <div className="flex flex-col gap-3">
         <Campo label="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Morango" />
 
@@ -227,7 +227,7 @@ function FormProduto({
         {erro ? <Aviso>{erro}</Aviso> : null}
 
         <div className="flex justify-end gap-2">
-          <Botao variante="neutro" onClick={onFechar}>Cancelar</Botao>
+          <Botao variante="neutro" onClick={onFechar} disabled={salvando}>Cancelar</Botao>
           <Botao onClick={salvar} disabled={salvando || nome.trim() === "" || (novo && camaraId === "")}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>
