@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 
@@ -35,6 +35,7 @@ export function ProdutosPage() {
   const produtos = useQuery(api.admin.produtos.listar);
   const camaras = useQuery(api.admin.camaras.listar);
   const [editando, setEditando] = useState<Produto | "novo" | null>(null);
+  const [busca, setBusca] = useState("");
 
   const nomeCamara = useMemo(() => {
     const m = new Map<string, string>();
@@ -43,6 +44,8 @@ export function ProdutosPage() {
   }, [camaras]);
 
   const carregando = produtos === undefined || camaras === undefined;
+  const buscaNorm = busca.trim().toLowerCase();
+  const filtrados = carregando ? [] : produtos.filter((p) => p.nome.toLowerCase().includes(buscaNorm));
 
   return (
     <>
@@ -52,13 +55,19 @@ export function ProdutosPage() {
         acao={<Botao onClick={() => setEditando("novo")}>Novo produto</Botao>}
       />
 
+      {!carregando && produtos.length > 6 ? (
+        <CampoBusca value={busca} onChange={setBusca} placeholder="Buscar por nome…" className="mb-3 max-w-xs" />
+      ) : null}
+
       <Tabela colunas={["Nome", "Categoria", "Câmara", "Un.", "Status", { rotulo: "Ações", dir: true }]}>
         {carregando ? (
           <LinhaMensagem colSpan={6}>Carregando…</LinhaMensagem>
         ) : produtos.length === 0 ? (
           <LinhaMensagem colSpan={6}>Nenhum produto cadastrado ainda. Use “Novo produto”, no topo, para adicionar o primeiro.</LinhaMensagem>
+        ) : filtrados.length === 0 ? (
+          <LinhaMensagem colSpan={6}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
-          produtos.map((p) => (
+          filtrados.map((p) => (
             <LinhaTabela key={p._id}>
               <td className="px-3 py-2.5 font-medium text-texto">{p.nome}</td>
               <td className="px-3 py-2.5 text-texto-suave">{p.categoria}</td>

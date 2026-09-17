@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
@@ -119,26 +119,48 @@ export function HistoricoPage() {
   // Cabeçalho do comprovante (tarefa 7) — mesma leitura pública usada pelo operador.
   const empresa = useQuery(api.empresaPublica.dadosComprovante);
 
-  // Pré-carrega o período (ou a contagem) pela URL — ex.: clique num dia do
-  // gráfico do Painel abre /historico?de=AAAA-MM-DD&ate=AAAA-MM-DD, e "Ver
-  // ajustes gerados" em Contagens abre /historico?contagemId=<id>. Depois vira
-  // estado interno normal.
-  const [params] = useSearchParams();
+  // Pré-carrega todo o estado do filtro pela URL — ex.: clique num dia do
+  // gráfico do Painel abre /historico?de=AAAA-MM-DD&ate=AAAA-MM-DD, "Ver
+  // ajustes gerados" em Contagens abre /historico?contagemId=<id>, e um link
+  // compartilhado com qualquer combinação de filtros chega com o mesmo
+  // recorte já aplicado. Depois vira estado interno normal, e um efeito
+  // abaixo escreve de volta na URL a cada mudança.
+  const [params, setSearchParams] = useSearchParams();
 
-  const [camaraId, setCamaraId] = useState<Id<"camaras"> | "">("");
-  const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">("");
-  const [tipo, setTipo] = useState<Tipo | "">("");
-  const [operadorId, setOperadorId] = useState<Id<"operadores"> | "">("");
-  const [autorClerkId, setAutorClerkId] = useState<string>("");
+  const [camaraId, setCamaraId] = useState<Id<"camaras"> | "">(() => (params.get("camaraId") as Id<"camaras">) || "");
+  const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">(() => (params.get("produtoId") as Id<"produtos">) || "");
+  const [tipo, setTipo] = useState<Tipo | "">(() => (params.get("tipo") as Tipo) || "");
+  const [operadorId, setOperadorId] = useState<Id<"operadores"> | "">(() => (params.get("operadorId") as Id<"operadores">) || "");
+  const [autorClerkId, setAutorClerkId] = useState<string>(() => params.get("autorClerkId") ?? "");
   const [de, setDe] = useState(() => params.get("de") ?? "");
   const [ate, setAte] = useState(() => params.get("ate") ?? "");
   const [contagemId] = useState<Id<"contagens"> | "">(() => (params.get("contagemId") as Id<"contagens">) || "");
   // Busca por protocolo (tarefa 4 do adendo) — localiza qualquer lançamento,
   // inclusive ajuste e estorno, sem precisar saber câmara/produto/tipo.
-  const [protocolo, setProtocolo] = useState("");
+  const [protocolo, setProtocolo] = useState(() => params.get("protocolo") ?? "");
   const [comprovante, setComprovante] = useState<DadosComprovante | null>(null);
   const [estornando, setEstornando] = useState<MovRow | null>(null);
   const [estornandoTransferLote, setEstornandoTransferLote] = useState<string | null>(null);
+  // Protocolo/Produto/Autor começam escondidos atrás de "Mais filtros" (só 4
+  // decisões visíveis de cara: De, Até, Câmara, Tipo) — mas se o admin chegou
+  // aqui por um link que já tinha um desses preenchido, mostra aberto.
+  const [maisFiltros, setMaisFiltros] = useState(
+    () => Boolean(params.get("protocolo") || params.get("produtoId") || params.get("operadorId") || params.get("autorClerkId")),
+  );
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (camaraId) next.set("camaraId", camaraId);
+    if (produtoId) next.set("produtoId", produtoId);
+    if (tipo) next.set("tipo", tipo);
+    if (operadorId) next.set("operadorId", operadorId);
+    if (autorClerkId) next.set("autorClerkId", autorClerkId);
+    if (protocolo.trim()) next.set("protocolo", protocolo.trim());
+    if (de) next.set("de", de);
+    if (ate) next.set("ate", ate);
+    if (contagemId) next.set("contagemId", contagemId);
+    setSearchParams(next, { replace: true });
+  }, [camaraId, produtoId, tipo, operadorId, autorClerkId, protocolo, de, ate, contagemId, setSearchParams]);
 
   const movs = useQuery(api.admin.historico.listar, {
     camaraId: camaraId || undefined,
@@ -159,6 +181,10 @@ export function HistoricoPage() {
   const linhas: LinhaAgrupada[] = semAgrupar
     ? (movs ?? []).map((mov) => ({ tipo: "individual" as const, mov }))
     : agruparPorLote(movs ?? []);
+
+  const filtrosAvancadosAtivos = [protocolo.trim() !== "", produtoId !== "", operadorId !== "" || autorClerkId !== ""].filter(
+    Boolean,
+  ).length;
 
   // Produtos filtrados pela câmara escolhida (se houver).
   const produtos = (opcoes?.produtos ?? []).filter((p) => !camaraId || p.camaraId === camaraId);
@@ -217,15 +243,12 @@ export function HistoricoPage() {
       <TituloPagina titulo="Histórico" subtitulo="Todas as movimentações. Somente leitura." />
 
       <Cartao className="mb-4 p-3">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
-          <Filtro label="Protocolo">
-            <input
-              type="text"
-              value={protocolo}
-              onChange={(e) => setProtocolo(e.target.value)}
-              placeholder="ex.: 42423F99"
-              className={`${inputCls} font-mono uppercase`}
-            />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Filtro label="De">
+            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={inputCls} />
+          </Filtro>
+          <Filtro label="Até">
+            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={inputCls} />
           </Filtro>
           <Filtro label="Câmara">
             <SelecaoInline
@@ -237,55 +260,75 @@ export function HistoricoPage() {
               {(opcoes?.camaras ?? []).map((c) => <option key={c._id} value={c._id}>{c.nome}</option>)}
             </SelecaoInline>
           </Filtro>
-          <Filtro label="Produto">
-            <SelecaoInline value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
-              <option value="">Todos</option>
-              {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
-                <optgroup key={camaraNome} label={camaraNome}>
-                  {lista.map((p) => (
-                    <option key={p._id} value={p._id}>{rotuloProduto(p.nome, camaraNome)}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </SelecaoInline>
-          </Filtro>
           <Filtro label="Tipo">
             <SelecaoInline value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)} className={inputCls}>
               <option value="">Todos</option>
               {Object.entries(rotuloTipo).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
             </SelecaoInline>
           </Filtro>
-          <Filtro label="Autor">
-            <SelecaoInline
-              value={operadorId ? `op:${operadorId}` : autorClerkId ? `admin:${autorClerkId}` : ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v.startsWith("admin:")) { setAutorClerkId(v.slice(6)); setOperadorId(""); }
-                else if (v.startsWith("op:")) { setOperadorId(v.slice(3) as Id<"operadores">); setAutorClerkId(""); }
-                else { setOperadorId(""); setAutorClerkId(""); }
-              }}
-              className={inputCls}
-            >
-              <option value="">Todos</option>
-              <optgroup label="Admin">
-                {(opcoes?.admins ?? []).map((a) => (
-                  <option key={a.clerkId} value={`admin:${a.clerkId}`}>{a.nome}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Colaborador">
-                {(opcoes?.operadores ?? []).map((o) => (
-                  <option key={o._id} value={`op:${o._id}`}>{o.nome}</option>
-                ))}
-              </optgroup>
-            </SelecaoInline>
-          </Filtro>
-          <Filtro label="De">
-            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={inputCls} />
-          </Filtro>
-          <Filtro label="Até">
-            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={inputCls} />
-          </Filtro>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setMaisFiltros((v) => !v)}
+          className="mt-3 text-xs font-medium text-acento hover:underline"
+        >
+          {maisFiltros
+            ? "Menos filtros"
+            : filtrosAvancadosAtivos > 0
+              ? `Mais filtros (${filtrosAvancadosAtivos})`
+              : "Mais filtros"}
+        </button>
+
+        {maisFiltros ? (
+          <div className="mt-3 grid grid-cols-2 gap-3 border-t border-borda pt-3 md:grid-cols-3">
+            <Filtro label="Protocolo">
+              <input
+                type="text"
+                value={protocolo}
+                onChange={(e) => setProtocolo(e.target.value)}
+                placeholder="ex.: 42423F99"
+                className={`${inputCls} font-mono uppercase`}
+              />
+            </Filtro>
+            <Filtro label="Produto">
+              <SelecaoInline value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
+                <option value="">Todos</option>
+                {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
+                  <optgroup key={camaraNome} label={camaraNome}>
+                    {lista.map((p) => (
+                      <option key={p._id} value={p._id}>{rotuloProduto(p.nome, camaraNome)}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </SelecaoInline>
+            </Filtro>
+            <Filtro label="Autor">
+              <SelecaoInline
+                value={operadorId ? `op:${operadorId}` : autorClerkId ? `admin:${autorClerkId}` : ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.startsWith("admin:")) { setAutorClerkId(v.slice(6)); setOperadorId(""); }
+                  else if (v.startsWith("op:")) { setOperadorId(v.slice(3) as Id<"operadores">); setAutorClerkId(""); }
+                  else { setOperadorId(""); setAutorClerkId(""); }
+                }}
+                className={inputCls}
+              >
+                <option value="">Todos</option>
+                <optgroup label="Admin">
+                  {(opcoes?.admins ?? []).map((a) => (
+                    <option key={a.clerkId} value={`admin:${a.clerkId}`}>{a.nome}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Colaborador">
+                  {(opcoes?.operadores ?? []).map((o) => (
+                    <option key={o._id} value={`op:${o._id}`}>{o.nome}</option>
+                  ))}
+                </optgroup>
+              </SelecaoInline>
+            </Filtro>
+          </div>
+        ) : null}
       </Cartao>
 
       <Tabela

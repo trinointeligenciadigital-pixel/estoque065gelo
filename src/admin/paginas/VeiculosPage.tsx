@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
 
@@ -17,6 +17,15 @@ type Veiculo = {
 export function VeiculosPage() {
   const veiculos = useQuery(api.admin.veiculos.listar);
   const [editando, setEditando] = useState<Veiculo | "novo" | null>(null);
+  const [busca, setBusca] = useState("");
+
+  const buscaNorm = busca.trim().toLowerCase();
+  const filtrados = (veiculos ?? []).filter(
+    (v) =>
+      v.placa.toLowerCase().includes(buscaNorm) ||
+      (v.modelo ?? "").toLowerCase().includes(buscaNorm) ||
+      (v.motoristaPadrao ?? "").toLowerCase().includes(buscaNorm),
+  );
 
   return (
     <>
@@ -26,13 +35,19 @@ export function VeiculosPage() {
         acao={<Botao onClick={() => setEditando("novo")}>Novo veículo</Botao>}
       />
 
+      {veiculos !== undefined && veiculos.length > 6 ? (
+        <CampoBusca value={busca} onChange={setBusca} placeholder="Buscar por placa, modelo ou motorista…" className="mb-3 max-w-xs" />
+      ) : null}
+
       <Tabela colunas={["Placa", "Modelo", "Motorista padrão", "Status", { rotulo: "Ações", dir: true }]}>
         {veiculos === undefined ? (
           <LinhaMensagem colSpan={5}>Carregando…</LinhaMensagem>
         ) : veiculos.length === 0 ? (
           <LinhaMensagem colSpan={5}>Nenhum veículo cadastrado ainda. Use “Novo veículo”, no topo, para adicionar o primeiro.</LinhaMensagem>
+        ) : filtrados.length === 0 ? (
+          <LinhaMensagem colSpan={5}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
-          veiculos.map((v) => (
+          filtrados.map((v) => (
             <LinhaTabela key={v._id}>
               <td className="px-3 py-2.5 font-mono font-medium text-texto">{v.placa}</td>
               <td className="px-3 py-2.5 text-texto-suave">{v.modelo || "—"}</td>

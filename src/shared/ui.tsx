@@ -1,6 +1,6 @@
 import { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, Search, X } from "lucide-react";
 
 /*
   Kit de UI do painel do Admin — denso (RNF12). Inter no texto; números em
@@ -46,6 +46,37 @@ export function Campo({
         {...props}
       />
     </label>
+  );
+}
+
+// Filtro de texto acima de uma lista/tabela que já carregou por inteiro
+// (client-side — os cadastros do Admin não têm volume que justifique busca
+// no servidor). Não é o <Campo label=...>: aqui o rótulo é o ícone de lupa,
+// pra caber como uma faixa fina acima da tabela em vez de mais um campo com
+// rótulo formal.
+export function CampoBusca({
+  value,
+  onChange,
+  placeholder = "Buscar…",
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative ${className}`}>
+      <Search size={15} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-texto-fraco" aria-hidden="true" />
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="w-full rounded border border-borda bg-superficie py-1.5 pr-2 pl-8 text-sm text-texto outline-none focus:border-acento"
+      />
+    </div>
   );
 }
 
@@ -486,7 +517,7 @@ export function Toast({ texto, onFechar }: { texto: string; onFechar: () => void
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-auto rounded-lg border border-borda bg-texto px-4 py-2.5 text-sm font-medium text-fundo shadow-sm"
+        className="pointer-events-auto rounded-lg border border-borda-forte bg-texto px-4 py-2.5 text-sm font-medium text-fundo"
       >
         {texto}
       </div>

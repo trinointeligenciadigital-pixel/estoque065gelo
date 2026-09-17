@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 
 type Camara = { _id: Id<"camaras">; nome: string; qrToken: string; ativo: boolean };
@@ -11,6 +11,10 @@ type Camara = { _id: Id<"camaras">; nome: string; qrToken: string; ativo: boolea
 export function CamarasPage() {
   const camaras = useQuery(api.admin.camaras.listar);
   const [editando, setEditando] = useState<Camara | "nova" | null>(null);
+  const [busca, setBusca] = useState("");
+
+  const buscaNorm = busca.trim().toLowerCase();
+  const filtradas = (camaras ?? []).filter((c) => c.nome.toLowerCase().includes(buscaNorm));
 
   return (
     <>
@@ -20,13 +24,19 @@ export function CamarasPage() {
         acao={<Botao onClick={() => setEditando("nova")}>Nova câmara</Botao>}
       />
 
+      {camaras !== undefined && camaras.length > 6 ? (
+        <CampoBusca value={busca} onChange={setBusca} placeholder="Buscar por nome…" className="mb-3 max-w-xs" />
+      ) : null}
+
       <Tabela colunas={["Nome", "Status", { rotulo: "Ações", dir: true }]}>
         {camaras === undefined ? (
           <LinhaMensagem colSpan={3}>Carregando…</LinhaMensagem>
         ) : camaras.length === 0 ? (
           <LinhaMensagem colSpan={3}>Nenhuma câmara cadastrada ainda. Use “Nova câmara”, no topo, para adicionar a primeira.</LinhaMensagem>
+        ) : filtradas.length === 0 ? (
+          <LinhaMensagem colSpan={3}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
-          camaras.map((c) => (
+          filtradas.map((c) => (
             <LinhaTabela key={c._id}>
               <td className="px-3 py-2.5 font-medium text-texto">{c.nome}</td>
               <td className="px-3 py-2.5"><Etiqueta ativo={c.ativo} /></td>

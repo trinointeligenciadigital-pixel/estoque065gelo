@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
 
@@ -23,8 +23,11 @@ export function FormatosPage() {
   const produtos = useQuery(api.admin.produtos.listar);
   const formatos = useQuery(api.admin.formatos.listarPorProduto, { produtoId: id });
   const [editando, setEditando] = useState<Formato | "novo" | null>(null);
+  const [busca, setBusca] = useState("");
 
   const produto = produtos?.find((p) => p._id === id);
+  const buscaNorm = busca.trim().toLowerCase();
+  const filtrados = (formatos ?? []).filter((f) => rotuloFormato(f).toLowerCase().includes(buscaNorm));
 
   return (
     <>
@@ -36,6 +39,10 @@ export function FormatosPage() {
         subtitulo="Cada formato tem seu peso e seu estoque mínimo (por tamanho de pacote)."
         acao={<Botao onClick={() => setEditando("novo")}>Novo formato</Botao>}
       />
+
+      {formatos !== undefined && formatos.length > 6 ? (
+        <CampoBusca value={busca} onChange={setBusca} placeholder="Buscar por formato…" className="mb-3 max-w-xs" />
+      ) : null}
 
       <Tabela
         colunas={[
@@ -50,8 +57,10 @@ export function FormatosPage() {
           <LinhaMensagem colSpan={5}>Carregando…</LinhaMensagem>
         ) : formatos.length === 0 ? (
           <LinhaMensagem colSpan={5}>Nenhum formato cadastrado ainda. Use “Novo formato”, no topo, para adicionar o primeiro.</LinhaMensagem>
+        ) : filtrados.length === 0 ? (
+          <LinhaMensagem colSpan={5}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
-          formatos.map((f) => (
+          filtrados.map((f) => (
             <LinhaTabela key={f._id}>
               {/* Rótulo canônico (tarefa 2 do adendo) — o mesmo texto que o
                   colaborador vê no PWA e o cliente vê no comprovante. */}

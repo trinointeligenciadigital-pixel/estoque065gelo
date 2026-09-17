@@ -3,7 +3,7 @@ import { Check, MessageCircle } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { mascaraTelefone, telefoneCompleto } from "../../lib/mascaras.ts";
 
@@ -37,6 +37,7 @@ export function OperadoresPage() {
   const [editando, setEditando] = useState<Operador | "novo" | null>(null);
   const [pinGerado, setPinGerado] = useState<PinGerado | null>(null);
   const [erro, setErro] = useState("");
+  const [busca, setBusca] = useState("");
 
   const nomeCamara = useMemo(() => {
     const m = new Map<string, string>();
@@ -45,10 +46,11 @@ export function OperadoresPage() {
   }, [camaras]);
 
   const carregando = operadores === undefined || camaras === undefined;
+  const buscaNorm = busca.trim().toLowerCase();
   // Inativo desce pra baixo dos ativos (quem está trabalhando aparece
   // primeiro); dentro de cada grupo, mantém a ordem que veio do servidor.
-  const ativos = carregando ? [] : operadores.filter((o) => o.ativo);
-  const inativos = carregando ? [] : operadores.filter((o) => !o.ativo);
+  const ativos = carregando ? [] : operadores.filter((o) => o.ativo && o.nome.toLowerCase().includes(buscaNorm));
+  const inativos = carregando ? [] : operadores.filter((o) => !o.ativo && o.nome.toLowerCase().includes(buscaNorm));
 
   return (
     <>
@@ -60,11 +62,17 @@ export function OperadoresPage() {
 
       {erro ? <div className="mb-3"><Aviso>{erro}</Aviso></div> : null}
 
+      {!carregando && operadores.length > 6 ? (
+        <CampoBusca value={busca} onChange={setBusca} placeholder="Buscar por nome…" className="mb-3 max-w-xs" />
+      ) : null}
+
       <Tabela colunas={["Nome", "Câmaras", "Permissões", "PIN", "Status", { rotulo: "Ações", dir: true }]}>
         {carregando ? (
           <LinhaMensagem colSpan={6}>Carregando…</LinhaMensagem>
         ) : operadores.length === 0 ? (
           <LinhaMensagem colSpan={6}>Nenhum colaborador cadastrado ainda. Use “Novo colaborador”, no topo, para adicionar o primeiro.</LinhaMensagem>
+        ) : ativos.length === 0 && inativos.length === 0 ? (
+          <LinhaMensagem colSpan={6}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
           <>
             {ativos.map((o) => (
