@@ -283,7 +283,7 @@ export function LancamentoPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-texto">{it.produtoNome} <span className="text-texto-suave">/ {it.formatoNome}</span></p>
                   </div>
-                  <span className="shrink-0 font-mono text-sm text-texto">
+                  <span className="shrink-0 font-numero tabular-nums text-sm text-texto">
                     {it.pesoVariavel ? "" : `${formatarContagem(Number(it.valor), it)} × `}{formatarPeso(it.pesoKg)}
                   </span>
                   <button
@@ -297,7 +297,7 @@ export function LancamentoPage() {
               ))}
               <div className="flex items-baseline justify-between border-t border-borda pt-2">
                 <span className="text-sm text-texto-suave">Peso total</span>
-                <span className="font-mono text-sm font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
+                <span className="font-numero tabular-nums text-sm font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
               </div>
             </div>
           ) : null}
@@ -348,7 +348,7 @@ export function LancamentoPage() {
               className="w-40"
             />
             {pesoPrevisto !== null && !formato?.pesoVariavel ? (
-              <span className="pb-1.5 font-mono text-sm text-texto-suave">= {formatarPeso(pesoPrevisto)}</span>
+              <span className="pb-1.5 font-numero tabular-nums text-sm text-texto-suave">= {formatarPeso(pesoPrevisto)}</span>
             ) : null}
             {ehCarregamento ? (
               <Botao variante="neutro" onClick={adicionarItem} disabled={!itemStaged} className="ml-auto">
@@ -441,7 +441,7 @@ export function LancamentoPage() {
                       </span>
                     </p>
                     {valorValido ? (
-                      <p className="mt-1 font-mono font-medium">
+                      <p className="mt-1 font-numero tabular-nums font-medium">
                         {formato.pesoVariavel
                           ? formatarPeso(numVal)
                           : `${formatarContagem(numVal, formato)} · ${formatarPeso(pesoPrevisto ?? 0)}`}

@@ -328,7 +328,7 @@ export function ListaProdutos({
 
       {frequentes.length > 0 ? (
         <div className="flex flex-col gap-2">
-          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-suave uppercase">
             Frequentes
           </span>
           <div className="flex flex-col gap-2">
@@ -341,7 +341,7 @@ export function ListaProdutos({
 
       <div className="flex flex-col gap-2">
         {frequentes.length > 0 ? (
-          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+          <span className="font-mono text-[11px] font-medium tracking-[0.1em] text-texto-suave uppercase">
             Todos
           </span>
         ) : null}

@@ -113,7 +113,9 @@ export function Tela({
             </button>
           ) : null}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-titulo text-lg font-semibold tracking-[0.02em] text-texto uppercase">{titulo}</h1>
+            {/* Até 2 linhas em vez de cortar com "…": a coluna do crachá + selo
+                come ~90px, e "PRODUÇÃO — PRODUTO" já não cabia em 390px. */}
+            <h1 className="line-clamp-2 font-titulo text-lg leading-tight font-semibold tracking-[0.02em] text-balance text-texto uppercase">{titulo}</h1>
             {subtitulo ? <p className="truncate text-sm text-texto-suave">{subtitulo}</p> : null}
           </div>
           {operadorNome || camaraAtual ? (
@@ -130,8 +132,10 @@ export function Tela({
                 // Única: em qual câmara a pessoa está é o dado que evita lançar no
                 // lugar errado, não decoração. `gelo` não serve aqui — falha
                 // contraste AA como cor de texto (por isso o sistema só usa gelo em
-                // preenchimento de régua, nunca em letra).
-                <span className="rounded-full bg-acento/10 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.06em] text-acento uppercase">
+                // preenchimento de régua, nunca em letra). Texto em acento-escuro:
+                // o acento puro sobre o próprio tom a 10% dá 4,2:1 (abaixo de 4,5
+                // para 10px); o escuro dá 5,9:1.
+                <span className="max-w-32 truncate rounded-full bg-acento/10 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.06em] text-acento-escuro uppercase">
                   {camaraAtual}
                 </span>
               ) : null}
@@ -286,7 +290,7 @@ export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode;
   // educados, pra não soar alarme onde não é erro (DESIGN.md, tom âmbar).
   const estilos = {
     erro: "bg-alerta/10 text-alerta",
-    aviso: "bg-aviso/10 text-aviso",
+    aviso: "bg-aviso/10 text-aviso-texto",
     ok: "bg-entrada/10 text-entrada",
   } as const;
   return (
@@ -480,7 +484,7 @@ function TeclaPasso({
   return (
     <button
       type="button"
-      className="flex min-h-[56px] w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-mono text-3xl leading-none text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
+      className="flex min-h-[56px] w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-numero tabular-nums text-3xl leading-none text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
       {...props}
     >
       {children}

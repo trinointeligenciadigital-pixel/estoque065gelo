@@ -216,7 +216,7 @@ function ModalPin({ dados, onFechar }: { dados: PinGerado; onFechar: () => void 
           se perder, gere outro.
         </p>
         <div className="rounded-lg border border-borda bg-fundo px-8 py-4">
-          <span className="font-mono text-3xl font-semibold tracking-widest text-texto">{dados.pin}</span>
+          <span className="font-numero tabular-nums text-3xl font-semibold tracking-widest text-texto">{dados.pin}</span>
         </div>
         <p className="text-xs text-texto-suave">
           Colaborador: {dados.nome}

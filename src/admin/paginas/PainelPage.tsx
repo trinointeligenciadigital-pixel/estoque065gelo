@@ -1,9 +1,10 @@
-import { Component, useState, type ReactNode } from "react";
+import { Component, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Cartao, LinhaTabela, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
+import { useNumeroAnimado } from "../movimento.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 import { mesmoTexto, nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
@@ -102,7 +103,7 @@ function PainelConteudo() {
               to="/contagens"
               className="flex items-center gap-2.5 rounded-[10px] border border-acento bg-acento/5 px-3.5 py-2"
             >
-              <span className="font-mono text-lg font-semibold text-acento">{r.qtdContagensPendentes}</span>
+              <span className="font-numero tabular-nums text-lg font-semibold text-acento">{r.qtdContagensPendentes}</span>
               <span className="text-[11.5px] leading-tight text-texto-suave">
                 {r.qtdContagensPendentes === 1 ? "contagem" : "contagens"}
                 <br />
@@ -121,38 +122,20 @@ function PainelConteudo() {
 
       {/* KPIs — Estado (agora) à esquerda, Movimento (período) à direita */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi rotulo="Estoque total" valor={formatarPeso(r.kpis.estoqueTotalKg)} rodape="soma por peso · agora" />
-        <button
-          onClick={() => r.qtdAbaixoMinimo > 0 && setSoAbaixo((v) => !v)}
-          className={`flex flex-col gap-2.5 rounded-[10px] border p-4 text-left transition-colors ${
-            r.qtdAbaixoMinimo > 0
-              ? "border-alerta bg-alerta/5 hover:bg-alerta/10"
-              : "cursor-default border-borda bg-superficie"
-          }`}
-        >
-          <Eyebrow>Abaixo do mínimo</Eyebrow>
-          <span className={`font-mono text-3xl leading-none font-semibold ${r.qtdAbaixoMinimo > 0 ? "text-alerta" : "text-texto"}`}>
-            {r.qtdAbaixoMinimo}
-            <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">
-              {r.qtdAbaixoMinimo === 1 ? "formato" : "formatos"}
-            </span>
-          </span>
-          <span className={`text-[11.5px] ${r.qtdAbaixoMinimo > 0 ? "text-alerta" : "text-texto-fraco"}`}>
-            {r.qtdAbaixoMinimo > 0 ? (soAbaixo ? "mostrando só estes ✓" : "ver quais →") : "tudo acima do mínimo"}
-          </span>
-        </button>
-        <Kpi rotulo={`Produção · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.producaoKg) : "—"} cor="text-entrada" rodape={t ? pluralizar(t.qtdLancamentos, "lançamento", "lançamentos") : "carregando…"} />
-        <Kpi rotulo={`Saídas · ${rotuloPeriodo}`} valor={t ? formatarPeso(t.saidasKg) : "—"} rodape="venda · patrocínio · perda" />
+        <Kpi i={0} rotulo="Estoque total" numero={r.kpis.estoqueTotalKg} formato={formatarPeso} rodape="soma por peso · agora" />
+        <KpiAbaixoMinimo qtd={r.qtdAbaixoMinimo} soAbaixo={soAbaixo} onAlternar={() => setSoAbaixo((v) => !v)} />
+        <Kpi i={2} rotulo={`Produção · ${rotuloPeriodo}`} numero={t?.producaoKg} formato={formatarPeso} cor="text-entrada" rodape={t ? pluralizar(t.qtdLancamentos, "lançamento", "lançamentos") : "carregando…"} />
+        <Kpi i={3} rotulo={`Saídas · ${rotuloPeriodo}`} numero={t?.saidasKg} formato={formatarPeso} rodape="venda · patrocínio · perda" />
       </div>
 
       {/* Por categoria (RF58) */}
       {r.porCategoria.length > 0 ? (
-        <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-[10px] border border-borda bg-superficie px-4 py-3">
+        <div className="bloco-entra mb-4 flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-[10px] border border-borda bg-superficie px-4 py-3 [--i:4]">
           <Eyebrow>Por categoria</Eyebrow>
           {r.porCategoria.map((c) => (
             <span key={c.categoria} className="text-[13px] text-texto">
               {rotuloCat[c.categoria] ?? c.categoria}{" "}
-              <span className="font-mono font-semibold text-acento">
+              <span className="font-numero tabular-nums font-semibold text-acento">
                 {c.pacotes !== null
                   ? `${formatarContagem(c.pacotes, { pesoVariavel: false, unidadeContagem: c.unidadeContagem })} · ${formatarPeso(c.pesoKg)}`
                   : formatarPeso(c.pesoKg)}
@@ -163,7 +146,7 @@ function PainelConteudo() {
       ) : null}
 
       {/* Tendência — Produção × Saídas por dia */}
-      <Cartao className="mb-3 p-5">
+      <Cartao className="bloco-entra mb-3 p-5 [--i:5]">
         <PanelHead
           titulo="Tendência"
           extra={<span className="font-mono text-[11px] text-texto-fraco">Produção × Saídas · {rotuloPeriodo}</span>}
@@ -180,7 +163,7 @@ function PainelConteudo() {
 
       <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         {/* Produção de hoje */}
-        <Cartao className="p-5">
+        <Cartao className="bloco-entra p-5 [--i:6]">
           <PanelHead titulo="Produção de hoje" extra={<Link to="/historico" className="text-xs font-medium text-acento">Ver histórico</Link>} />
           {r.producaoHoje.length === 0 ? (
             <Vazio>Nenhuma produção lançada hoje ainda. Aparece aqui assim que o chão de fábrica começar.</Vazio>
@@ -190,7 +173,7 @@ function PainelConteudo() {
               <thead>
                 <Th cols={["Produto", "Colaborador", "Hora", "Qtd · Peso", ""]} />
               </thead>
-              <tbody>
+              <tbody className="linhas-entram [--base:280ms]">
                 {r.producaoHoje.map((m, i) => (
                   <LinhaTabela key={i}>
                     <td className="py-2.5 pr-3 text-texto">
@@ -198,16 +181,16 @@ function PainelConteudo() {
                     </td>
                     {/* Ênfase por peso, não por cor nova (DESIGN.md §3). */}
                     <td className="py-2.5 pr-3 font-medium text-texto">{m.autor}</td>
-                    <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
+                    <td className="py-2.5 pr-3 font-numero tabular-nums text-xs text-texto-suave">{hora(m.registradoEm)}</td>
                     <td className="py-2.5 pr-3 text-right">
                       {m.formatoPesoVariavel ? (
-                        <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
+                        <span className="font-numero tabular-nums text-texto">{formatarPeso(m.pesoKg)}</span>
                       ) : (
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="font-mono font-semibold text-texto">
+                          <span className="font-numero tabular-nums font-semibold text-texto">
                             {formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
                           </span>
-                          <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
+                          <span className="font-numero tabular-nums text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
                         </div>
                       )}
                     </td>
@@ -221,7 +204,7 @@ function PainelConteudo() {
         </Cartao>
 
         {/* Estoque por produto */}
-        <Cartao className="p-5">
+        <Cartao className="bloco-entra p-5 [--i:6]">
           {/* Filtro por câmara fria e por tipo de produto — só este bloco;
               os KPIs acima somam a fábrica inteira de propósito. */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -277,7 +260,7 @@ function PainelConteudo() {
             </Vazio>
           ) : (
             <div className="flex max-h-[460px] flex-col gap-2.5 overflow-y-auto pr-1">
-              {produtos.map((p) => (
+              {produtos.map((p, idx) => (
                 <div key={p._id} className={`rounded-lg p-3 ${p.abaixoMinimo ? "bg-alerta/5" : "bg-superficie-fria"}`}>
                   {(() => {
                     // Total do produto agrega formatos (tamanhos diferentes) por
@@ -304,7 +287,7 @@ function PainelConteudo() {
                           )}
                         </span>
                         <span className="flex items-baseline gap-1">
-                          <span className="font-mono text-sm font-semibold text-texto">{destaqueProduto}</span>
+                          <span className="font-numero tabular-nums text-sm font-semibold text-texto">{destaqueProduto}</span>
                           {mostrarPacotes ? (
                             <span className="text-[10.5px] text-texto-fraco">· {formatarPeso(p.pesoTotalKg)}</span>
                           ) : null}
@@ -343,7 +326,7 @@ function PainelConteudo() {
                               )}
                             </div>
                             <div className="mt-0.5 flex items-baseline gap-1.5">
-                              <span className={`font-mono text-sm font-semibold ${f.abaixoMinimo ? "text-alerta" : "text-texto"}`}>
+                              <span className={`font-numero tabular-nums text-sm font-semibold ${f.abaixoMinimo ? "text-alerta" : "text-texto"}`}>
                                 {destaque}
                               </span>
                               {secundario ? (
@@ -353,7 +336,7 @@ function PainelConteudo() {
                               ) : null}
                             </div>
                             {f.estoqueMinimo > 0 ? (
-                              <BulletMinimo saldo={f.saldo} minimo={f.estoqueMinimo} abaixo={f.abaixoMinimo} />
+                              <BulletMinimo saldo={f.saldo} minimo={f.estoqueMinimo} abaixo={f.abaixoMinimo} atraso={120 + Math.min(idx, 6) * 40} />
                             ) : null}
                           </div>
                         );
@@ -368,7 +351,7 @@ function PainelConteudo() {
       </div>
 
       {/* Saídas recentes */}
-      <Cartao className="p-5">
+      <Cartao className="bloco-entra p-5 [--i:6]">
         <PanelHead titulo="Saídas recentes" extra={<Link to="/historico" className="text-xs font-medium text-acento">Ver expedição</Link>} />
         {r.saidasRecentes.length === 0 ? (
           <Vazio>Nenhuma saída registrada nos últimos dias.</Vazio>
@@ -378,22 +361,22 @@ function PainelConteudo() {
             <thead>
               <Th cols={["Cliente / motivo", "Produto", "Veículo", "Hora", "Qtd · Peso", ""]} />
             </thead>
-            <tbody>
+            <tbody className="linhas-entram [--base:320ms]">
               {r.saidasRecentes.map((m, i) => (
                 <LinhaTabela key={i}>
                   <td className="py-2.5 pr-3 text-texto">{m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}</td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
                   <td className="py-2.5 pr-3 text-texto-suave">{veiculoRotulo(m)}</td>
-                  <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
+                  <td className="py-2.5 pr-3 font-numero tabular-nums text-xs text-texto-suave">{hora(m.registradoEm)}</td>
                   <td className="py-2.5 pr-3 text-right">
                     {m.formatoPesoVariavel ? (
-                      <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
+                      <span className="font-numero tabular-nums text-texto">{formatarPeso(m.pesoKg)}</span>
                     ) : (
                       <div className="flex flex-col items-end leading-tight">
-                        <span className="font-mono font-semibold text-texto">
+                        <span className="font-numero tabular-nums font-semibold text-texto">
                           {formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
                         </span>
-                        <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
+                        <span className="font-numero tabular-nums text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
                       </div>
                     )}
                   </td>
@@ -437,22 +420,35 @@ function veiculoRotulo(m: {
   return <span className="text-texto-fraco">Terceiro — não identificado</span>;
 }
 
-function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) => void }) {
-  const ops = [
-    { v: 1, l: "Hoje" },
-    { v: 7, l: "7 dias" },
-    { v: 30, l: "30 dias" },
-  ];
+// Seletor segmentado com o "marcador" deslizando de uma opção à outra — colunas
+// de largura igual, para o marcador andar em passos exatos de 100%.
+function Segmentado<T extends string | number>({
+  opcoes,
+  valor,
+  onChange,
+  compacto = false,
+}: {
+  opcoes: { v: T; l: string }[];
+  valor: T;
+  onChange: (v: T) => void;
+  compacto?: boolean;
+}) {
+  const idx = Math.max(0, opcoes.findIndex((o) => o.v === valor));
   return (
-    <div className="inline-flex rounded-lg border border-borda bg-superficie p-0.5">
-      {ops.map((o) => (
+    <div className="relative inline-grid auto-cols-fr grid-flow-col rounded-lg border border-borda bg-superficie p-0.5">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0.5 left-0.5 rounded-md bg-superficie-fria-2 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ width: `calc((100% - 4px) / ${opcoes.length})`, transform: `translateX(${idx * 100}%)` }}
+      />
+      {opcoes.map((o) => (
         <button
           key={o.v}
           onClick={() => onChange(o.v)}
-          aria-pressed={dias === o.v}
-          className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-            dias === o.v ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
-          }`}
+          aria-pressed={valor === o.v}
+          className={`relative rounded-md font-medium whitespace-nowrap transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            compacto ? "px-2.5 py-1 text-[11.5px]" : "px-3 py-1.5 text-[12.5px]"
+          } ${valor === o.v ? "text-acento" : "text-texto-suave hover:text-texto"}`}
         >
           {o.l}
         </button>
@@ -461,28 +457,33 @@ function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) =>
   );
 }
 
+function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) => void }) {
+  return (
+    <Segmentado
+      valor={dias}
+      onChange={onChange}
+      opcoes={[
+        { v: 1, l: "Hoje" },
+        { v: 7, l: "7 dias" },
+        { v: 30, l: "30 dias" },
+      ]}
+    />
+  );
+}
+
 // Alternância pacotes/kg do bloco "Estoque por produto" — mesmo visual do
 // SegPeriodo, versão com 2 opções.
 function SegUnidade({ unidade, onChange }: { unidade: "pacotes" | "kg"; onChange: (u: "pacotes" | "kg") => void }) {
-  const ops = [
-    { v: "pacotes" as const, l: "Qtd." },
-    { v: "kg" as const, l: "Kg" },
-  ];
   return (
-    <div className="inline-flex rounded-lg border border-borda bg-superficie p-0.5">
-      {ops.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          aria-pressed={unidade === o.v}
-          className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-            unidade === o.v ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
-          }`}
-        >
-          {o.l}
-        </button>
-      ))}
-    </div>
+    <Segmentado
+      compacto
+      valor={unidade}
+      onChange={onChange}
+      opcoes={[
+        { v: "pacotes", l: "Qtd." },
+        { v: "kg", l: "Kg" },
+      ]}
+    />
   );
 }
 
@@ -490,14 +491,20 @@ function SegUnidade({ unidade, onChange }: { unidade: "pacotes" | "kg"; onChange
 // é o saldo; o traço escuro é o mínimo. Se o vermelho para antes do traço, está
 // abaixo do mínimo — visível num relance. Escala própria de cada formato (as
 // unidades diferem: pacotes × kg), então é comparação com o próprio limite.
-function BulletMinimo({ saldo, minimo, abaixo }: { saldo: number; minimo: number; abaixo: boolean }) {
+// Movimento: enche da esquerda ao aparecer e, quando o saldo muda ao vivo, corre
+// até o novo nível; a marca do mínimo entra logo depois do preenchimento.
+function BulletMinimo({ saldo, minimo, abaixo, atraso = 0 }: { saldo: number; minimo: number; abaixo: boolean; atraso?: number }) {
   const escala = Math.max(saldo, minimo) * 1.25 || 1;
   const wSaldo = Math.max(2, Math.min(100, (saldo / escala) * 100));
   const xMin = Math.min(100, (minimo / escala) * 100);
+  const espera = { "--atraso": `${atraso}ms` } as CSSProperties;
   return (
     <div className="relative mt-1 h-1.5 rounded-full bg-gelo-trilho">
-      <div className={`h-full rounded-full ${abaixo ? "bg-alerta" : "bg-entrada"}`} style={{ width: `${wSaldo}%` }} />
-      <div className="absolute -top-0.5 -bottom-0.5 w-0.5 rounded bg-texto" style={{ left: `${xMin}%` }} aria-hidden="true" />
+      <div
+        className={`regua-enche h-full rounded-full transition-[width,background-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${abaixo ? "bg-alerta" : "bg-entrada"}`}
+        style={{ width: `${wSaldo}%`, ...espera }}
+      />
+      <div className="regua-marca absolute -top-0.5 -bottom-0.5 w-0.5 rounded bg-texto" style={{ left: `${xMin}%`, ...espera }} aria-hidden="true" />
     </div>
   );
 }
@@ -506,16 +513,42 @@ function Eyebrow({ children }: { children: ReactNode }) {
   return <span className="font-mono text-[10.5px] font-medium tracking-[0.11em] text-texto-fraco uppercase">{children}</span>;
 }
 
-function Kpi({ rotulo, valor, unidade, cor = "text-texto", rodape }: { rotulo: string; valor: string; unidade?: string; cor?: string; rodape: string }) {
+// O número "sobe" até o valor ao abrir, ao trocar de período e quando um
+// lançamento novo chega. Leitor de tela recebe só o valor final (o número
+// animado fica escondido dele).
+function Kpi({ i, rotulo, numero, formato, cor = "text-texto", rodape }: { i: number; rotulo: string; numero: number | undefined; formato: (n: number) => string; cor?: string; rodape: string }) {
+  const exibido = useNumeroAnimado(numero, { atraso: i * 40 });
   return (
-    <div className="flex flex-col gap-2.5 rounded-[10px] border border-borda bg-superficie p-4">
+    <div className="bloco-entra flex flex-col gap-2.5 rounded-[10px] border border-borda bg-superficie p-4" style={{ "--i": i } as CSSProperties}>
       <Eyebrow>{rotulo}</Eyebrow>
-      <span className={`font-mono text-3xl leading-none font-semibold ${cor}`}>
-        {valor}
-        {unidade ? <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{unidade}</span> : null}
+      <span className={`font-numero text-3xl leading-none font-semibold tabular-nums ${cor}`}>
+        <span aria-hidden="true">{numero === undefined ? "—" : formato(exibido)}</span>
+        <span className="sr-only">{numero === undefined ? "carregando" : formato(numero)}</span>
       </span>
       <span className="text-[11.5px] text-texto-fraco">{rodape}</span>
     </div>
+  );
+}
+
+function KpiAbaixoMinimo({ qtd, soAbaixo, onAlternar }: { qtd: number; soAbaixo: boolean; onAlternar: () => void }) {
+  const exibido = useNumeroAnimado(qtd, { duracao: 500, atraso: 40 });
+  return (
+    <button
+      onClick={() => qtd > 0 && onAlternar()}
+      className={`bloco-entra flex flex-col gap-2.5 rounded-[10px] border p-4 text-left transition-colors [--i:1] ${
+        qtd > 0 ? "border-alerta bg-alerta/5 hover:bg-alerta/10" : "cursor-default border-borda bg-superficie"
+      }`}
+    >
+      <Eyebrow>Abaixo do mínimo</Eyebrow>
+      <span className={`font-numero text-3xl leading-none font-semibold tabular-nums ${qtd > 0 ? "text-alerta" : "text-texto"}`}>
+        <span aria-hidden="true">{Math.round(exibido)}</span>
+        <span className="sr-only">{qtd}</span>
+        <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{qtd === 1 ? "formato" : "formatos"}</span>
+      </span>
+      <span className={`text-[11.5px] ${qtd > 0 ? "text-alerta" : "text-texto-fraco"}`}>
+        {qtd > 0 ? (soAbaixo ? "mostrando só estes ✓" : "ver quais →") : "tudo acima do mínimo"}
+      </span>
+    </button>
   );
 }
 

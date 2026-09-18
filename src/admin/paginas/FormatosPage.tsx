@@ -66,10 +66,10 @@ export function FormatosPage() {
               {/* Rótulo canônico (tarefa 2 do adendo) — o mesmo texto que o
                   colaborador vê no PWA e o cliente vê no comprovante. */}
               <td className="px-3 py-2.5 font-medium text-texto">{rotuloFormato(f)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">
                 {f.pesoVariavel ? <span className="text-texto-suave">variável</span> : formatarPeso(f.pesoKg)}
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto-suave">
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto-suave">
                 {f.estoqueMinimo
                   ? f.pesoVariavel
                     ? formatarPeso(f.estoqueMinimo)

@@ -454,10 +454,10 @@ function LinhaMov({
 }) {
   return (
     <LinhaTabela className={`${indentado ? "bg-superficie-fria/40" : ""} ${m.estornado ? "opacity-60" : ""}`}>
-      <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">
+      <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">
         {indentado ? <span className="mr-1 text-texto-fraco">↳</span> : null}
         {dataHora(m.registradoEm)}
-        <span className="block text-texto-fraco">{m.protocolo}</span>
+        <span className="block font-mono text-texto-fraco">{m.protocolo}</span>
       </td>
       <td className="px-3 py-2.5">
         <span className={m.sinal > 0 ? "text-entrada" : "text-saida"}>
@@ -471,10 +471,10 @@ function LinhaMov({
       </td>
       <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
       <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
-      <td className="px-3 py-2.5 text-right font-mono font-semibold text-texto">
+      <td className="px-3 py-2.5 text-right font-numero tabular-nums font-semibold text-texto">
         {m.formatoPesoVariavel ? "—" : formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
       </td>
-      <td className="px-3 py-2.5 text-right font-mono text-xs text-texto-suave">{formatarPeso(m.pesoKg)}</td>
+      <td className="px-3 py-2.5 text-right font-numero tabular-nums text-xs text-texto-suave">{formatarPeso(m.pesoKg)}</td>
       <td className="px-3 py-2.5 text-texto-suave">
         {m.tipo === "ajuste" ? (
           m.motivoCategoria === null || m.motivoCategoria === "nao_informado" ? (
@@ -564,7 +564,7 @@ function LinhaGrupo({
   return (
     <>
       <LinhaTabela>
-        <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(primeiro.registradoEm)}</td>
+        <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{dataHora(primeiro.registradoEm)}</td>
         <td colSpan={6} className="px-3 py-2.5">
           <button
             onClick={() => setAberto((v) => !v)}
@@ -578,7 +578,7 @@ function LinhaGrupo({
             />
             <span>
               {rotulo} · {primeiro.camaraNome} · {itens.length} {itens.length === 1 ? "item" : "itens"} ·{" "}
-              <span className="font-mono font-medium">{formatarPeso(pesoTotal)}</span> · {primeiro.autor}
+              <span className="font-numero tabular-nums font-medium">{formatarPeso(pesoTotal)}</span> · {primeiro.autor}
             </span>
           </button>
         </td>
@@ -624,6 +624,20 @@ function LinhaGrupoTransferencia({
   onEstornar: (m: MovRow) => void;
   onEstornarTransferencia: (loteId: string) => void;
 }) {
+  // Só uma perna carregada (filtro de Câmara mostra só o lado daquela câmara,
+  // ou a página de 100 linhas cortou o par no meio): não dá pra montar
+  // "origem → destino" — mostra a perna como linha comum, em vez de quebrar a
+  // tela tentando ler uma perna que não veio.
+  if (itens.length < 2) {
+    return (
+      <>
+        {itens.map((m) => (
+          <LinhaMov key={m._id} m={m} onComprovante={() => onComprovante(m)} onEstornar={() => onEstornar(m)} />
+        ))}
+      </>
+    );
+  }
+
   const origem = itens.find((it) => it.sinal < 0) ?? itens[0];
   const destino = itens.find((it) => it.sinal > 0) ?? itens[1];
   const estornado = itens.some((it) => it.estornado);
@@ -632,7 +646,7 @@ function LinhaGrupoTransferencia({
   return (
     <>
       <LinhaTabela className={estornado ? "opacity-60" : ""}>
-        <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{dataHora(origem.registradoEm)}</td>
+        <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{dataHora(origem.registradoEm)}</td>
         <td colSpan={6} className="px-3 py-2.5">
           <button
             onClick={onToggle}
@@ -646,7 +660,7 @@ function LinhaGrupoTransferencia({
             />
             <span>
               Transferência · {origem.camaraNome} → {destino.camaraNome} ·{" "}
-              <span className="font-mono font-medium">
+              <span className="font-numero tabular-nums font-medium">
                 {origem.formatoPesoVariavel
                   ? formatarPeso(origem.pesoKg)
                   : `${formatarQuantidade(origem.quantidade, { pesoVariavel: false, unidadeContagem: origem.formatoUnidadeContagem })} · ${formatarPeso(origem.pesoKg)}`}
@@ -713,7 +727,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
                 {preview.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: preview.formatoNome, pesoKg: preview.formatoPesoKg, pesoVariavel: preview.pesoVariavel, unidadesPorPacote: preview.formatoUnidadesPorPacote })}</span>
                 <span className="text-texto-suave"> · {preview.camaraNome}</span>
               </p>
-              <p className="mt-1 font-mono text-sm text-texto">
+              <p className="mt-1 font-numero tabular-nums text-sm text-texto">
                 {!preview.pesoVariavel ? (
                   <>{formatarQuantidade(preview.impactoQuantidade, { pesoVariavel: false, unidadeContagem: preview.formatoUnidadeContagem })} · </>
                 ) : null}
@@ -721,7 +735,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
               </p>
               <p className="mt-2 text-xs text-texto-suave">
                 Saldo depois do estorno:{" "}
-                <span className="font-mono font-medium text-texto">
+                <span className="font-numero tabular-nums font-medium text-texto">
                   {formatarQuantidade(preview.saldoDepois, { pesoVariavel: preview.pesoVariavel, unidadeContagem: preview.formatoUnidadeContagem })}
                 </span>
               </p>
@@ -796,7 +810,7 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
                   <span className="text-texto-suave">
                     / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.formatoPesoVariavel, unidadesPorPacote: p.formatoUnidadesPorPacote })}
                   </span>
-                  <span className="ml-2 font-mono font-medium">
+                  <span className="ml-2 font-numero tabular-nums font-medium">
                     {p.formatoPesoVariavel
                       ? formatarPeso(p.pesoKg)
                       : `${formatarQuantidade(p.quantidade, { pesoVariavel: false, unidadeContagem: p.formatoUnidadeContagem })} · ${formatarPeso(p.pesoKg)}`}

@@ -18,6 +18,7 @@ colors:
   entrada: "#2f7d52"
   saida: "#b23a32"
   aviso: "#a9761e"
+  aviso-texto: "#8a5f12"
   alerta: "#b23a32"
 typography:
   display:
@@ -115,7 +116,7 @@ components:
 
 **Creative North Star: "O livro-razão vivo"**
 
-O Estoque 065 se apresenta como um registro sempre atualizado e auditável — um livro-razão que respira. Cada número na tela é uma leitura exata, rastreável até a movimentação que a originou; a interface é a página bem editada desse livro. A confiança não vem de enfeite, vem da precisão: números em fonte monoespaçada, alinhados como uma coluna contábil; superfícies claras e planas; nada compete com o dado. A paleta é derivada do **gelo — o produto — e não do interior escuro da câmara fria**: um azul-esverdeado claro de fundo, branco nas superfícies, um ciano-petróleo firme como única voz de ação.
+O Estoque 065 se apresenta como um registro sempre atualizado e auditável — um livro-razão que respira. Cada número na tela é uma leitura exata, rastreável até a movimentação que a originou; a interface é a página bem editada desse livro. A confiança não vem de enfeite, vem da precisão: números em Space Grotesk com algarismos tabulares, alinhados como uma coluna contábil; superfícies claras e planas; nada compete com o dado. A paleta é derivada do **gelo — o produto — e não do interior escuro da câmara fria**: um azul-esverdeado claro de fundo, branco nas superfícies, um ciano-petróleo firme como única voz de ação.
 
 São, na verdade, dois documentos no mesmo livro. As telas do **colaborador** são arejadas, de toque grande, para uso em pé na porta da câmara, com uma mão fria e com pressa — cada tela faz uma coisa e a faz óbvia. As telas do **Admin** são densas, de leitura rápida no desktop, com muita informação organizada por tela. A mesma linguagem serve aos dois em termos opostos: espaço para um, densidade para o outro, sem nunca trocar de identidade.
 
@@ -125,8 +126,9 @@ O sistema rejeita explicitamente quatro caras: o **ERP/planilha antigo** (cinza 
 - O dado é o protagonista; tudo mais recua.
 - Claro e plano — profundidade por tom e borda, nunca por sombra pesada.
 - Uma única voz de ação (ciano-petróleo), usada com parcimônia.
-- Números sempre em monoespaçada, alinhados como colunas de um razão.
+- Números sempre em Space Grotesk tabular, alinhados como colunas de um razão; a Plex Mono fica com rótulos e códigos.
 - Dois modos de densidade (colaborador arejado / Admin denso) numa só identidade.
+- Movimento discreto e único — "o nível sobe": números contam, réguas enchem, curvas se erguem; sempre uma desaceleração suave, nunca mola nem quique.
 
 ## 2. Colors
 
@@ -141,7 +143,7 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 ### Tertiary (semânticas)
 - **Verde Entrada** (`#2f7d52`): produção e retorno — tudo que soma ao estoque. Discreto, nunca vibrante.
 - **Vermelho Saída** (`#b23a32`): venda, patrocínio, perda, divergência e alerta de estoque abaixo do mínimo — tudo que subtrai ou exige atenção crítica.
-- **Âmbar Aviso** (`#a9761e`): atenção sem urgência (perto do mínimo).
+- **Âmbar Aviso** (`#a9761e`): atenção sem urgência (perto do mínimo). Só em preenchimento e borda — como texto dá 3,96:1 no branco (reprova AA). Para **texto** âmbar use **Âmbar Aviso Texto** (`#8a5f12`, 5,6:1).
 
 ### Neutral
 - **Fundo Gelo-Claro** (`#eef3f4`): fundo geral do app.
@@ -210,7 +212,7 @@ O sistema é **plano por princípio**. Não há sombras decorativas — nenhuma.
 
 ### Inputs / Fields
 - **Style:** borda `#d7e1e4`, fundo branco, 4px de raio, `padding: 6px 8px`. Rótulo acima em Plex/Inter pequeno tinta-suave.
-- **Focus:** a borda muda para ciano-petróleo (`#0e7c9c`); sem glow, sem sombra. Campos de número usam Plex Mono.
+- **Focus:** a borda muda para ciano-petróleo (`#0e7c9c`); sem glow, sem sombra. Campos de número (CNPJ, placa, quantidades) usam Space Grotesk tabular, como todo número de dado.
 - **Disabled:** fundo gelo-claro, texto suave (ex.: campo de câmara fixa no produto, que nunca se edita).
 
 ### Navigation
@@ -219,10 +221,28 @@ O sistema é **plano por princípio**. Não há sombras decorativas — nenhuma.
 - **Colaborador:** sem nav persistente — um cabeçalho por tela com título e botão "‹ voltar" grande; a navegação é o próprio fluxo.
 
 ### Régua de nível (componente-assinatura)
-A barra de saldo por produto no Painel: um trilho arredondado de gelo-trilho (`#cfdde0`) preenchido em gelo (`#54b7d2`), proporcional ao peso; vira vermelho (`#b23a32`) quando o produto está abaixo do mínimo. É a tradução mais literal do North Star — o nível do estoque lido como um mostrador.
+A barra de saldo por formato no Painel: um trilho arredondado de gelo-trilho (`#cfdde0`, 6px de altura) preenchido em verde entrada (`#2f7d52`), com um traço escuro fino marcando o estoque mínimo; o preenchimento vira vermelho (`#b23a32`) quando o formato está abaixo do mínimo. Cada formato tem escala própria (pacotes ou kg), então a comparação é sempre com o próprio limite. É a tradução mais literal do North Star — o nível do estoque lido como um mostrador. Ao aparecer, enche da esquerda (800ms); quando o saldo muda ao vivo, corre até o novo nível (500ms); a marca do mínimo entra logo depois do preenchimento.
 
 ### Tabela (componente-assinatura)
 A superfície de trabalho do Admin. Cabeçalho em rótulo-mostrador (Plex versalete 12px), linhas com divisor de 1px a 60% de opacidade, realce de linha no hover (superfície fria), colunas de número alinhadas à direita, estado vazio centralizado. Um só componente compartilhado governa todas as 10 telas do Admin.
+
+### Gráfico de tendência (componente-assinatura)
+Produção × Saídas por dia, desenhado à mão em SVG (sem biblioteca). Curvas suaves que nunca ultrapassam os dados (interpolação monótona — sem "barriga" nem valor abaixo de zero). Produção é verde entrada em traço contínuo; Saídas é vermelho saída em traço **tracejado** — o traço, não só a cor, distingue as séries. Sob cada linha há um véu da mesma cor que só some de cima para baixo (18% para Produção, 7% para Saídas, para as duas áreas não virarem lama onde se cruzam); é a única exceção ao "sem gradiente" do sistema, porque não troca de matiz nem decora. Guias horizontais tracejadas em `#d7e1e4` com o eixo Y arredondado para um número redondo. Interação: passar o mouse mostra o dia com os dois pesos; clicar fixa o balão e oferece o link para o Histórico daquele dia; a legenda liga e desliga cada série.
+
+### Seletor segmentado
+Dois ou três botões de largura igual dentro de uma pílula de 8px de raio com borda de 1px; um marcador em superfície fria 2 (`#dce6e8`) desliza sob a opção ativa (300ms), cujo texto fica ciano. Usado no período do Painel (Hoje / 7 dias / 30 dias) e na unidade do estoque (Qtd. / Kg).
+
+### Movimento (assinatura)
+Uma só ideia: **o nível sobe.** O que é dado entra como um mostrador lendo um valor — números contam até o valor, réguas enchem da esquerda, as curvas do gráfico se erguem da linha de base numa onda da esquerda para a direita, e o último dia recebe um único toque (um anel que se expande e some). Nada repete em laço e nada depende de sombra ou brilho.
+
+- **Curva:** desaceleração forte, `cubic-bezier(0.16, 1, 0.3, 1)` em CSS; nos números e no gráfico, a mesma sensação por interpolação de quarta potência. Nunca mola, quique ou elástico.
+- **Duração:** feedback de estado 100–300ms; entrada de blocos 500ms; réguas 800ms; contagem dos números 800ms (500ms quando o valor muda ao vivo); subida do gráfico 1s, com 150ms de espera. Sair é mais rápido que entrar.
+- **Cascata:** os blocos do Painel entram em sequência curta (passo de 40ms, no máximo 6 passos); só as 6 primeiras linhas de tabela entram em sequência (passo de 30ms). O total nunca passa de ~750ms — o Admin volta várias vezes ao dia e não espera coreografia.
+- **Só na chegada:** animação de entrada roda uma vez, na montagem — trocar filtro ou ordenar não recomeça a cascata. O gráfico recomeça a subir só quando o período muda. Entradas usam preenchimento `backwards` (nunca `both`), para não deixar contexto de empilhamento pendurado e cobrir o menu de seleção do vizinho.
+- **Ao vivo:** quando um lançamento chega com o Painel aberto, os números e réguas correm do valor antigo ao novo; o gráfico reescala com transição (onde o navegador anima o caminho).
+- **Mais leve, nunca zero:** sob `prefers-reduced-motion`, tudo aparece já no lugar (sem espera, sem contagem, sem subida); o estado e a informação continuam idênticos. O leitor de tela recebe só o valor final dos números.
+
+**A Regra do Nível que Sobe.** Movimento serve para mostrar que um dado chegou ou mudou, ou para explicar uma relação (o cursor que desliza entre dias, o marcador que muda de opção). Se uma animação não faz nenhuma das duas, é decoração e não entra. Este bloco descreve o Painel do Admin; as telas do colaborador têm as próprias animações de entrada e de feedback de toque.
 
 ## 6. Do's and Don'ts
 
@@ -234,13 +254,17 @@ A superfície de trabalho do Admin. Cabeçalho em rótulo-mostrador (Plex versal
 - **Do** manter 56px de alvo de toque nas telas do colaborador; arejado para uma mão fria com pressa.
 - **Do** deixar o Admin denso — muita informação por tela é uma virtude ali, não um defeito.
 - **Do** garantir contraste mínimo AA: texto corrido ≥ 4,5:1, números/rótulos grandes ≥ 3:1.
+- **Do** animar só o que mostra chegada ou mudança de dado, com a curva de desaceleração única e sempre com um caminho para `prefers-reduced-motion`.
+- **Do** distinguir séries de gráfico também pelo traço (contínuo × tracejado), nunca só pela cor.
 
 ### Don't:
 - **Don't** parecer **ERP/planilha antigo**: nada de cinza sufocante, botões minúsculos ou tudo apertado. Densidade sim, aperto não.
-- **Don't** parecer **SaaS genérico**: proibido gradiente (especialmente roxo), grade infinita de cartões idênticos, decoração vazia.
+- **Don't** parecer **SaaS genérico**: proibido gradiente (especialmente roxo), grade infinita de cartões idênticos, decoração vazia. A única exceção é o véu de área do gráfico de tendência (mesma cor, só some de cima para baixo).
 - **Don't** parecer **app colorido/lúdico**: sem cores vibrantes, ícones grandes coloridos ou cara de joguinho. É ferramenta de trabalho.
 - **Don't** parecer **dashboard dark "gamer"**: sem fundo preto, sem neon. O tema é claro, derivado do gelo.
 - **Don't** usar `box-shadow` decorativa — a Regra do Sem-Sombra. Se parece um app de 2014, a sombra é o problema.
 - **Don't** usar texto com gradiente (`background-clip: text`), borda lateral colorida > 1px como faixa, ou glassmorphism decorativo.
 - **Don't** espalhar o ciano-petróleo como cor de preenchimento genérica; ele deixa de significar "aja aqui".
+- **Don't** usar mola, quique, elástico nem animação em laço; nada pisca ou pulsa para chamar atenção. O movimento acontece uma vez, na chegada do dado.
+- **Don't** fazer o Admin esperar: entrada de tela nunca passa de ~750ms no total, e o dado já é legível antes de a animação terminar.
 - **Don't** expor `_id` interno ou jargão técnico/código de erro ao usuário final.

@@ -41,7 +41,7 @@ export function Campo({
       <span className="text-xs font-medium text-texto-suave">{label}</span>
       <input
         className={`rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento ${
-          mono ? "font-mono" : ""
+          mono ? "font-numero tabular-nums" : ""
         } ${className}`}
         {...props}
       />
@@ -600,7 +600,7 @@ export function TituloPagina({ titulo, subtitulo, acao }: { titulo: string; subt
 export function Aviso({ children, tom = "erro" }: { children: ReactNode; tom?: "erro" | "aviso" | "ok" | "info" }) {
   const cores = {
     erro: "text-alerta",
-    aviso: "text-aviso",
+    aviso: "text-aviso-texto",
     ok: "text-entrada",
     info: "text-texto-suave",
   } as const;
@@ -677,31 +677,36 @@ export function Modal({
   }, []);
 
   return (
+    // O véu rola (overflow-y-auto) e o miolo centraliza com min-h-full: conteúdo
+    // mais alto que a tela (celular deitado, comprovante com vários itens)
+    // rola em vez de ser cortado com os botões inalcançáveis.
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-texto/40 p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-texto/40"
       onClick={fecharDesabilitado ? undefined : onFechar}
     >
-      <div
-        ref={ref}
-        role="dialog"
-        aria-modal="true"
-        aria-label={titulo}
-        tabIndex={-1}
-        className="w-full max-w-lg rounded-lg border border-borda bg-superficie p-5 outline-none"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-texto">{titulo}</h2>
-          <button
-            className="rounded text-texto-suave transition outline-none hover:text-texto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={onFechar}
-            disabled={fecharDesabilitado}
-            aria-label="Fechar"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          ref={ref}
+          role="dialog"
+          aria-modal="true"
+          aria-label={titulo}
+          tabIndex={-1}
+          className="w-full max-w-lg rounded-lg border border-borda bg-superficie p-5 outline-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-texto">{titulo}</h2>
+            <button
+              className="rounded text-texto-suave transition outline-none hover:text-texto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={onFechar}
+              disabled={fecharDesabilitado}
+              aria-label="Fechar"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );

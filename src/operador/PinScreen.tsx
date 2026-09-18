@@ -77,7 +77,7 @@ export function PinScreen({
           alt="065 Gelo"
           className="h-16 w-16 rounded-full object-cover ring-1 ring-borda"
         />
-        <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.14em] text-texto-fraco uppercase">
+        <p className="mt-3 font-mono text-[11px] font-medium tracking-[0.14em] text-texto-suave uppercase">
           Estoque 065
         </p>
         <h1 className="mt-1 font-titulo text-2xl font-semibold tracking-[0.02em] text-texto uppercase">{camaraNome}</h1>
@@ -96,7 +96,7 @@ export function PinScreen({
       <div
         role={aviso ? "status" : "alert"}
         aria-live={aviso ? "polite" : "assertive"}
-        className={`h-6 text-center text-base ${aviso ? "text-aviso" : "text-alerta"}`}
+        className={`h-6 text-center text-base ${aviso ? "text-aviso-texto" : "text-alerta"}`}
       >
         {erro}
       </div>

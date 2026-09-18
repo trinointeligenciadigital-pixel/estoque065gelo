@@ -49,7 +49,7 @@ export function VeiculosPage() {
         ) : (
           filtrados.map((v) => (
             <LinhaTabela key={v._id}>
-              <td className="px-3 py-2.5 font-mono font-medium text-texto">{v.placa}</td>
+              <td className="px-3 py-2.5 font-numero tabular-nums font-medium text-texto">{v.placa}</td>
               <td className="px-3 py-2.5 text-texto-suave">{v.modelo || "—"}</td>
               <td className="px-3 py-2.5 text-texto-suave">{v.motoristaPadrao || "—"}</td>
               <td className="px-3 py-2.5"><Etiqueta ativo={v.ativo} /></td>

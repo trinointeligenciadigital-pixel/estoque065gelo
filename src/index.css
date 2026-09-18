@@ -25,7 +25,8 @@
 
   --color-entrada: #2f7d52; /* verde discreto — produção, retorno */
   --color-saida: #b23a32; /* venda, patrocínio, perda */
-  --color-aviso: #a9761e; /* âmbar — atenção (perto do mínimo) */
+  --color-aviso: #a9761e; /* âmbar — atenção (perto do mínimo); só p/ preenchimento/borda */
+  --color-aviso-texto: #8a5f12; /* âmbar p/ TEXTO: 5,6:1 no branco, 4,9:1 sobre aviso a 10% (o #a9761e dá 3,96 / 3,53) */
   --color-alerta: #b23a32; /* estoque abaixo do mínimo e divergência */
 
   /* Tipografia — Inter (texto), Space Grotesk (número de dado — peso, saldo,
@@ -94,6 +95,91 @@
   }
 }
 
+/*
+  Painel do Admin — "o nível sobe". Uma só curva (desaceleração forte) e um só
+  vocabulário: subir e aparecer. `backwards` (nunca `both`) devolve o elemento ao
+  estado normal ao terminar, para não deixar contexto de empilhamento pendurado
+  (o menu de seleção do bloco de estoque precisa passar por cima do vizinho).
+*/
+@keyframes bloco-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Blocos do Painel entram em cascata curta; o teto de 6 passos mantém o total sob ~750ms. */
+.bloco-entra {
+  animation: bloco-entra 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(min(var(--i, 0), 6) * 40ms);
+}
+
+@keyframes item-entra {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+/* Linhas de tabela e itens de lista: só os primeiros aparecem em sequência; o resto entra junto. */
+.linhas-entram > * {
+  animation: item-entra 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--base, 0ms) + var(--k, 6) * 30ms);
+}
+.linhas-entram > :nth-child(1) { --k: 0; }
+.linhas-entram > :nth-child(2) { --k: 1; }
+.linhas-entram > :nth-child(3) { --k: 2; }
+.linhas-entram > :nth-child(4) { --k: 3; }
+.linhas-entram > :nth-child(5) { --k: 4; }
+.linhas-entram > :nth-child(6) { --k: 5; }
+
+/* Régua de nível enchendo da esquerda; a marca do mínimo aparece logo depois. */
+@keyframes regua-enche {
+  from {
+    transform: scaleX(0);
+  }
+}
+.regua-enche {
+  transform-origin: left center;
+  animation: regua-enche 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--atraso, 0ms);
+}
+@keyframes aparece {
+  from {
+    opacity: 0;
+  }
+}
+.regua-marca {
+  animation: aparece 0.35s ease-out backwards;
+  animation-delay: calc(var(--atraso, 0ms) + 450ms);
+}
+
+/* Gráfico de tendência: o dia mais recente recebe um único toque, sem repetir. */
+@keyframes grafico-ping {
+  from {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+@keyframes grafico-ponta {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.grafico-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: grafico-ping 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.grafico-ponta {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: grafico-ponta 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-tremor {
     animation: none;
@@ -105,6 +191,7 @@
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;

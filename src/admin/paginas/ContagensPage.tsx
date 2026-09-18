@@ -27,7 +27,7 @@ function dataHoraOuTraco(ms: number | null): string {
 // não carregava nenhum sinal de estado, só texto neutro.
 function PillStatusContagem({ status }: { status: "pendente" | "aprovada" | "rejeitada" }) {
   const estilo = {
-    pendente: "bg-aviso/10 text-aviso",
+    pendente: "bg-aviso/10 text-aviso-texto",
     aprovada: "bg-entrada/10 text-entrada",
     rejeitada: "bg-alerta/10 text-alerta",
   }[status];
@@ -117,7 +117,7 @@ export function ContagensPage() {
                   <PillStatusContagem status="pendente" />
                 </td>
                 <td className="px-3 py-2.5 text-texto-suave">{c.abertaPorNome}</td>
-                <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.fechadaEm)}</td>
+                <td className="px-3 py-2.5 font-numero tabular-nums text-texto-suave">{dataHoraOuTraco(c.fechadaEm)}</td>
                 <td className="px-3 py-2.5 text-right">
                   <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Conferir</Botao>
                 </td>
@@ -139,8 +139,8 @@ export function ContagensPage() {
                   <PillStatusContagem status={c.status === "aprovada" ? "aprovada" : "rejeitada"} />
                 </td>
                 <td className="px-3 py-2.5 text-texto-suave">{c.decididaPorNome}</td>
-                <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.decididaEm)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarPeso(c.divergenciaTotalKg)}</td>
+                <td className="px-3 py-2.5 font-numero tabular-nums text-texto-suave">{dataHoraOuTraco(c.decididaEm)}</td>
+                <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarPeso(c.divergenciaTotalKg)}</td>
                 <td className="px-3 py-2.5 text-right">
                   <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Ver</Botao>
                 </td>
@@ -195,7 +195,7 @@ function LinhaAndamento({
     <LinhaTabela>
       <td className="px-3 py-2.5 font-medium text-texto">{item.camaraNome}</td>
       <td className="px-3 py-2.5 text-texto-suave">{item.abertaPorNome}</td>
-      <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHora(item.abertaEm)}</td>
+      <td className="px-3 py-2.5 font-numero tabular-nums text-texto-suave">{dataHora(item.abertaEm)}</td>
       <td className="px-3 py-2.5 text-right">
         {confirmando ? (
           <div className="flex items-center justify-end gap-2">
@@ -271,9 +271,9 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
               <td className="px-3 py-2.5 text-texto-suave">
                 {rotuloFormato({ nome: it.formatoNome, pesoKg: it.formatoPesoKg, pesoVariavel: it.pesoVariavel, unidadesPorPacote: it.formatoUnidadesPorPacote })}
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
-              <td className={`px-3 py-2.5 text-right font-mono ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
+              <td className={`px-3 py-2.5 text-right font-numero tabular-nums ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
                 {div > 0 ? "+" : ""}{formatarQtd(div, it.pesoVariavel, it.formatoUnidadeContagem)}
               </td>
             </LinhaTabela>
@@ -451,7 +451,7 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
                           value={contado[f._id] ?? ""}
                           onChange={(e) => setContado((c) => ({ ...c, [f._id]: e.target.value }))}
                           placeholder="0"
-                          className="w-24 rounded border border-borda bg-superficie px-2 py-1.5 text-right font-mono text-sm text-texto outline-none focus:border-acento"
+                          className="w-24 rounded border border-borda bg-superficie px-2 py-1.5 text-right font-numero tabular-nums text-sm text-texto outline-none focus:border-acento"
                         />
                       </label>
                     ))}

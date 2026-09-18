@@ -52,14 +52,14 @@ export function PatrociniosPage() {
         ) : (
           filtrados.map((p) => (
             <LinhaTabela key={p._id}>
-              <td className="px-3 py-2.5 font-mono text-xs text-texto-suave">{data(p.registradoEm)}</td>
+              <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{data(p.registradoEm)}</td>
               <td className="px-3 py-2.5 font-medium text-texto">{p.clienteNome || "—"}</td>
               <td className="px-3 py-2.5 text-texto-suave">
                 {p.produtoNome} / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.unidade === "kg", unidadesPorPacote: p.formatoUnidadesPorPacote })}
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.saiu, p.unidade, p.formatoUnidadeContagem)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-entrada">{formatarQtd(p.retornado, p.unidade, p.formatoUnidadeContagem)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.consumido, p.unidade, p.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarQtd(p.saiu, p.unidade, p.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-entrada">{formatarQtd(p.retornado, p.unidade, p.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarQtd(p.consumido, p.unidade, p.formatoUnidadeContagem)}</td>
               <td className="px-3 py-2.5">
                 {p.emAberto ? (
                   <span className="inline-block rounded-full bg-acento/10 px-2 py-0.5 text-[11px] font-semibold text-acento">
