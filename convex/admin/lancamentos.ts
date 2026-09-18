@@ -51,6 +51,7 @@ export const produtosParaLancamento = query({
           _id: p._id,
           nome: p.nome,
           categoria: p.categoria,
+          camaraId: p.camaraId,
           camaraNome: nomeCamara.get(p.camaraId) ?? "—",
           formatos: formatos
             .filter((f) => f.ativo)

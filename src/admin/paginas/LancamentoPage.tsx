@@ -6,7 +6,6 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina, Toast } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarContagem, formatarPeso, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
-import { rotuloProduto } from "../../lib/produto.ts";
 import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
 
 /*
@@ -49,6 +48,7 @@ export function LancamentoPage() {
   const transferir = useMutation(api.admin.transferencias.transferir);
 
   const [tipo, setTipo] = useState<Tipo>("producao");
+  const [camaraId, setCamaraId] = useState<Id<"camaras"> | "">("");
   const [produtoId, setProdutoId] = useState<Id<"produtos"> | "">("");
   const [formatoId, setFormatoId] = useState<Id<"formatos"> | "">("");
   const [valor, setValor] = useState("");
@@ -72,28 +72,23 @@ export function LancamentoPage() {
   const [observacaoTransferencia, setObservacaoTransferencia] = useState("");
   const [chaveTransferencia, setChaveTransferencia] = useState(() => crypto.randomUUID());
 
-  // Agrupado por câmara — produtos homônimos em câmaras diferentes (ex.: dois
-  // "Cubo") ficam em grupos separados, e o rótulo de cada opção leva a câmara
-  // junto (necessário porque um <select> fechado só mostra o texto da opção
-  // escolhida, não o rótulo do optgroup).
-  const produtosPorCamara = useMemo(() => {
-    const grupos = new Map<string, NonNullable<typeof produtos>>();
-    for (const p of produtos ?? []) {
-      const lista = grupos.get(p.camaraNome) ?? [];
-      lista.push(p);
-      grupos.set(p.camaraNome, lista);
-    }
-    return grupos;
-  }, [produtos]);
+  // Só os produtos da câmara escolhida. Produtos homônimos (ex.: dois "Cubo")
+  // só existem em câmaras DIFERENTES — dentro de uma câmara o servidor barra
+  // nome repetido —, então aqui o nome puro basta, sem sufixo nem agrupamento.
+  const produtosDaCamara = useMemo(
+    () => (produtos ?? []).filter((p) => p.camaraId === camaraId),
+    [produtos, camaraId],
+  );
 
   const produto = produtos?.find((p) => p._id === produtoId);
   const formato = produto?.formatos.find((f) => f._id === formatoId);
   const ehCarregamento = tipo === "venda" || tipo === "patrocinio";
   const ehTransferencia = tipo === "transferencia";
 
-  // Ao trocar de produto, limpa o formato. Ao trocar de tipo, esvazia o carrinho
-  // e a câmara de destino (evita levar uma escolha de uma transferência
-  // anterior para a próxima, com outro produto de origem).
+  // Cascata: trocar a câmara limpa o produto, que limpa o formato. Trocar o
+  // tipo esvazia o carrinho e a câmara de destino (evita levar uma escolha de
+  // uma transferência anterior para a próxima) — mas mantém a câmara de origem.
+  useEffect(() => { setProdutoId(""); }, [camaraId]);
   useEffect(() => { setFormatoId(""); }, [produtoId]);
   useEffect(() => { setItens([]); setCamaraDestinoId(""); }, [tipo]);
 
@@ -176,6 +171,7 @@ export function LancamentoPage() {
     setChave(crypto.randomUUID());
     setCarregamentoId(crypto.randomUUID());
     setChaveTransferencia(crypto.randomUUID());
+    setCamaraId("");
     setProdutoId("");
     setFormatoId("");
     setValor("");
@@ -306,15 +302,29 @@ export function LancamentoPage() {
             </div>
           ) : null}
 
+          <Selecao
+            label={ehTransferencia ? "Câmara de origem" : "Câmara"}
+            value={camaraId}
+            onChange={(e) => setCamaraId(e.target.value as Id<"camaras">)}
+          >
+            <option value="">— escolha —</option>
+            {(camaras ?? [])
+              .filter((c) => c.ativo)
+              .map((c) => (
+                <option key={c._id} value={c._id}>{c.nome}</option>
+              ))}
+          </Selecao>
+
           <div className="grid grid-cols-2 gap-3">
-            <Selecao label="Produto" value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)}>
+            <Selecao
+              label="Produto"
+              value={produtoId}
+              onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)}
+              disabled={!camaraId}
+            >
               <option value="">— escolha —</option>
-              {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
-                <optgroup key={camaraNome} label={camaraNome}>
-                  {lista.map((p) => (
-                    <option key={p._id} value={p._id}>{rotuloProduto(p.nome, p.camaraNome)}</option>
-                  ))}
-                </optgroup>
+              {produtosDaCamara.map((p) => (
+                <option key={p._id} value={p._id}>{p.nome}</option>
               ))}
             </Selecao>
             <Selecao label="Formato" value={formatoId} onChange={(e) => setFormatoId(e.target.value as Id<"formatos">)} disabled={!produto}>
@@ -404,11 +414,11 @@ export function LancamentoPage() {
                 label="Câmara de destino"
                 value={camaraDestinoId}
                 onChange={(e) => setCamaraDestinoId(e.target.value as Id<"camaras">)}
-                disabled={!produto}
+                disabled={!camaraId}
               >
                 <option value="">— escolha —</option>
                 {(camaras ?? [])
-                  .filter((c) => c.ativo && c.nome !== produto?.camaraNome)
+                  .filter((c) => c.ativo && c._id !== camaraId)
                   .map((c) => (
                     <option key={c._id} value={c._id}>{c.nome}</option>
                   ))}

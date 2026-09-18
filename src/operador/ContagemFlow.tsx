@@ -266,7 +266,7 @@ function Preenchimento({
                           value={contado[f._id] ?? ""}
                           onChange={(e) => setContado((c) => ({ ...c, [f._id]: e.target.value }))}
                           placeholder="não contado"
-                          className={`w-28 rounded-xl border bg-superficie px-3 py-3 text-center font-mono text-2xl text-texto outline-none focus:border-acento placeholder:font-sans placeholder:text-xs placeholder:tracking-normal placeholder:text-texto-fraco ${
+                          className={`w-28 rounded-xl border bg-superficie px-3 py-3 text-center font-numero text-2xl text-texto outline-none focus:border-acento placeholder:font-sans placeholder:text-xs placeholder:tracking-normal placeholder:text-texto-fraco ${
                             emBranco ? "border-dashed border-aviso" : "border-borda"
                           }`}
                         />

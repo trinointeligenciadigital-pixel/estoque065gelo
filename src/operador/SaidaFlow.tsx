@@ -528,13 +528,13 @@ function SaidaCarregamento({
                 <span className="text-right">
                   {totalPacotes > 0 ? (
                     <>
-                      <span className="font-mono text-lg font-semibold text-texto">
+                      <span className="font-numero text-lg font-semibold text-texto">
                         {formatarContagem(totalPacotes, { pesoVariavel: false, unidadeContagem: modoContagem })}
                       </span>
-                      <span className="ml-2 font-mono text-sm text-texto-suave">{formatarPeso(pesoTotal)}</span>
+                      <span className="ml-2 font-numero text-sm text-texto-suave">{formatarPeso(pesoTotal)}</span>
                     </>
                   ) : (
-                    <span className="font-mono text-lg font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
+                    <span className="font-numero text-lg font-semibold text-texto">{formatarPeso(pesoTotal)}</span>
                   )}
                 </span>
               </div>
@@ -650,7 +650,7 @@ function SaidaCarregamento({
         {disponivel !== null ? (
           <p className="mt-3 text-center text-base text-texto-suave">
             Disponível nesta câmara:{" "}
-            <span className="font-mono text-texto">
+            <span className="font-numero text-texto">
               {formatarQuantidade(disponivel, formato)}
             </span>
           </p>
@@ -693,7 +693,7 @@ function SaidaCarregamento({
             <select
               value={veiculoSel}
               onChange={(e) => escolherVeiculo(e.target.value)}
-              className="min-h-[56px] rounded-xl border border-borda bg-superficie px-4 text-base text-texto"
+              className="min-h-[56px] rounded-xl border border-borda bg-superficie px-4 text-base text-texto outline-none focus:border-acento"
             >
               <option value="">— sem veículo —</option>
               {(veiculos ?? []).map((v) => (
@@ -716,7 +716,7 @@ function SaidaCarregamento({
                   inputMode="text"
                   autoCapitalize="characters"
                   maxLength={7}
-                  className="min-h-[56px] rounded-xl border border-borda bg-superficie px-4 font-mono text-base text-texto outline-none focus:border-acento"
+                  className="min-h-[56px] rounded-xl border border-borda bg-superficie px-4 font-numero text-base text-texto outline-none focus:border-acento"
                 />
                 {veiculoTerceiro !== "" && !placaCompleta(veiculoTerceiro) ? (
                   <span className="text-sm text-alerta">Formato: ABC-1234 ou ABC1D23.</span>
@@ -846,16 +846,16 @@ function LinhaItem({
         <span className="shrink-0 text-right whitespace-nowrap">
           {quantidadePacotes !== null ? (
             <>
-              <span className="block font-mono text-base font-semibold text-texto">
+              <span className="block font-numero text-base font-semibold text-texto">
                 {quantidadePacotes}
                 <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
                   {nomeUnidade({ pesoVariavel: false, unidadeContagem }, quantidadePacotes)}
                 </span>
               </span>
-              <span className="block font-mono text-sm text-texto-suave">{formatarPeso(pesoKg)}</span>
+              <span className="block font-numero text-sm text-texto-suave">{formatarPeso(pesoKg)}</span>
             </>
           ) : (
-            <span className="block font-mono text-base font-semibold text-texto">{formatarPeso(pesoKg)}</span>
+            <span className="block font-numero text-base font-semibold text-texto">{formatarPeso(pesoKg)}</span>
           )}
         </span>
       </button>
@@ -1086,7 +1086,7 @@ function SaidaPerda({
         {disponivel !== null ? (
           <p className="mt-3 text-center text-base text-texto-suave">
             Disponível nesta câmara:{" "}
-            <span className="font-mono text-texto">
+            <span className="font-numero text-texto">
               {formatarQuantidade(disponivel, formato)}
             </span>
           </p>

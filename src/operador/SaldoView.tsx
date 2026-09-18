@@ -1,6 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { AvisoOperador, Kg, primeiroNome, Tela } from "./ui.tsx";
+import { AvisoOperador, EstadoVazio, Kg, primeiroNome, Tela } from "./ui.tsx";
 import { formatarPeso, formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
 
 /*
@@ -31,7 +31,7 @@ export function SaldoView({
       ) : saldos === null ? (
         <AvisoOperador>Saldo indisponível durante a contagem.</AvisoOperador>
       ) : saldos.length === 0 ? (
-        <p className="text-base text-texto-suave">Nenhum produto nesta câmara.</p>
+        <EstadoVazio mensagem="Nenhum produto nesta câmara." onVoltar={onVoltar} />
       ) : (
         <div className="flex flex-col gap-4">
           {saldos.map((p) => (
@@ -49,7 +49,7 @@ export function SaldoView({
                   p.formatos.map((f) => (
                     <div key={f._id} className="flex items-center justify-between text-base">
                       <span className="text-texto-suave">{rotuloFormato(f)}</span>
-                      <span className="font-mono text-texto">
+                      <span className="font-numero text-texto">
                         {f.pesoVariavel ? formatarPeso(f.pesoLiquidoKg) : formatarQuantidade(f.saldo, f)}
                       </span>
                     </div>

@@ -45,7 +45,7 @@ typography:
     lineHeight: 1.2
     letterSpacing: "0.05em"
   data:
-    fontFamily: "IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+    fontFamily: "Space Grotesk, Inter, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.875rem"
     fontWeight: 600
     lineHeight: 1
@@ -161,9 +161,10 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 
 **Display / Títulos:** Poppins (600/700), com fallback Inter → system-ui.
 **Corpo:** Inter (400/500/600/700), com fallback system-ui → Segoe UI → Roboto.
-**Rótulos e Dados:** IBM Plex Mono (400/500/600), com fallback ui-monospace → Consolas.
+**Números (dado):** Space Grotesk (500/600/700), com fallback Inter → system-ui.
+**Rótulos e códigos:** IBM Plex Mono (400/500/600), com fallback ui-monospace → Consolas.
 
-**Character:** um trio de contraste, não de semelhança. Poppins (geométrica, humana) dá o tom moderno e amigável dos títulos; Inter (neutra, legível) carrega o texto sem chamar atenção; IBM Plex Mono transforma todo número numa leitura de instrumento — e, em versaletes, vira o rótulo de mostrador que dá a cara de "livro-razão".
+**Character:** um quarteto de contraste, não de semelhança. Poppins (geométrica, humana) dá o tom moderno e amigável dos títulos; Inter (neutra, legível) carrega o texto sem chamar atenção; Space Grotesk dá aos números um caráter geométrico e vivo — instrumento, não terminal; IBM Plex Mono, em versaletes, vira o rótulo de mostrador e o código/protocolo que emolduram o dado, dando a cara de "livro-razão".
 
 ### Hierarchy
 - **Display** (Poppins 600, 1.25rem / 20px, `letter-spacing: -0.01em`): título de página no Admin. No colaborador, uma variante levemente menor (1.125rem) no cabeçalho da tela.
@@ -171,10 +172,12 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 - **Body** (Inter 400, 0.875rem / 14px, `line-height: 1.5`): texto geral, células de tabela, descrições. Ênfase com peso 500/600, nunca com cor.
 - **Label** (IBM Plex Mono 600, 0.75rem / 12px, `letter-spacing: 0.05em`, versalete): cabeçalho de tabela, "eyebrow" de KPI, rótulos de seção. É a assinatura tipográfica do sistema.
 - **Micro-rótulo** (IBM Plex Mono 500/600, 0.625–0.6875rem / 10–11px, tracking largo, versalete): a mesma assinatura do Label, num espaço mais apertado onde 12px não cabe — crachá do operador no cabeçalho, "Passo N de M", eyebrow "Quantidade"/"Peso" do resumo de lançamento, cabeçalho de grupo de combobox. Continua Plex Mono/versalete/tracking; só o tamanho encolhe.
-- **Data** (IBM Plex Mono 600, até 1.875rem / 30px, `line-height: 1`): os números grandes de KPI e saldo. A unidade (kg, formatos) vem ao lado em Inter pequeno e fraco, para o número reinar sozinho.
+- **Data** (Space Grotesk 600, até 1.875rem / 30px, `line-height: 1`, `font-variant-numeric: tabular-nums`): os números grandes de KPI e saldo. A unidade (kg, formatos) vem ao lado em Inter pequeno e fraco, para o número reinar sozinho.
 
 ### Named Rules
-**A Regra do Número em Mono.** Todo número exibido — peso, saldo, quantidade, PIN, hora, placa, divergência — é IBM Plex Mono. Sem exceção. É o que faz colunas alinharem e o que dá a leitura de instrumento. Texto é Inter; número é Plex Mono.
+**A Regra do Número Vivo.** Todo número que é dado do negócio — peso, saldo, quantidade, PIN, hora, placa, divergência — é Space Grotesk, com `tabular-nums` pra continuar alinhando em coluna mesmo sem ser monoespaçada de verdade. Texto é Inter; número de dado é Space Grotesk. (Histórico: até 2026-09 essa regra usava IBM Plex Mono; trocado porque a mono sozinha, em todo número da tela, lia como terminal/planilha em vez de instrumento — ver "A Regra do Rótulo-Mostrador" logo abaixo pra onde a Plex Mono continua.)
+
+**Código não é dado.** O protocolo (chave de idempotência, hex técnico) continua em IBM Plex Mono, junto com os rótulos — é carimbo de auditoria, não algo que a pessoa lê em voz alta. O número sequencial do comprovante (o "talão" que o cliente cita) é diferente: é um número de verdade que alguém vai falar/digitar, então segue a regra geral e vai em Space Grotesk.
 
 **A Regra do Rótulo-Mostrador.** Rótulos de estrutura (cabeçalho de tabela, eyebrow de KPI, título de seção da nav) são Plex Mono em versalete com tracking. Eles emolduram o dado como o texto impresso ao redor de um mostrador — presentes, discretos, nunca protagonistas.
 
@@ -224,7 +227,7 @@ A superfície de trabalho do Admin. Cabeçalho em rótulo-mostrador (Plex versal
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** usar IBM Plex Mono em **todo** número (peso, saldo, quantidade, hora, PIN, placa, divergência). Texto é Inter.
+- **Do** usar Space Grotesk em **todo** número de dado (peso, saldo, quantidade, hora, PIN, placa, divergência), com `tabular-nums`. Texto é Inter; protocolo/comprovante continuam em Plex Mono, como código.
 - **Do** reservar o ciano-petróleo (`#0e7c9c`) para ação — a Regra da Voz Única. Poucos pontos por tela.
 - **Do** criar profundidade com borda de 1px e superfícies frias tonais, nunca com sombra.
 - **Do** acompanhar toda cor semântica (verde/vermelho/âmbar) de sinal, texto ou ícone — para daltonismo e para luz forte.

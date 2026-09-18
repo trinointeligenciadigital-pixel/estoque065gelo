@@ -138,7 +138,7 @@ function TeclaNum({
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
-      className="flex h-16 items-center justify-center rounded-xl border border-borda bg-superficie font-mono text-2xl text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-50"
+      className="flex h-16 items-center justify-center rounded-xl border border-borda bg-superficie font-numero text-2xl text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-50"
     >
       {children}
     </button>

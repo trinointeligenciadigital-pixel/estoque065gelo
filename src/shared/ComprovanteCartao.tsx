@@ -65,13 +65,13 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
               documento usa pra citar ESTE comprovante; o protocolo hex no
               rodapé continua existindo, mas é o técnico, não o humano. */}
           {dados.numeroComprovante !== null ? (
-            <span className={`font-mono ${denso ? "text-sm" : "text-base"} font-semibold text-acento`}>
+            <span className={`font-numero ${denso ? "text-sm" : "text-base"} font-semibold text-acento`}>
               {rotuloNumeroComprovante(dados.numeroComprovante)}
             </span>
           ) : null}
         </div>
         <div className={`mt-0.5 ${denso ? "text-sm" : "text-base"} font-semibold text-texto`}>
-          {dados.rotulo} <span className={`font-mono ${meta} font-normal text-texto-suave`}>{dataHoraComprovante(dados.quandoMs)}</span>
+          {dados.rotulo} <span className={`font-numero ${meta} font-normal text-texto-suave`}>{dataHoraComprovante(dados.quandoMs)}</span>
         </div>
       </div>
 
@@ -90,16 +90,16 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
             <div className="shrink-0 text-right whitespace-nowrap">
               {it.quantidadePacotes !== null ? (
                 <>
-                  <p className={`font-mono ${qtd} font-semibold text-texto`}>
+                  <p className={`font-numero ${qtd} font-semibold text-texto`}>
                     {it.quantidadePacotes}
                     <span className={`ml-1 font-sans ${meta} font-normal text-texto-suave`}>
                       {nomeUnidade({ pesoVariavel: false, unidadeContagem: it.unidadeContagem }, it.quantidadePacotes)}
                     </span>
                   </p>
-                  <p className={`font-mono ${meta} text-texto-suave`}>{formatarPeso(it.pesoKg)}</p>
+                  <p className={`font-numero ${meta} text-texto-suave`}>{formatarPeso(it.pesoKg)}</p>
                 </>
               ) : (
-                <p className={`font-mono ${qtd} font-semibold text-texto`}>{formatarPeso(it.pesoKg)}</p>
+                <p className={`font-numero ${qtd} font-semibold text-texto`}>{formatarPeso(it.pesoKg)}</p>
               )}
             </div>
           </div>
@@ -111,13 +111,13 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
         <dd className="text-right">
           {contagem !== null ? (
             <>
-              <span className={`font-mono ${total} font-semibold text-texto`}>
+              <span className={`font-numero ${total} font-semibold text-texto`}>
                 {formatarContagem(contagem.total, { pesoVariavel: false, unidadeContagem: contagem.modo })}
               </span>
-              <span className={`ml-2 font-mono ${meta} text-texto-suave`}>{formatarPeso(dados.pesoTotalKg)}</span>
+              <span className={`ml-2 font-numero ${meta} text-texto-suave`}>{formatarPeso(dados.pesoTotalKg)}</span>
             </>
           ) : (
-            <span className={`font-mono ${total} font-semibold text-texto`}>{formatarPeso(dados.pesoTotalKg)}</span>
+            <span className={`font-numero ${total} font-semibold text-texto`}>{formatarPeso(dados.pesoTotalKg)}</span>
           )}
         </dd>
       </div>
@@ -126,7 +126,10 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
         {contexto.map((l, i) => (
           <div key={i} className={`flex items-baseline justify-between gap-3 border-b border-borda/60 ${pad} ${padY} last:border-0`}>
             <dt className={`min-w-0 flex-1 ${denso ? "text-sm" : "text-base"} text-texto-suave`}>{l.rotulo}</dt>
-            <dd className={`shrink-0 text-right ${denso ? "text-sm" : "text-base"} text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+            {/* min-w-0 (sem shrink-0): cliente/veículo/motorista são texto livre,
+                sem limite de caracteres — sem isto, um nome comprido estourava a
+                largura do cartão em vez de quebrar linha. */}
+            <dd className={`min-w-0 text-right break-words ${denso ? "text-sm" : "text-base"} text-texto ${l.mono ? "font-numero" : ""}`}>{l.valor}</dd>
           </div>
         ))}
       </dl>

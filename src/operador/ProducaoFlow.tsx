@@ -368,13 +368,13 @@ function LinhaProduto({ produto, onClick }: { produto: ProdutoGrid; onClick: () 
       <span className="min-w-0 flex-1 truncate text-base font-medium text-texto">{produto.nome}</span>
       {produto.saldo ? (
         <span className="shrink-0 text-right leading-tight">
-          <span className="block font-mono text-base font-semibold text-texto">
+          <span className="block font-numero text-base font-semibold text-texto">
             {produto.saldo.pacotes !== null
               ? formatarContagem(produto.saldo.pacotes, { pesoVariavel: false, unidadeContagem: produto.formatos[0]?.unidadeContagem })
               : formatarPeso(produto.saldo.pesoKg)}
           </span>
           {produto.saldo.pacotes !== null ? (
-            <span className="block font-mono text-xs text-texto-suave">{formatarPeso(produto.saldo.pesoKg)}</span>
+            <span className="block font-numero text-xs text-texto-suave">{formatarPeso(produto.saldo.pesoKg)}</span>
           ) : null}
         </span>
       ) : null}

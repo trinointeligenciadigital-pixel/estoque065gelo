@@ -109,7 +109,7 @@ export function RetornoFlow({
       <Tela titulo="Retorno lançado" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">
           Retorno registrado:{" "}
-          <span className="font-mono">{formatarQtd(num, alvo ?? { formatoPesoVariavel: false })}</span>
+          <span className="font-numero">{formatarQtd(num, alvo ?? { formatoPesoVariavel: false })}</span>
           {alvo ? ` · ${alvo.produtoNome} · ${rotuloFormatoPatrocinio(alvo)}` : ""}.
           {protocolo ? <span className="ml-1.5 font-mono text-sm">· {protocolo}</span> : null}
         </AvisoOperador>
@@ -140,7 +140,7 @@ export function RetornoFlow({
         <p className="mb-3 text-base text-texto-suave">
           Cliente: <span className="text-texto">{alvo.clienteNome || "—"}</span>
           <br />
-          Em aberto: <span className="font-mono text-texto">{formatarQtd(alvo.aberto, alvo)}</span>
+          Em aberto: <span className="font-numero text-texto">{formatarQtd(alvo.aberto, alvo)}</span>
         </p>
         <label className="flex flex-col gap-2">
           <span className="text-base font-medium text-texto">
@@ -151,7 +151,7 @@ export function RetornoFlow({
             value={valor}
             onChange={(e) => setValor(e.target.value)}
             placeholder="0"
-            className="w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
+            className="w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-numero text-3xl text-texto outline-none focus:border-acento"
           />
         </label>
         {num > alvo.aberto ? (
@@ -204,7 +204,7 @@ export function RetornoFlow({
                     <span className="text-sm text-texto-suave">
                       {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
                     </span>
-                    <span className="font-mono text-sm text-acento">
+                    <span className="font-numero text-sm text-acento">
                       em aberto: {formatarQtd(p.aberto, p)}
                     </span>
                   </span>

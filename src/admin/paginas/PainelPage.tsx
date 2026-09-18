@@ -196,7 +196,8 @@ function PainelConteudo() {
                     <td className="py-2.5 pr-3 text-texto">
                       {m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span>
                     </td>
-                    <td className="py-2.5 pr-3 text-texto-suave">{m.autor}</td>
+                    {/* Ênfase por peso, não por cor nova (DESIGN.md §3). */}
+                    <td className="py-2.5 pr-3 font-medium text-texto">{m.autor}</td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-texto-suave">{hora(m.registradoEm)}</td>
                     <td className="py-2.5 pr-3 text-right">
                       {m.formatoPesoVariavel ? (

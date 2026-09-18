@@ -9,7 +9,7 @@ import { ComprovanteCartao } from "../../shared/ComprovanteCartao.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
-import { rotuloProduto } from "../../lib/produto.ts";
+import { nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
 import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../../lib/comprovante.ts";
 
 /*
@@ -222,16 +222,15 @@ export function HistoricoPage() {
   // Produtos filtrados pela câmara escolhida (se houver).
   const produtos = (opcoes?.produtos ?? []).filter((p) => !camaraId || p.camaraId === camaraId);
 
-  // Mapa de câmara para o rótulo "nome · câmara" (dois produtos podem ter o
-  // mesmo nome em câmaras diferentes — o filtro tem que distingui-los).
+  // Com uma câmara escolhida não há homônimo possível (nome repetido só existe
+  // entre câmaras diferentes), então o nome puro basta. Em "Todas", só os nomes
+  // que de fato se repetem em outra câmara levam o sufixo — calculado sobre
+  // TODOS os produtos, não só os filtrados. Sem agrupamento por câmara: o
+  // cabeçalho do grupo + o sufixo mostravam a câmara duas vezes.
   const nomeCamara = new Map((opcoes?.camaras ?? []).map((c) => [c._id, c.nome]));
-  const produtosPorCamara = new Map<string, typeof produtos>();
-  for (const p of produtos) {
-    const camaraNome = nomeCamara.get(p.camaraId) ?? "—";
-    const lista = produtosPorCamara.get(camaraNome) ?? [];
-    lista.push(p);
-    produtosPorCamara.set(camaraNome, lista);
-  }
+  const homonimos = nomesHomonimos(opcoes?.produtos ?? []);
+  const rotuloDoProduto = (p: { nome: string; camaraId: Id<"camaras"> }) =>
+    rotuloProduto(p.nome, nomeCamara.get(p.camaraId) ?? "—", !camaraId && homonimos.has(p.nome.trim().toLowerCase()));
 
   // Monta o comprovante a partir de uma linha de saída (venda/patrocínio). Se a
   // linha faz parte de um carregamento (carregamentoId), agrupa TODAS as linhas
@@ -328,12 +327,8 @@ export function HistoricoPage() {
             <Filtro label="Produto">
               <SelecaoInline value={produtoId} onChange={(e) => setProdutoId(e.target.value as Id<"produtos">)} className={inputCls}>
                 <option value="">Todos</option>
-                {[...produtosPorCamara.entries()].map(([camaraNome, lista]) => (
-                  <optgroup key={camaraNome} label={camaraNome}>
-                    {lista.map((p) => (
-                      <option key={p._id} value={p._id}>{rotuloProduto(p.nome, camaraNome)}</option>
-                    ))}
-                  </optgroup>
+                {produtos.map((p) => (
+                  <option key={p._id} value={p._id}>{rotuloDoProduto(p)}</option>
                 ))}
               </SelecaoInline>
             </Filtro>
@@ -507,8 +502,10 @@ function LinhaMov({
           </>
         )}
       </td>
-      <td className="px-3 py-2.5 text-texto-suave">
-        {m.autor}{" "}
+      <td className="px-3 py-2.5">
+        {/* Ênfase por peso, não por cor nova (DESIGN.md §3) — quem fez o
+            lançamento é o dado que a auditoria mais procura nesta tabela. */}
+        <span className="font-medium text-texto">{m.autor}</span>{" "}
         <span className="rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
           {m.autorTipo === "admin" ? "Admin" : "Colaborador"}
         </span>

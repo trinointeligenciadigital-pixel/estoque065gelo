@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { ClipboardList, Gauge, PackagePlus, Truck } from "lucide-react";
 import { api } from "../../convex/_generated/api";
-import { AzulejoAcao, Tela } from "./ui.tsx";
+import { AzulejoAcao, ProvedorCamaraAtual, Tela } from "./ui.tsx";
 import { ProducaoFlow } from "./ProducaoFlow.tsx";
 import { SaidaFlow } from "./SaidaFlow.tsx";
 import { SaldoView } from "./SaldoView.tsx";
@@ -48,42 +48,50 @@ export function SessaoOperador({
 
   if (tela === "producao") {
     return (
-      <ProducaoFlow
-        token={token}
-        camaraNome={sessao.camaraNome}
-        operadorNome={sessao.operadorNome}
-        onVoltar={() => setTela("menu")}
-      />
+      <ProvedorCamaraAtual camaraNome={sessao.camaraNome}>
+        <ProducaoFlow
+          token={token}
+          camaraNome={sessao.camaraNome}
+          operadorNome={sessao.operadorNome}
+          onVoltar={() => setTela("menu")}
+        />
+      </ProvedorCamaraAtual>
     );
   }
   if (tela === "saida") {
     return (
-      <SaidaFlow
-        token={token}
-        camaraNome={sessao.camaraNome}
-        operadorNome={sessao.operadorNome}
-        onVoltar={() => setTela("menu")}
-      />
+      <ProvedorCamaraAtual camaraNome={sessao.camaraNome}>
+        <SaidaFlow
+          token={token}
+          camaraNome={sessao.camaraNome}
+          operadorNome={sessao.operadorNome}
+          onVoltar={() => setTela("menu")}
+        />
+      </ProvedorCamaraAtual>
     );
   }
   if (tela === "saldo") {
     return (
-      <SaldoView
-        token={token}
-        camaraNome={sessao.camaraNome}
-        operadorNome={sessao.operadorNome}
-        onVoltar={() => setTela("menu")}
-      />
+      <ProvedorCamaraAtual camaraNome={sessao.camaraNome}>
+        <SaldoView
+          token={token}
+          camaraNome={sessao.camaraNome}
+          operadorNome={sessao.operadorNome}
+          onVoltar={() => setTela("menu")}
+        />
+      </ProvedorCamaraAtual>
     );
   }
   if (tela === "contagem") {
     return (
-      <ContagemFlow
-        token={token}
-        camaraNome={sessao.camaraNome}
-        operadorNome={sessao.operadorNome}
-        onVoltar={() => setTela("menu")}
-      />
+      <ProvedorCamaraAtual camaraNome={sessao.camaraNome}>
+        <ContagemFlow
+          token={token}
+          camaraNome={sessao.camaraNome}
+          operadorNome={sessao.operadorNome}
+          onVoltar={() => setTela("menu")}
+        />
+      </ProvedorCamaraAtual>
     );
   }
 
@@ -120,47 +128,49 @@ export function SessaoOperador({
   const impar = acoes.length % 2 === 1;
 
   return (
-    <Tela titulo={`Olá, ${sessao.operadorNome}`} camaraNome={sessao.camaraNome}>
-      {temContagemAberta ? (
-        <button
-          onClick={() => setTela("contagem")}
-          className="mb-4 flex w-full flex-col gap-0.5 rounded-xl border border-acento bg-acento/5 px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
-        >
-          <span className="flex items-center gap-2 text-base font-medium text-texto">
-            <ClipboardList size={18} aria-hidden="true" />
-            Contagem em andamento · {sessao.camaraNome}
-          </span>
-          <span className="text-sm text-texto-suave">
-            Toque para continuar. Saldo indisponível até você terminar.
-          </span>
-        </button>
-      ) : null}
+    <ProvedorCamaraAtual camaraNome={sessao.camaraNome}>
+      <Tela titulo={`Olá, ${sessao.operadorNome}`} camaraNome={sessao.camaraNome}>
+        {temContagemAberta ? (
+          <button
+            onClick={() => setTela("contagem")}
+            className="mb-4 flex w-full flex-col gap-0.5 rounded-xl border border-acento bg-acento/5 px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+          >
+            <span className="flex items-center gap-2 text-base font-medium text-texto">
+              <ClipboardList size={18} aria-hidden="true" />
+              Contagem em andamento · {sessao.camaraNome}
+            </span>
+            <span className="text-sm text-texto-suave">
+              Toque para continuar. Saldo indisponível até você terminar.
+            </span>
+          </button>
+        ) : null}
 
-      <div className="grid grid-cols-2 gap-3">
-        {acoes.map(({ chave, rotulo, Icone, variante }, i) => {
-          // Contagem ímpar: o último azulejo ocupa a linha inteira, sem deixar
-          // uma célula vazia solta. Entrada escalonada (tarefa: profundidade e
-          // movimento) — cada azulejo "chega" um pouco depois do anterior.
-          const ultimoImpar = impar && i === acoes.length - 1;
-          return (
-            <AzulejoAcao
-              key={chave}
-              rotulo={rotulo}
-              Icone={Icone}
-              variante={variante}
-              largo={ultimoImpar}
-              atraso={i * 60}
-              onClick={() => setTela(chave)}
-            />
-          );
-        })}
-      </div>
+        <div className="grid grid-cols-2 gap-3">
+          {acoes.map(({ chave, rotulo, Icone, variante }, i) => {
+            // Contagem ímpar: o último azulejo ocupa a linha inteira, sem deixar
+            // uma célula vazia solta. Entrada escalonada (tarefa: profundidade e
+            // movimento) — cada azulejo "chega" um pouco depois do anterior.
+            const ultimoImpar = impar && i === acoes.length - 1;
+            return (
+              <AzulejoAcao
+                key={chave}
+                rotulo={rotulo}
+                Icone={Icone}
+                variante={variante}
+                largo={ultimoImpar}
+                atraso={i * 60}
+                onClick={() => setTela(chave)}
+              />
+            );
+          })}
+        </div>
 
-      <div className="mt-10">
-        <button onClick={sairAgora} className="w-full py-3 text-base text-texto-suave underline">
-          Sair
-        </button>
-      </div>
-    </Tela>
+        <div className="mt-10">
+          <button onClick={sairAgora} className="w-full py-3 text-base text-texto-suave underline">
+            Sair
+          </button>
+        </div>
+      </Tela>
+    </ProvedorCamaraAtual>
   );
 }

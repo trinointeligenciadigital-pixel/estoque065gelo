@@ -1,8 +1,18 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { createContext, useContext, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { ChevronLeft, type LucideIcon } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
 import { artigoUnidade, formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
+
+// Câmara real da sessão, disponível em toda tela sem precisar passar por
+// prop — a prop `camaraNome` do `Tela` abaixo é reaproveitada como subtítulo
+// genérico (produto, formato...) nos passos mais fundos de um fluxo, então
+// não dá pra confiar nela pra sempre mostrar a câmara. Isto existe só pra
+// isso: "em qual câmara estou logado", sempre certo, em toda tela.
+const CamaraAtualContext = createContext<string | null>(null);
+export function ProvedorCamaraAtual({ camaraNome, children }: { camaraNome: string; children: ReactNode }) {
+  return <CamaraAtualContext.Provider value={camaraNome}>{children}</CamaraAtualContext.Provider>;
+}
 
 /*
   Componentes das telas do colaborador — arejadas, para uso em pé, com uma mão,
@@ -80,6 +90,14 @@ export function Tela({
   useVoltarHardware(onVoltar ?? aoVoltarHardware);
 
   const temProgresso = etapa !== undefined && totalEtapas !== undefined;
+  // O selo (abaixo) é agora a ÚNICA forma de mostrar a câmara — presente desde
+  // a tela inicial pós-login, em toda tela, sempre no mesmo canto. `camaraNome`
+  // (subtítulo) ainda é reaproveitado pra produto/formato nos passos fundos de
+  // um fluxo; quando ele só ia repetir a própria câmara (telas de topo), o
+  // subtítulo some — o selo já carrega essa informação, e mostrar os dois ao
+  // mesmo tempo lia como bug, não como reforço (testado e corrigido, 2026-09-18).
+  const camaraAtual = useContext(CamaraAtualContext);
+  const subtitulo = camaraNome && camaraNome !== camaraAtual ? camaraNome : null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-fundo">
@@ -96,12 +114,28 @@ export function Tela({
           ) : null}
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-titulo text-lg font-semibold tracking-[0.02em] text-texto uppercase">{titulo}</h1>
-            {camaraNome ? <p className="truncate text-sm text-texto-suave">{camaraNome}</p> : null}
+            {subtitulo ? <p className="truncate text-sm text-texto-suave">{subtitulo}</p> : null}
           </div>
-          {operadorNome ? (
-            <span className="shrink-0 rounded-full border border-borda px-2.5 py-1 font-mono text-[11px] font-medium text-texto-suave">
-              {operadorNome}
-            </span>
+          {operadorNome || camaraAtual ? (
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {operadorNome ? (
+                <span className="rounded-full border border-borda px-2.5 py-1 font-mono text-[11px] font-medium text-texto-suave">
+                  {operadorNome}
+                </span>
+              ) : null}
+              {camaraAtual ? (
+                // Tinta do acento (10% no fundo, sólida no texto) — mesma receita
+                // já usada em toda etiqueta de estado do app (Etiqueta, AvisoOperador,
+                // pills do Admin). Cabe na exceção "dado-chave" da Regra da Voz
+                // Única: em qual câmara a pessoa está é o dado que evita lançar no
+                // lugar errado, não decoração. `gelo` não serve aqui — falha
+                // contraste AA como cor de texto (por isso o sistema só usa gelo em
+                // preenchimento de régua, nunca em letra).
+                <span className="rounded-full bg-acento/10 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.06em] text-acento uppercase">
+                  {camaraAtual}
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
         {temProgresso ? (
@@ -267,7 +301,7 @@ export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode;
 }
 
 export function Kg({ valor }: { valor: number }) {
-  return <span className="font-mono">{formatarPeso(valor)}</span>;
+  return <span className="font-numero">{formatarPeso(valor)}</span>;
 }
 
 // Resumo de confirmação antes de gravar (rede de segurança do ledger append-only,
@@ -317,18 +351,18 @@ export function ResumoLancamento({
               <span className="font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
                 Quantidade
               </span>
-              <span className="font-mono text-3xl leading-none font-semibold text-texto">
+              <span className="font-numero text-3xl leading-none font-semibold text-texto">
                 {formatarContagem(quantidadePacotes, { pesoVariavel: false, unidadeContagem })}
               </span>
             </div>
-            <div className="text-right font-mono text-sm text-texto-suave">= {formatarPeso(pesoKg)}</div>
+            <div className="text-right font-numero text-sm text-texto-suave">= {formatarPeso(pesoKg)}</div>
           </>
         ) : (
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
               Peso
             </span>
-            <span className="font-mono text-3xl leading-none font-semibold text-texto">
+            <span className="font-numero text-3xl leading-none font-semibold text-texto">
               {formatarPeso(pesoKg)}
             </span>
           </div>
@@ -345,16 +379,16 @@ export function ResumoLancamento({
               <div className="shrink-0 text-right whitespace-nowrap">
                 {it.quantidadePacotes !== null ? (
                   <>
-                    <p className="font-mono text-base font-semibold text-texto">
+                    <p className="font-numero text-base font-semibold text-texto">
                       {it.quantidadePacotes}
                       <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
                         {nomeUnidade({ pesoVariavel: false, unidadeContagem: it.unidadeContagem }, it.quantidadePacotes)}
                       </span>
                     </p>
-                    <p className="font-mono text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
+                    <p className="font-numero text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
                   </>
                 ) : (
-                  <p className="font-mono text-base font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
+                  <p className="font-numero text-base font-semibold text-texto">{formatarPeso(it.pesoKg)}</p>
                 )}
               </div>
             </div>
@@ -368,7 +402,7 @@ export function ResumoLancamento({
             className="flex items-baseline justify-between gap-3 border-b border-borda/60 px-4 py-2.5 last:border-0"
           >
             <dt className="min-w-0 flex-1 text-base text-texto-suave">{l.rotulo}</dt>
-            <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-mono" : ""}`}>{l.valor}</dd>
+            <dd className={`shrink-0 text-right text-base text-texto ${l.mono ? "font-numero" : ""}`}>{l.valor}</dd>
           </div>
         ))}
       </dl>
@@ -410,7 +444,7 @@ export function CampoQuantidade({
           value={valor}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
-          className="min-h-[56px] w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
+          className="min-h-[56px] w-full rounded-xl border border-borda bg-superficie px-4 py-3 text-center font-numero text-3xl text-texto outline-none focus:border-acento"
         />
       ) : (
         <div className="flex items-stretch gap-2">
@@ -423,7 +457,7 @@ export function CampoQuantidade({
             onChange={(e) => onChange(e.target.value)}
             placeholder="0"
             aria-label={`Quantidade de ${unidade}`}
-            className="min-h-[56px] min-w-0 flex-1 rounded-xl border border-borda bg-superficie px-2 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
+            className="min-h-[56px] min-w-0 flex-1 rounded-xl border border-borda bg-superficie px-2 py-3 text-center font-numero text-3xl text-texto outline-none focus:border-acento"
           />
           <TeclaPasso onClick={() => ajustar(1)} aria-label={`Aumentar ${artigo} ${nomeUnidade(formato, 1)}`}>
             +
