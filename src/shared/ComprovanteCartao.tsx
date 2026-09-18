@@ -3,11 +3,11 @@ import {
   linhasContexto,
   rotuloNumeroComprovante,
   SELO_NAO_FISCAL,
-  totalPacotesComprovante,
+  totalContagemComprovante,
   type DadosComprovante,
 } from "../lib/comprovante.ts";
 import { dataHoraComprovante } from "../lib/data.ts";
-import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
 
 /*
   Corpo visual do comprovante de saída — compartilhado entre a tela de sucesso
@@ -22,7 +22,7 @@ import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
 */
 export function ComprovanteCartao({ dados, denso = false }: { dados: DadosComprovante; denso?: boolean }) {
   const contexto = linhasContexto(dados);
-  const totalPacotes = totalPacotesComprovante(dados);
+  const contagem = totalContagemComprovante(dados);
   const empresa = dados.empresa;
   const cabecalho = cabecalhoEmpresaEstruturado(empresa);
 
@@ -93,7 +93,7 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
                   <p className={`font-mono ${qtd} font-semibold text-texto`}>
                     {it.quantidadePacotes}
                     <span className={`ml-1 font-sans ${meta} font-normal text-texto-suave`}>
-                      {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                      {nomeUnidade({ pesoVariavel: false, unidadeContagem: it.unidadeContagem }, it.quantidadePacotes)}
                     </span>
                   </p>
                   <p className={`font-mono ${meta} text-texto-suave`}>{formatarPeso(it.pesoKg)}</p>
@@ -109,9 +109,11 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
       <div className={`flex items-baseline justify-between gap-3 border-b border-borda bg-superficie-fria/40 ${pad} ${denso ? "py-2" : "py-3"}`}>
         <dt className={`${denso ? "text-sm" : "text-base"} font-medium text-texto`}>Total</dt>
         <dd className="text-right">
-          {totalPacotes > 0 ? (
+          {contagem !== null ? (
             <>
-              <span className={`font-mono ${total} font-semibold text-texto`}>{formatarPacotes(totalPacotes)}</span>
+              <span className={`font-mono ${total} font-semibold text-texto`}>
+                {formatarContagem(contagem.total, { pesoVariavel: false, unidadeContagem: contagem.modo })}
+              </span>
               <span className={`ml-2 font-mono ${meta} text-texto-suave`}>{formatarPeso(dados.pesoTotalKg)}</span>
             </>
           ) : (

@@ -6,7 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
 
 /*
   Contagens (RF51–RF56). O Admin vê as pendentes, confere a divergência item a
@@ -14,8 +14,8 @@ import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.
   ledger. Quem abriu não decide (RF52) — os botões somem e a mutation revalida.
   O Admin também pode ABRIR e contar às cegas (RF46).
 */
-function formatarQtd(n: number, pesoVariavel: boolean): string {
-  return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
+function formatarQtd(n: number, pesoVariavel: boolean, unidadeContagem?: "pacote" | "unidade" | null): string {
+  return formatarQuantidade(n, { pesoVariavel, unidadeContagem });
 }
 function dataHoraOuTraco(ms: number | null): string {
   return ms ? dataHora(ms) : "—";
@@ -259,10 +259,10 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
               <td className="px-3 py-2.5 text-texto-suave">
                 {rotuloFormato({ nome: it.formatoNome, pesoKg: it.formatoPesoKg, pesoVariavel: it.pesoVariavel, unidadesPorPacote: it.formatoUnidadesPorPacote })}
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoContado, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(it.saldoSistema, it.pesoVariavel, it.formatoUnidadeContagem)}</td>
               <td className={`px-3 py-2.5 text-right font-mono ${div !== 0 ? "font-semibold text-alerta" : "text-texto-suave"}`}>
-                {div > 0 ? "+" : ""}{formatarQtd(div, it.pesoVariavel)}
+                {div > 0 ? "+" : ""}{formatarQtd(div, it.pesoVariavel, it.formatoUnidadeContagem)}
               </td>
             </LinhaTabela>
           );
@@ -432,7 +432,7 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
                     {p.formatos.map((f) => (
                       <label key={f._id} className="flex items-center justify-between gap-2">
                         <span className="text-sm text-texto">
-                          {rotuloFormato(f)} <span className="text-texto-suave">({f.pesoVariavel ? "kg" : "pacotes"})</span>
+                          {rotuloFormato(f)} <span className="text-texto-suave">({f.pesoVariavel ? "kg" : nomeUnidade(f, 2)})</span>
                         </span>
                         <input
                           inputMode="decimal"

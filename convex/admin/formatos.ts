@@ -27,9 +27,10 @@ export const criar = mutation({
     pesoKg: v.number(),
     pesoVariavel: v.boolean(),
     unidadesPorPacote: v.optional(v.number()),
+    unidadeContagem: v.optional(v.union(v.literal("pacote"), v.literal("unidade"))),
     estoqueMinimo: v.optional(v.number()),
   },
-  handler: async (ctx, { produtoId, nome, pesoKg, pesoVariavel, unidadesPorPacote, estoqueMinimo }) => {
+  handler: async (ctx, { produtoId, nome, pesoKg, pesoVariavel, unidadesPorPacote, unidadeContagem, estoqueMinimo }) => {
     await exigirAdmin(ctx);
 
     const produto = await ctx.db.get(produtoId);
@@ -45,20 +46,30 @@ export const criar = mutation({
     if (unidadesPorPacote !== undefined && unidadesPorPacote <= 0) {
       throw new ConvexError("Unidades por pacote deve ser maior que zero.");
     }
+    const unidade = unidadeContagem ?? "pacote";
+    if (unidade === "unidade" && unidadesPorPacote !== undefined) {
+      throw new ConvexError("Formato em unidades não tem \"unidades por pacote\" — ele já é a unidade.");
+    }
 
     return await ctx.db.insert("formatos", {
       produtoId,
       nome,
       pesoKg: pesoVariavel ? 0 : pesoKg,
       pesoVariavel,
-      // Peso variável não tem contagem de unidades por pacote (não há "pacote").
-      unidadesPorPacote: pesoVariavel ? undefined : unidadesPorPacote,
+      // Peso variável e formato "unidade" não têm contagem de unidades por
+      // pacote — só faz sentido pra formato "pacote" de peso fixo.
+      unidadesPorPacote: pesoVariavel || unidade === "unidade" ? undefined : unidadesPorPacote,
+      // Ausente = "pacote", pra não distinguir de todo formato já existente.
+      unidadeContagem: unidade === "pacote" ? undefined : unidade,
       estoqueMinimo: estoqueMinimo ?? 0,
       ativo: true,
     });
   },
 });
 
+// Sem unidadeContagem aqui de propósito: é fixada na criação e nunca muda
+// depois (ver comentário do campo em convex/schema.ts). Passar unidadeContagem
+// aqui é rejeitado pela validação de argumentos do Convex.
 export const atualizar = mutation({
   args: {
     id: v.id("formatos"),

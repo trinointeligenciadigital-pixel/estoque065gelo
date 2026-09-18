@@ -1,5 +1,5 @@
 import { dataHoraComprovante } from "./data.ts";
-import { formatarPacotes, formatarPeso, parPacotesPeso } from "./formato.ts";
+import { formatarContagem, formatarPeso, type FormatoUnidade } from "./formato.ts";
 import { mascaraCnpj, mascaraTelefone } from "./mascaras.ts";
 
 /*
@@ -9,14 +9,17 @@ import { mascaraCnpj, mascaraTelefone } from "./mascaras.ts";
   O "Protocolo" vem da chave de idempotência (UUID do cliente), nunca do _id (RNF13).
 
   Correção "pacote prevalece, quilo agrega" (tarefa 5): cada item carrega a
-  quantidade em pacotes como NÚMERO (`quantidadePacotes`), não mais pré-formatada
-  — quem renderiza decide o destaque (visual) ou monta a linha de texto (plano).
-  `null` = formato de peso variável, que não tem "pacote".
+  quantidade em pacotes/unidades como NÚMERO (`quantidadePacotes`), não mais
+  pré-formatada — quem renderiza decide o destaque (visual) ou monta a linha de
+  texto (plano). `null` = formato de peso variável, que não tem contagem.
 */
 export type ItemComprovante = {
   produtoNome: string;
   formatoNome: string;
   quantidadePacotes: number | null;
+  // Ausente/"pacote" = comportamento de sempre. Migração pacote→unidade do
+  // gelo saborizado: um item pode vir contado em unidades.
+  unidadeContagem?: "pacote" | "unidade" | null;
   pesoKg: number;
 };
 
@@ -62,23 +65,32 @@ export function rotuloNumeroComprovante(n: number): string {
 
 export const SELO_NAO_FISCAL = "Documento não fiscal · controle interno de saída";
 
-// Total de pacotes do carregamento — soma só os itens de formato fixo (peso
-// variável não tem "pacote"). 0 quando é só granel: aí não existe "0 pacotes"
-// pra mostrar, só o peso total.
-export function totalPacotesComprovante(d: DadosComprovante): number {
-  return d.itens.reduce((acc, it) => acc + (it.quantidadePacotes ?? 0), 0);
+// Total contado do carregamento — soma só os itens de formato fixo (peso
+// variável não tem contagem). Se os itens contados misturarem pacote e
+// unidade (carregamento raro, mas não impedido), não dá pra somar como se
+// fossem a mesma coisa: devolve null, e quem chama cai pro peso total.
+export function totalContagemComprovante(d: DadosComprovante): { total: number; modo: "pacote" | "unidade" } | null {
+  const contados = d.itens.filter((it) => it.quantidadePacotes !== null);
+  if (contados.length === 0) return null;
+  const modo = contados[0].unidadeContagem ?? "pacote";
+  const mesmoModo = contados.every((it) => (it.unidadeContagem ?? "pacote") === modo);
+  const total = contados.reduce((acc, it) => acc + (it.quantidadePacotes ?? 0), 0);
+  return mesmoModo && total > 0 ? { total, modo } : null;
 }
 
 // Rótulo de UM item em texto puro (sem hierarquia visual — usado no texto
 // copiado e no WhatsApp): quantidade antes do peso, como em toda a correção.
 function itemLabelTexto(it: ItemComprovante): string {
-  const qtd = it.quantidadePacotes !== null ? `${formatarPacotes(it.quantidadePacotes)} · ` : "";
+  const f: FormatoUnidade = { pesoVariavel: false, unidadeContagem: it.unidadeContagem };
+  const qtd = it.quantidadePacotes !== null ? `${formatarContagem(it.quantidadePacotes, f)} · ` : "";
   return `${it.produtoNome} · ${it.formatoNome} — ${qtd}${formatarPeso(it.pesoKg)}`;
 }
 
 function linhaTotalTexto(d: DadosComprovante): string {
-  const totalPacotes = totalPacotesComprovante(d);
-  return `Total: ${totalPacotes > 0 ? parPacotesPeso(totalPacotes, d.pesoTotalKg) : formatarPeso(d.pesoTotalKg)}`;
+  const contagem = totalContagemComprovante(d);
+  if (contagem === null) return `Total: ${formatarPeso(d.pesoTotalKg)}`;
+  const f: FormatoUnidade = { pesoVariavel: false, unidadeContagem: contagem.modo };
+  return `Total: ${formatarContagem(contagem.total, f)} · ${formatarPeso(d.pesoTotalKg)}`;
 }
 
 // Linhas de CONTEXTO do cartão visual (rótulo/valor simples) — cliente,

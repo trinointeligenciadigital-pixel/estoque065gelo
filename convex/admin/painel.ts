@@ -122,6 +122,7 @@ export const resumo = query({
                 pesoKg: f.pesoKg,
                 pesoVariavel: f.pesoVariavel,
                 unidadesPorPacote: f.unidadesPorPacote ?? null,
+                unidadeContagem: f.unidadeContagem ?? "pacote",
                 saldo,
                 estoqueMinimo: minimo,
                 abaixoMinimo: minimo > 0 && saldo < minimo,
@@ -151,11 +152,14 @@ export const resumo = query({
     // em que "pacotes" não está misturando tamanhos diferentes. Com dois ou mais
     // formatos ativos (ou o único sendo de peso variável), fica só o peso.
     const porCategoria = new Map<string, number>();
-    const formatosPorCategoria = new Map<string, { pesoVariavel: boolean; saldo: number }[]>();
+    const formatosPorCategoria = new Map<
+      string,
+      { pesoVariavel: boolean; unidadeContagem: "pacote" | "unidade"; saldo: number }[]
+    >();
     for (const l of linhas) {
       porCategoria.set(l.categoria, (porCategoria.get(l.categoria) ?? 0) + l.pesoTotalKg);
       const lista = formatosPorCategoria.get(l.categoria) ?? [];
-      for (const f of l.formatos) lista.push({ pesoVariavel: f.pesoVariavel, saldo: f.saldo });
+      for (const f of l.formatos) lista.push({ pesoVariavel: f.pesoVariavel, unidadeContagem: f.unidadeContagem, saldo: f.saldo });
       formatosPorCategoria.set(l.categoria, lista);
     }
 
@@ -212,6 +216,7 @@ export const resumo = query({
         formatoPesoKg: formatoPorId.get(m.formatoId)?.pesoKg ?? 0,
         formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
         formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
+        formatoUnidadeContagem: formatoPorId.get(m.formatoId)?.unidadeContagem ?? "pacote",
         autor: autorDe(m),
         quantidade: m.quantidade,
         pesoKg: m.pesoKg,
@@ -231,6 +236,7 @@ export const resumo = query({
         formatoPesoKg: formatoPorId.get(m.formatoId)?.pesoKg ?? 0,
         formatoPesoVariavel: formatoPorId.get(m.formatoId)?.pesoVariavel ?? false,
         formatoUnidadesPorPacote: formatoPorId.get(m.formatoId)?.unidadesPorPacote ?? null,
+        formatoUnidadeContagem: formatoPorId.get(m.formatoId)?.unidadeContagem ?? "pacote",
         // Veículo próprio: placa. Terceiro: a identificação digitada (nunca o
         // rótulo genérico "Terceiro" — quem separou a carga quer saber QUAL
         // terceiro). Nenhum dos dois: null — a tela decide o texto (ex.:
@@ -252,11 +258,8 @@ export const resumo = query({
       produtos: linhas,
       porCategoria: [...porCategoria.entries()].map(([categoria, pesoKg]) => {
         const formatosDaCategoria = formatosPorCategoria.get(categoria) ?? [];
-        const pacotes =
-          formatosDaCategoria.length === 1 && !formatosDaCategoria[0].pesoVariavel
-            ? formatosDaCategoria[0].saldo
-            : null;
-        return { categoria, pesoKg, pacotes };
+        const unico = formatosDaCategoria.length === 1 && !formatosDaCategoria[0].pesoVariavel ? formatosDaCategoria[0] : null;
+        return { categoria, pesoKg, pacotes: unico?.saldo ?? null, unidadeContagem: unico?.unidadeContagem ?? "pacote" };
       }),
       qtdAbaixoMinimo,
       qtdContagensPendentes: pendentes.length,

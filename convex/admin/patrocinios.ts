@@ -38,6 +38,7 @@ export const listar = query({
           formatoNome: formato?.nome ?? "—",
           formatoPesoKg: formato?.pesoKg ?? 0,
           formatoUnidadesPorPacote: formato?.unidadesPorPacote ?? null,
+          formatoUnidadeContagem: formato?.unidadeContagem ?? "pacote",
           unidade: porPeso ? "kg" : "un",
           saiu,
           retornado,

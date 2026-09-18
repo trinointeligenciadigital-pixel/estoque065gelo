@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { ChevronLeft, type LucideIcon } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
-import { formatarPacotes, formatarPeso } from "../lib/formato.ts";
+import { artigoUnidade, formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
 
 /*
   Componentes das telas do colaborador — arejadas, para uso em pé, com uma mão,
@@ -15,6 +15,7 @@ export type FormatoGrid = {
   pesoKg: number;
   pesoVariavel: boolean;
   unidadesPorPacote?: number | null;
+  unidadeContagem?: "pacote" | "unidade" | null;
 };
 // Saldo do produto pra lista (tarefa 3): `pacotes` só existe quando o produto
 // tem UM formato ativo, não peso-variável — é a única situação em que "N
@@ -275,7 +276,10 @@ export type LinhaResumo = { rotulo: string; valor: string; mono?: boolean };
 export type ItemResumo = {
   produtoNome: string;
   formatoNome: string;
-  quantidadePacotes: number | null; // null = peso variável, não tem "pacote"
+  quantidadePacotes: number | null; // null = peso variável, não tem contagem
+  // Ausente/"pacote" = comportamento de sempre. Migração pacote→unidade do
+  // gelo saborizado: um item pode vir contado em unidades.
+  unidadeContagem?: "pacote" | "unidade" | null;
   pesoKg: number;
 };
 
@@ -289,11 +293,13 @@ export type ItemResumo = {
 export function ResumoLancamento({
   pesoKg,
   quantidadePacotes,
+  unidadeContagem,
   itens,
   linhas,
 }: {
   pesoKg: number;
   quantidadePacotes?: number | null;
+  unidadeContagem?: "pacote" | "unidade" | null;
   itens?: ItemResumo[];
   linhas: LinhaResumo[];
 }) {
@@ -307,7 +313,7 @@ export function ResumoLancamento({
                 Quantidade
               </span>
               <span className="font-mono text-3xl leading-none font-semibold text-texto">
-                {formatarPacotes(quantidadePacotes)}
+                {formatarContagem(quantidadePacotes, { pesoVariavel: false, unidadeContagem })}
               </span>
             </div>
             <div className="text-right font-mono text-sm text-texto-suave">= {formatarPeso(pesoKg)}</div>
@@ -337,7 +343,7 @@ export function ResumoLancamento({
                     <p className="font-mono text-base font-semibold text-texto">
                       {it.quantidadePacotes}
                       <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
-                        {it.quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                        {nomeUnidade({ pesoVariavel: false, unidadeContagem: it.unidadeContagem }, it.quantidadePacotes)}
                       </span>
                     </p>
                     <p className="font-mono text-sm text-texto-suave">{formatarPeso(it.pesoKg)}</p>
@@ -385,10 +391,13 @@ export function CampoQuantidade({
     onChange(String(novo));
   }
 
+  const unidade = nomeUnidade(formato, 2);
+  const artigo = artigoUnidade(formato);
+
   return (
     <div className="flex flex-col gap-2">
       <label className="text-base font-medium text-texto">
-        {formato.pesoVariavel ? "Peso em kg" : "Quantidade (pacotes)"}
+        {formato.pesoVariavel ? "Peso em kg" : `Quantidade (${unidade})`}
       </label>
       {formato.pesoVariavel ? (
         <input
@@ -400,7 +409,7 @@ export function CampoQuantidade({
         />
       ) : (
         <div className="flex items-stretch gap-2">
-          <TeclaPasso onClick={() => ajustar(-1)} disabled={num <= 0} aria-label="Diminuir um pacote">
+          <TeclaPasso onClick={() => ajustar(-1)} disabled={num <= 0} aria-label={`Diminuir ${artigo} ${nomeUnidade(formato, 1)}`}>
             −
           </TeclaPasso>
           <input
@@ -408,10 +417,10 @@ export function CampoQuantidade({
             value={valor}
             onChange={(e) => onChange(e.target.value)}
             placeholder="0"
-            aria-label="Quantidade de pacotes"
+            aria-label={`Quantidade de ${unidade}`}
             className="min-h-[56px] min-w-0 flex-1 rounded-xl border border-borda bg-superficie px-2 py-3 text-center font-mono text-3xl text-texto outline-none focus:border-acento"
           />
-          <TeclaPasso onClick={() => ajustar(1)} aria-label="Aumentar um pacote">
+          <TeclaPasso onClick={() => ajustar(1)} aria-label={`Aumentar ${artigo} ${nomeUnidade(formato, 1)}`}>
             +
           </TeclaPasso>
         </div>

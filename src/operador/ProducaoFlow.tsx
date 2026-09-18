@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
+import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, EstadoVazio, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
@@ -147,6 +147,7 @@ export function ProducaoFlow({
             <ResumoLancamento
               pesoKg={kgDe(formato, num, num)}
               quantidadePacotes={formato.pesoVariavel ? null : num}
+              unidadeContagem={formato.unidadeContagem}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: rotuloFormato(formato) },
@@ -215,10 +216,10 @@ export function ProducaoFlow({
 
   if (passo === "revisar" && produto && formato) {
     const pesoKg = kgDe(formato, num, num);
-    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const formatarValor = (n: number) => formatarQuantidade(n, formato);
     const mensagemAviso = plaus.precisaConfirmar
       ? mensagemPlausibilidade({
-          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoKg)}.`,
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarContagem(num, formato)} = ${formatarPeso(pesoKg)}.`,
           produtoNome: produto.nome,
           mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
           saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
@@ -253,6 +254,7 @@ export function ProducaoFlow({
         <ResumoLancamento
           pesoKg={pesoKg}
           quantidadePacotes={formato.pesoVariavel ? null : num}
+          unidadeContagem={formato.unidadeContagem}
           linhas={[
             { rotulo: "Tipo", valor: "Produção (entrada)" },
             { rotulo: "Produto", valor: produto.nome },
@@ -367,7 +369,9 @@ function LinhaProduto({ produto, onClick }: { produto: ProdutoGrid; onClick: () 
       {produto.saldo ? (
         <span className="shrink-0 text-right leading-tight">
           <span className="block font-mono text-base font-semibold text-texto">
-            {produto.saldo.pacotes !== null ? formatarPacotes(produto.saldo.pacotes) : formatarPeso(produto.saldo.pesoKg)}
+            {produto.saldo.pacotes !== null
+              ? formatarContagem(produto.saldo.pacotes, { pesoVariavel: false, unidadeContagem: produto.formatos[0]?.unidadeContagem })
+              : formatarPeso(produto.saldo.pesoKg)}
           </span>
           {produto.saldo.pacotes !== null ? (
             <span className="block font-mono text-xs text-texto-suave">{formatarPeso(produto.saldo.pesoKg)}</span>

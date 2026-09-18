@@ -3,14 +3,14 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { CampoBusca, LinhaMensagem, LinhaTabela, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { data } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 
 /*
   Consulta de patrocínio (RF42). Para cada patrocínio: quanto saiu, quanto voltou
   e quanto foi consumido. Somente leitura.
 */
-function formatarQtd(n: number, unidade: string): string {
-  return unidade === "kg" ? formatarPeso(n) : formatarPacotes(n);
+function formatarQtd(n: number, unidade: string, unidadeContagem?: "pacote" | "unidade" | null): string {
+  return formatarQuantidade(n, { pesoVariavel: unidade === "kg", unidadeContagem });
 }
 
 export function PatrociniosPage() {
@@ -57,9 +57,9 @@ export function PatrociniosPage() {
               <td className="px-3 py-2.5 text-texto-suave">
                 {p.produtoNome} / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.unidade === "kg", unidadesPorPacote: p.formatoUnidadesPorPacote })}
               </td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.saiu, p.unidade)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-entrada">{formatarQtd(p.retornado, p.unidade)}</td>
-              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.consumido, p.unidade)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.saiu, p.unidade, p.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-entrada">{formatarQtd(p.retornado, p.unidade, p.formatoUnidadeContagem)}</td>
+              <td className="px-3 py-2.5 text-right font-mono text-texto">{formatarQtd(p.consumido, p.unidade, p.formatoUnidadeContagem)}</td>
               <td className="px-3 py-2.5">
                 {p.emAberto ? (
                   <span className="inline-block rounded-full bg-acento/10 px-2 py-0.5 text-[11px] font-semibold text-acento">

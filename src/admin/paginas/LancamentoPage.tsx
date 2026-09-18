@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarContagem, formatarPeso, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
 
@@ -34,6 +34,7 @@ type ItemCarregamento = {
   produtoNome: string;
   formatoNome: string;
   pesoVariavel: boolean;
+  unidadeContagem?: "pacote" | "unidade" | null;
   valor: string;
   pesoKg: number;
 };
@@ -143,6 +144,7 @@ export function LancamentoPage() {
       produtoNome: produto.nome,
       formatoNome: rotuloFormato(formato),
       pesoVariavel: formato.pesoVariavel,
+      unidadeContagem: formato.unidadeContagem,
       valor,
       pesoKg: formato.pesoVariavel ? numVal : numVal * formato.pesoKg,
     };
@@ -286,7 +288,7 @@ export function LancamentoPage() {
                     <p className="truncate text-sm text-texto">{it.produtoNome} <span className="text-texto-suave">/ {it.formatoNome}</span></p>
                   </div>
                   <span className="shrink-0 font-mono text-sm text-texto">
-                    {it.pesoVariavel ? "" : `${formatarPacotes(Number(it.valor))} × `}{formatarPeso(it.pesoKg)}
+                    {it.pesoVariavel ? "" : `${formatarContagem(Number(it.valor), it)} × `}{formatarPeso(it.pesoKg)}
                   </span>
                   <button
                     onClick={() => removerItem(it.chave)}
@@ -325,7 +327,7 @@ export function LancamentoPage() {
 
           <div className="flex items-end gap-3">
             <Campo
-              label={formato?.pesoVariavel ? "Peso (kg)" : "Quantidade (pacotes)"}
+              label={formato?.pesoVariavel ? "Peso (kg)" : `Quantidade (${formato ? nomeUnidade(formato, 2) : "pacotes"})`}
               type="number"
               min={0}
               step={formato?.pesoVariavel ? "0.01" : "1"}
@@ -432,7 +434,7 @@ export function LancamentoPage() {
                       <p className="mt-1 font-mono font-medium">
                         {formato.pesoVariavel
                           ? formatarPeso(numVal)
-                          : `${formatarPacotes(numVal)} · ${formatarPeso(pesoPrevisto ?? 0)}`}
+                          : `${formatarContagem(numVal, formato)} · ${formatarPeso(pesoPrevisto ?? 0)}`}
                       </p>
                     ) : null}
                   </div>

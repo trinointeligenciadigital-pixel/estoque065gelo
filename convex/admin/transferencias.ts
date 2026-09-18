@@ -61,6 +61,7 @@ export const opcoes = query({
           pesoKg: f.pesoKg,
           pesoVariavel: f.pesoVariavel,
           unidadesPorPacote: f.unidadesPorPacote ?? null,
+          unidadeContagem: f.unidadeContagem ?? "pacote",
         })),
       })),
     );

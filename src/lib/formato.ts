@@ -13,12 +13,16 @@ export function formatarPacotes(n: number): string {
   return `${arredondado.toLocaleString("pt-BR")} ${unidade}`;
 }
 
-// "37.047,0 kg" / "1.077,3 kg" / "5,7 kg" — sempre 1 casa decimal, separador
-// de milhar e decimal pt-BR.
+// "37.047,0 kg" / "1.077,3 kg" / "5,7 kg" — 1 casa decimal, separador de
+// milhar e decimal pt-BR. Abaixo de 1kg (migração pacote→unidade do
+// saborizado: 1 unidade pesa ~0,19 kg), 1 casa decimal perderia precisão
+// real (0,19 viraria "0,2 kg", um erro de ~5% já no formato mais miúdo) —
+// aí mostra até 3 casas, sem zero à toa no fim (0,19 kg, não 0,190 kg).
 export function formatarPeso(kg: number): string {
+  const miudo = kg !== 0 && Math.abs(kg) < 1;
   const texto = kg.toLocaleString("pt-BR", {
     minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: miudo ? 3 : 1,
   });
   return `${texto} kg`;
 }
@@ -37,6 +41,7 @@ export type FormatoRotulo = {
   pesoKg: number;
   pesoVariavel: boolean;
   unidadesPorPacote?: number | null;
+  unidadeContagem?: "pacote" | "unidade" | null;
 };
 export function rotuloFormato(f: FormatoRotulo): string {
   if (f.pesoVariavel) return f.nome;
@@ -49,4 +54,46 @@ export function rotuloFormato(f: FormatoRotulo): string {
 // diferenciação visual de tamanho (texto copiado, WhatsApp, rótulos simples).
 export function parPacotesPeso(qtdPacotes: number, pesoKg: number): string {
   return `${formatarPacotes(qtdPacotes)} · ${formatarPeso(pesoKg)}`;
+}
+
+/*
+  Migração pacote→unidade (gelo saborizado): um formato de peso fixo pode
+  contar em "pacotes" (padrão, embalagem com várias peças) ou em "unidade"
+  (contagem direta, sem embalagem — cada peça é o item). Generaliza o padrão
+  `pesoVariavel ? formatarPeso(x) : formatarPacotes(x)` que se repetia em
+  cada tela, agora cobrindo os dois substantivos.
+*/
+export type FormatoUnidade = { pesoVariavel: boolean; unidadeContagem?: "pacote" | "unidade" | null };
+
+// "unidade"/"unidades" ou "pacote"/"pacotes" — o substantivo certo, no
+// singular/plural certo, pra este formato. Nunca chamado pra peso variável
+// (que não tem substantivo de contagem, só kg).
+export function nomeUnidade(f: FormatoUnidade, n: number): string {
+  const singular = Math.abs(Math.round(n)) === 1;
+  return (f.unidadeContagem ?? "pacote") === "unidade"
+    ? singular
+      ? "unidade"
+      : "unidades"
+    : singular
+      ? "pacote"
+      : "pacotes";
+}
+
+// "um"/"uma" — artigo certo pro substantivo de nomeUnidade (pacote é
+// masculino, unidade é feminino), pra montar frases tipo "Aumentar um pacote".
+export function artigoUnidade(f: FormatoUnidade): "um" | "uma" {
+  return (f.unidadeContagem ?? "pacote") === "unidade" ? "uma" : "um";
+}
+
+// "1 unidade" / "1.461 pacotes" — mesma formatação de formatarPacotes
+// (pt-BR, sem casas decimais), com o substantivo certo pro formato.
+export function formatarContagem(n: number, f: FormatoUnidade): string {
+  const arredondado = Math.round(n);
+  return `${arredondado.toLocaleString("pt-BR")} ${nomeUnidade(f, n)}`;
+}
+
+// Substitui o padrão repetido `pesoVariavel ? formatarPeso(x) : formatarPacotes(x)`
+// — agora também cobre o caso "unidade".
+export function formatarQuantidade(n: number, f: FormatoUnidade): string {
+  return f.pesoVariavel ? formatarPeso(n) : formatarContagem(n, f);
 }

@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
+import { formatarContagem, formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "../lib/formato.ts";
 import { mascaraPlaca, placaCompleta, rotuloPlacaOuTexto } from "../lib/mascaras.ts";
 import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
 import type { FormatoGrid, ItemResumo, LinhaResumo, ProdutoGrid } from "./ui.tsx";
@@ -171,14 +171,17 @@ function SaidaCarregamento({
   const [desfeito, setDesfeito] = useState(false);
 
   const pesoTotal = itens.reduce((acc, it) => acc + pesoDoItem(it), 0);
-  // Total de pacotes (tarefa 5 do adendo): quem carrega a van conta pacotes, não
-  // quilos — soma só os itens de formato fixo (peso variável não tem "pacote").
-  // 0 quando o carregamento é só granel: nesse caso não existe "0 pacotes" pra
-  // mostrar, só o peso.
-  const totalPacotes = itens.reduce(
-    (acc, it) => (it.formato.pesoVariavel ? acc : acc + (Number(it.valor) || 0)),
-    0,
-  );
+  // Total contado (tarefa 5 do adendo): quem carrega a van conta pacotes/
+  // unidades, não quilos — soma só os itens de formato fixo (peso variável não
+  // tem contagem), e só quando todos usam o MESMO modo de contagem (misturar
+  // pacote com unidade num só carregamento não pode virar uma soma só — cai
+  // pro peso, como já acontecia quando o carregamento era só granel).
+  const itensContados = itens.filter((it) => !it.formato.pesoVariavel);
+  const modoContagem: "pacote" | "unidade" = itensContados[0]?.formato.unidadeContagem ?? "pacote";
+  const mesmoModoContagem = itensContados.every((it) => (it.formato.unidadeContagem ?? "pacote") === modoContagem);
+  const totalPacotes = mesmoModoContagem
+    ? itensContados.reduce((acc, it) => acc + (Number(it.valor) || 0), 0)
+    : 0;
 
   // Hook no topo (regra dos hooks) — a query só ativa com produto+formato+
   // quantidade > 0, então não pesa nos outros passos do carrinho.
@@ -335,6 +338,7 @@ function SaidaCarregamento({
         produtoNome: it.produto.nome,
         formatoNome: rotuloFormato(it.formato),
         quantidadePacotes: it.formato.pesoVariavel ? null : Number(it.valor),
+        unidadeContagem: it.formato.unidadeContagem,
         pesoKg: pesoDoItem(it),
       })),
       pesoTotalKg: pesoTotal,
@@ -441,6 +445,7 @@ function SaidaCarregamento({
                     produtoNome={it.produto.nome}
                     formatoNome={rotuloFormato(it.formato)}
                     quantidadePacotes={it.formato.pesoVariavel ? null : Number(it.valor)}
+                    unidadeContagem={it.formato.unidadeContagem}
                     pesoKg={pesoDoItem(it)}
                     onEditar={() => editarItem(i)}
                     onRemover={() => removerItem(i)}
@@ -454,7 +459,9 @@ function SaidaCarregamento({
                 <span className="text-right">
                   {totalPacotes > 0 ? (
                     <>
-                      <span className="font-mono text-lg font-semibold text-texto">{formatarPacotes(totalPacotes)}</span>
+                      <span className="font-mono text-lg font-semibold text-texto">
+                        {formatarContagem(totalPacotes, { pesoVariavel: false, unidadeContagem: modoContagem })}
+                      </span>
                       <span className="ml-2 font-mono text-sm text-texto-suave">{formatarPeso(pesoTotal)}</span>
                     </>
                   ) : (
@@ -532,11 +539,11 @@ function SaidaCarregamento({
 
     // Fora do saldo, a quantidade é grande demais pro padrão (tarefa 4):
     // segunda confirmação nomeando o número, em vez de deixar passar direto.
-    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const formatarValor = (n: number) => formatarQuantidade(n, formato);
     const pesoDigitado = kgDe(formato, num, num);
     const mensagemAviso = valido && plaus.precisaConfirmar
       ? mensagemPlausibilidade({
-          resumo: formato.pesoVariavel ? `${formatarPeso(pesoDigitado)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoDigitado)}.`,
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoDigitado)}.` : `${formatarContagem(num, formato)} = ${formatarPeso(pesoDigitado)}.`,
           produtoNome: produto.nome,
           mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
           saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
@@ -575,14 +582,14 @@ function SaidaCarregamento({
           <p className="mt-3 text-center text-base text-texto-suave">
             Disponível nesta câmara:{" "}
             <span className="font-mono text-texto">
-              {formato.pesoVariavel ? formatarPeso(disponivel) : formatarPacotes(disponivel)}
+              {formatarQuantidade(disponivel, formato)}
             </span>
           </p>
         ) : null}
         {excede ? (
           <div className="mt-4">
             <AvisoOperador>
-              Só há {formato.pesoVariavel ? formatarPeso(disponivel!) : formatarPacotes(disponivel!)} deste formato nesta câmara
+              Só há {formatarQuantidade(disponivel!, formato)} deste formato nesta câmara
               {jaNoCarrinho(formato._id, editIdx) > 0 ? " (contando o que já está no carregamento)" : ""}.
             </AvisoOperador>
           </div>
@@ -670,6 +677,7 @@ function SaidaCarregamento({
       produtoNome: it.produto.nome,
       formatoNome: rotuloFormato(it.formato),
       quantidadePacotes: it.formato.pesoVariavel ? null : Number(it.valor),
+      unidadeContagem: it.formato.unidadeContagem,
       pesoKg: pesoDoItem(it),
     }));
     const linhas: LinhaResumo[] = [
@@ -700,6 +708,7 @@ function SaidaCarregamento({
         <ResumoLancamento
           pesoKg={pesoTotal}
           quantidadePacotes={totalPacotes > 0 ? totalPacotes : null}
+          unidadeContagem={modoContagem}
           itens={itensResumo}
           linhas={linhas}
         />
@@ -721,6 +730,7 @@ function LinhaItem({
   produtoNome,
   formatoNome,
   quantidadePacotes,
+  unidadeContagem,
   pesoKg,
   onEditar,
   onRemover,
@@ -728,6 +738,7 @@ function LinhaItem({
   produtoNome: string;
   formatoNome: string;
   quantidadePacotes: number | null;
+  unidadeContagem?: "pacote" | "unidade" | null;
   pesoKg: number;
   onEditar: () => void;
   onRemover: () => void;
@@ -769,7 +780,7 @@ function LinhaItem({
               <span className="block font-mono text-base font-semibold text-texto">
                 {quantidadePacotes}
                 <span className="ml-1 font-sans text-sm font-normal text-texto-suave">
-                  {quantidadePacotes === 1 ? "pacote" : "pacotes"}
+                  {nomeUnidade({ pesoVariavel: false, unidadeContagem }, quantidadePacotes)}
                 </span>
               </span>
               <span className="block font-mono text-sm text-texto-suave">{formatarPeso(pesoKg)}</span>
@@ -932,6 +943,7 @@ function SaidaPerda({
             <ResumoLancamento
               pesoKg={pesoKg}
               quantidadePacotes={formato.pesoVariavel ? null : num}
+              unidadeContagem={formato.unidadeContagem}
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: rotuloFormato(formato) },
@@ -1006,14 +1018,14 @@ function SaidaPerda({
           <p className="mt-3 text-center text-base text-texto-suave">
             Disponível nesta câmara:{" "}
             <span className="font-mono text-texto">
-              {formato.pesoVariavel ? formatarPeso(disponivel) : formatarPacotes(disponivel)}
+              {formatarQuantidade(disponivel, formato)}
             </span>
           </p>
         ) : null}
         {excede ? (
           <div className="mt-4">
             <AvisoOperador>
-              Só há {formato.pesoVariavel ? formatarPeso(disponivel!) : formatarPacotes(disponivel!)} deste formato nesta câmara.
+              Só há {formatarQuantidade(disponivel!, formato)} deste formato nesta câmara.
             </AvisoOperador>
           </div>
         ) : null}
@@ -1062,10 +1074,10 @@ function SaidaPerda({
       { rotulo: "Câmara", valor: camaraNome },
     ];
 
-    const formatarValor = formato.pesoVariavel ? formatarPeso : formatarPacotes;
+    const formatarValor = (n: number) => formatarQuantidade(n, formato);
     const mensagemAviso = plaus.precisaConfirmar
       ? mensagemPlausibilidade({
-          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarPacotes(num)} = ${formatarPeso(pesoKg)}.`,
+          resumo: formato.pesoVariavel ? `${formatarPeso(pesoKg)}.` : `${formatarContagem(num, formato)} = ${formatarPeso(pesoKg)}.`,
           produtoNome: produto.nome,
           mediaDiariaLabel: plaus.mediaDiaria !== null ? formatarValor(plaus.mediaDiaria) : null,
           saldoLabel: formatarValor(plaus.saldoAtual ?? 0),
@@ -1095,7 +1107,12 @@ function SaidaPerda({
           )
         }
       >
-        <ResumoLancamento pesoKg={pesoKg} quantidadePacotes={formato.pesoVariavel ? null : num} linhas={linhas} />
+        <ResumoLancamento
+          pesoKg={pesoKg}
+          quantidadePacotes={formato.pesoVariavel ? null : num}
+          unidadeContagem={formato.unidadeContagem}
+          linhas={linhas}
+        />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>
     );

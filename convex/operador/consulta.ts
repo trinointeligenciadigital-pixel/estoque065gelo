@@ -79,6 +79,7 @@ export const gridProdutos = query({
             pesoKg: f.pesoKg,
             pesoVariavel: f.pesoVariavel,
             unidadesPorPacote: f.unidadesPorPacote ?? null,
+            unidadeContagem: f.unidadeContagem ?? "pacote",
           })),
           saldo,
         };
@@ -145,6 +146,7 @@ export const saldos = query({
               pesoKg: f.pesoKg,
               pesoVariavel: f.pesoVariavel,
               unidadesPorPacote: f.unidadesPorPacote ?? null,
+              unidadeContagem: f.unidadeContagem ?? "pacote",
               // Fixo: saldo em pacotes. Variável: o estoque real é o peso líquido
               // (kg), pois "quantidade" ali é sempre 1 e não representa o estoque.
               saldo: await saldoDoFormato(ctx, p._id, camara._id, f._id),
@@ -199,6 +201,7 @@ export const patrociniosAbertos = query({
         formatoNome: formato.nome,
         formatoPesoKg: formato.pesoKg,
         formatoUnidadesPorPacote: formato.unidadesPorPacote ?? null,
+        formatoUnidadeContagem: formato.unidadeContagem ?? "pacote",
         formatoPesoVariavel: porPeso,
         clienteNome: p.clienteNome ?? "",
         saido,

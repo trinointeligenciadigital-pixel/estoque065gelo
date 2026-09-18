@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { Cartao, LinhaTabela, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 import { mesmoTexto, nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
 import { pluralizar } from "../../lib/plural.ts";
 import { rotuloPlacaOuTexto } from "../../lib/mascaras.ts";
@@ -153,7 +153,9 @@ function PainelConteudo() {
             <span key={c.categoria} className="text-[13px] text-texto">
               {rotuloCat[c.categoria] ?? c.categoria}{" "}
               <span className="font-mono font-semibold text-acento">
-                {c.pacotes !== null ? `${formatarPacotes(c.pacotes)} · ${formatarPeso(c.pesoKg)}` : formatarPeso(c.pesoKg)}
+                {c.pacotes !== null
+                  ? `${formatarContagem(c.pacotes, { pesoVariavel: false, unidadeContagem: c.unidadeContagem })} · ${formatarPeso(c.pesoKg)}`
+                  : formatarPeso(c.pesoKg)}
               </span>
             </span>
           ))}
@@ -201,7 +203,9 @@ function PainelConteudo() {
                         <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
                       ) : (
                         <div className="flex flex-col items-end leading-tight">
-                          <span className="font-mono font-semibold text-texto">{formatarPacotes(m.quantidade)}</span>
+                          <span className="font-mono font-semibold text-texto">
+                            {formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
+                          </span>
                           <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
                         </div>
                       )}
@@ -257,7 +261,7 @@ function PainelConteudo() {
                 <SegUnidade unidade={unidadeDestaque} onChange={setUnidadeDestaque} />
                 <span className="font-mono text-[11px] text-texto-fraco">
                   {pluralizar(produtos.length, "produto", "produtos")} · ordenado por{" "}
-                  {unidadeDestaque === "pacotes" ? "pacotes" : "peso"}
+                  {unidadeDestaque === "pacotes" ? "quantidade" : "peso"}
                 </span>
               </div>
             }
@@ -284,7 +288,7 @@ function PainelConteudo() {
                     const unicoFormato = p.formatos.length === 1 && !p.formatos[0].pesoVariavel;
                     const mostrarPacotes = unicoFormato && unidadeDestaque === "pacotes";
                     const destaqueProduto = mostrarPacotes
-                      ? formatarPacotes(p.formatos[0].saldo)
+                      ? formatarContagem(p.formatos[0].saldo, p.formatos[0])
                       : formatarPeso(p.pesoTotalKg);
                     // Tag de categoria só informa quando difere do nome do produto
                     // (ex.: "Escamado" categoria "escamado" não diz nada de novo;
@@ -314,14 +318,14 @@ function PainelConteudo() {
                         // não tem "pacote", então segue sempre em kg.
                         const mostrarPacotes = !f.pesoVariavel && unidadeDestaque === "pacotes";
                         const pesoSaldo = f.pesoVariavel ? f.saldo : f.saldo * f.pesoKg;
-                        const destaque = mostrarPacotes ? formatarPacotes(f.saldo) : formatarPeso(pesoSaldo);
+                        const destaque = mostrarPacotes ? formatarContagem(f.saldo, f) : formatarPeso(pesoSaldo);
                         const secundario = f.pesoVariavel
                           ? null
                           : mostrarPacotes
                             ? formatarPeso(pesoSaldo)
-                            : formatarPacotes(f.saldo);
+                            : formatarContagem(f.saldo, f);
                         const pesoMinimo = f.pesoVariavel ? f.estoqueMinimo : f.estoqueMinimo * f.pesoKg;
-                        const minDestaque = mostrarPacotes ? formatarPacotes(f.estoqueMinimo) : formatarPeso(pesoMinimo);
+                        const minDestaque = mostrarPacotes ? formatarContagem(f.estoqueMinimo, f) : formatarPeso(pesoMinimo);
                         return (
                           <div key={f._id}>
                             <div className="flex items-baseline justify-between gap-2">
@@ -385,7 +389,9 @@ function PainelConteudo() {
                       <span className="font-mono text-texto">{formatarPeso(m.pesoKg)}</span>
                     ) : (
                       <div className="flex flex-col items-end leading-tight">
-                        <span className="font-mono font-semibold text-texto">{formatarPacotes(m.quantidade)}</span>
+                        <span className="font-mono font-semibold text-texto">
+                          {formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
+                        </span>
                         <span className="font-mono text-[11px] text-texto-suave">{formatarPeso(m.pesoKg)}</span>
                       </div>
                     )}
@@ -458,7 +464,7 @@ function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) =>
 // SegPeriodo, versão com 2 opções.
 function SegUnidade({ unidade, onChange }: { unidade: "pacotes" | "kg"; onChange: (u: "pacotes" | "kg") => void }) {
   const ops = [
-    { v: "pacotes" as const, l: "Pacotes" },
+    { v: "pacotes" as const, l: "Qtd." },
     { v: "kg" as const, l: "Kg" },
   ];
   return (

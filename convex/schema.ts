@@ -94,6 +94,13 @@ export default defineSchema({
     // só faz sentido pra formato de peso fixo. Ausente = o formato não tem uma
     // contagem de unidades que valha a pena mostrar (ex.: saco de escama por kg).
     unidadesPorPacote: v.optional(v.number()),
+    // Unidade em que ESTE formato é contado: "pacote" (padrão) ou "unidade"
+    // (contagem direta, sem embalagem — ex.: gelo saborizado vendido por peça,
+    // não por pacote). Ausente = "pacote", o comportamento de todo formato já
+    // existente. Nunca editável depois de criado (ver atualizar em
+    // convex/admin/formatos.ts) — mudar isto num formato com movimentações
+    // misturaria duas unidades diferentes na mesma soma de saldoDoFormato.
+    unidadeContagem: v.optional(v.union(v.literal("pacote"), v.literal("unidade"))),
     // Estoque mínimo DESTE formato, na unidade natural dele: nº de pacotes no
     // formato normal, kg no de peso variável. 0 (ou ausente) = sem alerta.
     estoqueMinimo: v.optional(v.number()),

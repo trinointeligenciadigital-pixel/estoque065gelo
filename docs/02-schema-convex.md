@@ -105,6 +105,12 @@ export default defineSchema({
     nome: v.string(),                 // "Pacote 30 pedras", "Saco 2kg", "Granel"
     pesoKg: v.number(),               // 5.7 | 2 | 4 | 10 ; ignorado se pesoVariavel
     pesoVariavel: v.boolean(),        // true = usuário digita o kg no lançamento
+    // "pacote" (padrão) ou "unidade" (contagem direta, sem embalagem — ex.:
+    // gelo saborizado vendido por peça). Ausente = "pacote". Fixado na
+    // criação, nunca editável depois — mudar isto num formato com
+    // movimentações misturaria duas unidades diferentes na mesma soma de
+    // saldoDoFormato (migração pacote→unidade do saborizado).
+    unidadeContagem: v.optional(v.union(v.literal("pacote"), v.literal("unidade"))),
     ativo: v.boolean(),
   }).index("by_produto", ["produtoId"]),
 

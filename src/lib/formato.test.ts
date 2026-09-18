@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "./formato.ts";
+import { formatarContagem, formatarPacotes, formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "./formato.ts";
 
 describe("formatarPacotes", () => {
   it("usa singular só para exatamente 1", () => {
@@ -28,6 +28,54 @@ describe("formatarPeso", () => {
 
   it("preserva o sinal negativo", () => {
     expect(formatarPeso(-250.4)).toBe("-250,4 kg");
+  });
+
+  it("abaixo de 1kg, mostra até 3 casas decimais sem perder precisão (peso de 1 unidade do saborizado)", () => {
+    expect(formatarPeso(0.19)).toBe("0,19 kg");
+    expect(formatarPeso(0.2)).toBe("0,2 kg");
+    expect(formatarPeso(0.125)).toBe("0,125 kg");
+    expect(formatarPeso(0)).toBe("0,0 kg");
+  });
+
+  it("1kg ou mais continua com exatamente 1 casa, mesmo vindo de pesos miúdos somados", () => {
+    expect(formatarPeso(500 * 0.19)).toBe("95,0 kg");
+  });
+});
+
+describe("formatarContagem (migração pacote→unidade)", () => {
+  it("sem unidadeContagem, mantém o comportamento de sempre (pacote)", () => {
+    expect(formatarContagem(1, { pesoVariavel: false })).toBe("1 pacote");
+    expect(formatarContagem(2, { pesoVariavel: false })).toBe("2 pacotes");
+  });
+
+  it("com unidadeContagem 'pacote' explícito, mesmo resultado", () => {
+    expect(formatarContagem(1, { pesoVariavel: false, unidadeContagem: "pacote" })).toBe("1 pacote");
+  });
+
+  it("com unidadeContagem 'unidade', usa singular/plural de 'unidade'", () => {
+    expect(formatarContagem(1, { pesoVariavel: false, unidadeContagem: "unidade" })).toBe("1 unidade");
+    expect(formatarContagem(30, { pesoVariavel: false, unidadeContagem: "unidade" })).toBe("30 unidades");
+    expect(formatarContagem(0, { pesoVariavel: false, unidadeContagem: "unidade" })).toBe("0 unidades");
+  });
+});
+
+describe("nomeUnidade", () => {
+  it("escolhe o substantivo certo, no singular/plural certo", () => {
+    expect(nomeUnidade({ pesoVariavel: false }, 1)).toBe("pacote");
+    expect(nomeUnidade({ pesoVariavel: false }, 2)).toBe("pacotes");
+    expect(nomeUnidade({ pesoVariavel: false, unidadeContagem: "unidade" }, 1)).toBe("unidade");
+    expect(nomeUnidade({ pesoVariavel: false, unidadeContagem: "unidade" }, 2)).toBe("unidades");
+  });
+});
+
+describe("formatarQuantidade", () => {
+  it("peso variável sempre vira kg, não importa o unidadeContagem", () => {
+    expect(formatarQuantidade(5.7, { pesoVariavel: true, unidadeContagem: "unidade" })).toBe("5,7 kg");
+  });
+
+  it("não-variável delega pro substantivo certo", () => {
+    expect(formatarQuantidade(30, { pesoVariavel: false, unidadeContagem: "unidade" })).toBe("30 unidades");
+    expect(formatarQuantidade(30, { pesoVariavel: false })).toBe("30 pacotes");
   });
 });
 

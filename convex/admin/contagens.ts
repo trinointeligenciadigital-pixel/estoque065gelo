@@ -46,6 +46,7 @@ export const itensParaContagem = query({
               pesoKg: f.pesoKg,
               pesoVariavel: f.pesoVariavel,
               unidadesPorPacote: f.unidadesPorPacote ?? null,
+              unidadeContagem: f.unidadeContagem ?? "pacote",
             })),
         };
       }),
@@ -278,6 +279,7 @@ export const detalhe = query({
           formatoNome: formato?.nome ?? "—",
           formatoPesoKg: formato?.pesoKg ?? 0,
           formatoUnidadesPorPacote: formato?.unidadesPorPacote ?? null,
+          formatoUnidadeContagem: formato?.unidadeContagem ?? "pacote",
           pesoVariavel: formato?.pesoVariavel ?? false,
           saldoSistema: it.saldoSistema,
           saldoContado: it.saldoContado,

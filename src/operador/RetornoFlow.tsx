@@ -4,11 +4,14 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { data } from "../lib/data.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../lib/formato.ts";
+import { formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
-function formatarQtd(n: number, pesoVariavel: boolean): string {
-  return pesoVariavel ? formatarPeso(n) : formatarPacotes(n);
+function formatarQtd(
+  n: number,
+  p: { formatoPesoVariavel: boolean; formatoUnidadeContagem?: "pacote" | "unidade" | null },
+): string {
+  return formatarQuantidade(n, { pesoVariavel: p.formatoPesoVariavel, unidadeContagem: p.formatoUnidadeContagem });
 }
 
 function rotuloFormatoPatrocinio(p: Patrocinio): string {
@@ -33,6 +36,7 @@ type Patrocinio = {
   formatoNome: string;
   formatoPesoKg: number;
   formatoUnidadesPorPacote: number | null;
+  formatoUnidadeContagem: "pacote" | "unidade";
   formatoPesoVariavel: boolean;
   clienteNome: string;
   saido: number;
@@ -99,7 +103,7 @@ export function RetornoFlow({
       <Tela titulo="Retorno lançado" camaraNome={camaraNome} operadorNome={nome} aoVoltarHardware={onVoltar}>
         <AvisoOperador tom="ok">
           Retorno registrado:{" "}
-          <span className="font-mono">{formatarQtd(num, alvo?.formatoPesoVariavel ?? false)}</span>
+          <span className="font-mono">{formatarQtd(num, alvo ?? { formatoPesoVariavel: false })}</span>
           {alvo ? ` · ${alvo.produtoNome} · ${rotuloFormatoPatrocinio(alvo)}` : ""}.
           {protocolo ? <span className="ml-1.5 font-mono text-sm">· {protocolo}</span> : null}
         </AvisoOperador>
@@ -130,7 +134,7 @@ export function RetornoFlow({
         <p className="mb-3 text-base text-texto-suave">
           Cliente: <span className="text-texto">{alvo.clienteNome || "—"}</span>
           <br />
-          Em aberto: <span className="font-mono text-texto">{formatarQtd(alvo.aberto, alvo.formatoPesoVariavel)}</span>
+          Em aberto: <span className="font-mono text-texto">{formatarQtd(alvo.aberto, alvo)}</span>
         </p>
         <label className="flex flex-col gap-2">
           <span className="text-base font-medium text-texto">
@@ -146,7 +150,7 @@ export function RetornoFlow({
         </label>
         {num > alvo.aberto ? (
           <p className="mt-2 text-center text-base text-alerta">
-            Máximo em aberto: {formatarQtd(alvo.aberto, alvo.formatoPesoVariavel)}.
+            Máximo em aberto: {formatarQtd(alvo.aberto, alvo)}.
           </p>
         ) : null}
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
@@ -173,7 +177,7 @@ export function RetornoFlow({
                 {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
               </span>
               <span className="font-mono text-sm text-acento">
-                em aberto: {formatarQtd(p.aberto, p.formatoPesoVariavel)}
+                em aberto: {formatarQtd(p.aberto, p)}
               </span>
             </button>
           ))}

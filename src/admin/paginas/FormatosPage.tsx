@@ -3,9 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, Marca, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarContagem, formatarPeso, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
 
 type Formato = {
   _id: Id<"formatos">;
@@ -13,6 +13,7 @@ type Formato = {
   pesoKg: number;
   pesoVariavel: boolean;
   unidadesPorPacote?: number;
+  unidadeContagem?: "pacote" | "unidade";
   estoqueMinimo?: number;
   ativo: boolean;
 };
@@ -72,7 +73,7 @@ export function FormatosPage() {
                 {f.estoqueMinimo
                   ? f.pesoVariavel
                     ? formatarPeso(f.estoqueMinimo)
-                    : formatarPacotes(f.estoqueMinimo)
+                    : formatarContagem(f.estoqueMinimo, f)
                   : "—"}
               </td>
               <td className="px-3 py-2.5"><Etiqueta ativo={f.ativo} /></td>
@@ -109,6 +110,7 @@ function FormFormato({
   const [nome, setNome] = useState(inicial?.nome ?? "");
   const [pesoKg, setPesoKg] = useState(String(inicial?.pesoKg ?? ""));
   const [pesoVariavel, setPesoVariavel] = useState(inicial?.pesoVariavel ?? false);
+  const [unidadeContagem, setUnidadeContagem] = useState<"pacote" | "unidade">(inicial?.unidadeContagem ?? "pacote");
   const [unidadesPorPacote, setUnidadesPorPacote] = useState(String(inicial?.unidadesPorPacote ?? ""));
   const [estoqueMinimo, setEstoqueMinimo] = useState(String(inicial?.estoqueMinimo ?? 0));
   const [ativo, setAtivo] = useState(inicial?.ativo ?? true);
@@ -116,6 +118,7 @@ function FormFormato({
   const [salvando, setSalvando] = useState(false);
 
   const novo = inicial === null;
+  const ehUnidade = unidadeContagem === "unidade";
 
   // Pré-visualização do rótulo canônico (tarefa 2) — o admin vê, ao digitar,
   // exatamente o texto que vai aparecer pro colaborador e no comprovante.
@@ -123,7 +126,7 @@ function FormFormato({
     nome: nome.trim() || "—",
     pesoKg: Number(pesoKg) || 0,
     pesoVariavel,
-    unidadesPorPacote: Number(unidadesPorPacote) || undefined,
+    unidadesPorPacote: ehUnidade ? undefined : Number(unidadesPorPacote) || undefined,
   });
 
   async function salvar() {
@@ -132,9 +135,20 @@ function FormFormato({
     try {
       const peso = pesoVariavel ? 0 : Number(pesoKg);
       const minimo = Number(estoqueMinimo) || 0;
-      const unidades = pesoVariavel || unidadesPorPacote.trim() === "" ? undefined : Number(unidadesPorPacote);
+      const unidades = pesoVariavel || ehUnidade || unidadesPorPacote.trim() === "" ? undefined : Number(unidadesPorPacote);
       if (novo) {
-        await criar({ produtoId, nome, pesoKg: peso, pesoVariavel, unidadesPorPacote: unidades, estoqueMinimo: minimo });
+        // unidadeContagem é fixada na criação e nunca muda depois — não existe
+        // no atualizar de propósito (ver comentário em convex/schema.ts). Peso
+        // variável não tem "unidade de contagem" (quantidade é sempre 1).
+        await criar({
+          produtoId,
+          nome,
+          pesoKg: peso,
+          pesoVariavel,
+          unidadesPorPacote: unidades,
+          unidadeContagem: pesoVariavel ? undefined : unidadeContagem,
+          estoqueMinimo: minimo,
+        });
       } else {
         await atualizar({ id: inicial._id, nome, pesoKg: peso, pesoVariavel, unidadesPorPacote: unidades, estoqueMinimo: minimo, ativo });
       }
@@ -154,6 +168,25 @@ function FormFormato({
           onChange={(e) => setNome(e.target.value)}
           placeholder="Pacote"
         />
+        {!pesoVariavel ? (
+          novo ? (
+            <Selecao
+              label="Como contar"
+              value={unidadeContagem}
+              onChange={(e) => setUnidadeContagem(e.target.value as "pacote" | "unidade")}
+            >
+              <option value="pacote">Pacote (embalagem com várias unidades)</option>
+              <option value="unidade">Unidade (cada peça é um item)</option>
+            </Selecao>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-texto-suave">Como contar (fixo)</span>
+              <div className="rounded border border-borda bg-fundo px-2 py-1.5 text-sm text-texto-suave">
+                {ehUnidade ? "Unidade" : "Pacote"}
+              </div>
+            </div>
+          )
+        ) : null}
         <Campo
           label="Peso em kg"
           type="number"
@@ -165,8 +198,11 @@ function FormFormato({
           disabled={pesoVariavel}
           placeholder={pesoVariavel ? "digitado no lançamento" : "2"}
         />
-        <Marca label="Peso variável (granel — kg digitado no lançamento)" marcado={pesoVariavel} onToggle={() => setPesoVariavel(!pesoVariavel)} />
         {!pesoVariavel ? (
+          <p className="-mt-2 text-xs text-texto-fraco">Peso de 1 {ehUnidade ? "unidade" : "pacote"}, em kg.</p>
+        ) : null}
+        <Marca label="Peso variável (granel — kg digitado no lançamento)" marcado={pesoVariavel} onToggle={() => setPesoVariavel(!pesoVariavel)} />
+        {!pesoVariavel && !ehUnidade ? (
           <Campo
             label="Unidades por pacote (opcional — ex.: pedras)"
             type="number"
@@ -183,7 +219,7 @@ function FormFormato({
           <span className="font-medium text-texto">{previa}</span>
         </p>
         <Campo
-          label={`Estoque mínimo em ${pesoVariavel ? "kg" : "pacotes"} (0 = sem alerta)`}
+          label={`Estoque mínimo em ${pesoVariavel ? "kg" : nomeUnidade({ pesoVariavel, unidadeContagem }, 2)} (0 = sem alerta)`}
           type="number"
           min={0}
           step={pesoVariavel ? "0.01" : "1"}
