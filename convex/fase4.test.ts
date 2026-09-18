@@ -259,7 +259,7 @@ describe("RF53/RF54 — aprovar gera ajuste só na divergência; rejeitar não m
 
     // Saldo do formato ajustado passa a bater com o contado.
     const saldos = await t.query(api.operador.consulta.saldos, { token });
-    const prod = saldos.find((p) => p._id === produtoId)!;
+    const prod = saldos!.find((p) => p._id === produtoId)!;
     const f1 = prod.formatos.find((f) => f.nome === "Saco 2kg")!;
     const f2 = prod.formatos.find((f) => f.nome === "Saco 5kg")!;
     expect(f1.saldo).toBe(3);
@@ -294,7 +294,7 @@ describe("RF53/RF54 — aprovar gera ajuste só na divergência; rejeitar não m
     expect(ajustes.length).toBe(0);
 
     const saldos = await t.query(api.operador.consulta.saldos, { token });
-    expect(saldos[0].formatos[0].saldo).toBe(5); // intacto
+    expect(saldos![0].formatos[0].saldo).toBe(5); // intacto
 
     const contagem = await t.run((ctx) => ctx.db.get(contagemId));
     expect(contagem?.status).toBe("rejeitada");

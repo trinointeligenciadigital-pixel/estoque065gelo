@@ -78,7 +78,7 @@ describe("Saída x saldo (RF35)", () => {
       formatoId: s.formatoId, quantidade: 5, clienteNome: "Bar do Zé",
     });
     const saldos = await t.query(api.operador.consulta.saldos, { token: s.token });
-    const f = saldos[0].formatos[0];
+    const f = saldos![0].formatos[0];
     expect(f.saldo).toBe(0);
   });
 });

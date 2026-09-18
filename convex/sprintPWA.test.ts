@@ -300,14 +300,14 @@ describe("Tarefa 4 — checarPlausibilidade", () => {
     const normal = await t.query(api.operador.consulta.checarPlausibilidade, {
       token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 5,
     });
-    expect(normal.mediaDiaria).toBeCloseTo(media, 5);
-    expect(normal.precisaConfirmar).toBe(false);
+    expect(normal!.mediaDiaria).toBeCloseTo(media, 5);
+    expect(normal!.precisaConfirmar).toBe(false);
 
     // 7 pacotes é mais que 3× a média (≈5,9) — pede confirmação, mesmo dentro do saldo.
     const implausivel = await t.query(api.operador.consulta.checarPlausibilidade, {
       token: joao.token, produtoId, formatoId, tipo: "producao", quantidade: 7,
     });
-    expect(implausivel.precisaConfirmar).toBe(true);
+    expect(implausivel!.precisaConfirmar).toBe(true);
   });
 
   test("durante contagem aberta, devolve null — mesma proteção da tarefa 1", async () => {
