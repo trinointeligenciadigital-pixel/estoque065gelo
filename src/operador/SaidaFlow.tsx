@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -91,6 +91,18 @@ type ItemCarrinho = {
   chave: string; // idempotência por item
 };
 type PassoCarr = "itens" | "produto" | "formato" | "quantidade" | "contexto" | "revisar" | "sucesso" | "confirmarSair";
+// O que persiste no aparelho enquanto o carregamento não é enviado — só o
+// carrinho e o contexto compartilhado; o item em edição (produto/formato/
+// valor "soltos") não entra, porque sempre volta pro hub "itens" ao restaurar.
+type RascunhoCarregamento = {
+  carregamentoId: string;
+  itens: ItemCarrinho[];
+  cliente: string;
+  veiculoSel: string;
+  veiculoTerceiro: string;
+  veiculoTerceiroModelo: string;
+  motorista: string;
+};
 
 function pesoDoItem(it: ItemCarrinho): number {
   const n = Number(it.valor);
@@ -140,11 +152,28 @@ function SaidaCarregamento({
 
   const rotulo = tipo === "venda" ? "Venda" : "Patrocínio";
 
+  // Rascunho do carregamento salvo no aparelho (mesmo padrão da Contagem):
+  // sobrevive a recarregar a página ou a uma sessão que expira sozinha no
+  // meio de montar um carregamento de vários produtos — o fluxo mais longo
+  // do Operador, e o mais fácil de ser interrompido.
+  const chaveRascunho = `saida065:${tipo}`;
+  const rascunho = (() => {
+    try {
+      const bruto = localStorage.getItem(chaveRascunho);
+      return bruto ? (JSON.parse(bruto) as RascunhoCarregamento) : null;
+    } catch {
+      return null;
+    }
+  })();
+
   // Um carregamentoId por saída — agrupa as linhas e serve de chave de idempotência
-  // do lote (duplo-toque no "Confirmar" não duplica).
-  const [carregamentoId] = useState(() => crypto.randomUUID());
-  const [itens, setItens] = useState<ItemCarrinho[]>([]);
-  const [passo, setPasso] = useState<PassoCarr>("produto"); // começa adicionando o 1º item
+  // do lote (duplo-toque no "Confirmar" não duplica). Mantém o mesmo id ao
+  // restaurar um rascunho, já que nada foi enviado ainda.
+  const [carregamentoId] = useState(() => rascunho?.carregamentoId ?? crypto.randomUUID());
+  const [itens, setItens] = useState<ItemCarrinho[]>(() => rascunho?.itens ?? []);
+  // Com itens restaurados, começa no hub do carrinho — "produto" é só pro
+  // primeiro item de um carregamento novo.
+  const [passo, setPasso] = useState<PassoCarr>(() => ((rascunho?.itens.length ?? 0) > 0 ? "itens" : "produto"));
 
   // Rascunho do item em adição/edição
   const [produto, setProduto] = useState<ProdutoGrid | null>(null);
@@ -153,11 +182,11 @@ function SaidaCarregamento({
   const [editIdx, setEditIdx] = useState<number | null>(null); // índice do item sendo editado
 
   // Contexto compartilhado do carregamento
-  const [cliente, setCliente] = useState("");
-  const [veiculoSel, setVeiculoSel] = useState(""); // "" | id | "terceiro"
-  const [veiculoTerceiro, setVeiculoTerceiro] = useState("");
-  const [veiculoTerceiroModelo, setVeiculoTerceiroModelo] = useState("");
-  const [motorista, setMotorista] = useState("");
+  const [cliente, setCliente] = useState(() => rascunho?.cliente ?? "");
+  const [veiculoSel, setVeiculoSel] = useState(() => rascunho?.veiculoSel ?? ""); // "" | id | "terceiro"
+  const [veiculoTerceiro, setVeiculoTerceiro] = useState(() => rascunho?.veiculoTerceiro ?? "");
+  const [veiculoTerceiroModelo, setVeiculoTerceiroModelo] = useState(() => rascunho?.veiculoTerceiroModelo ?? "");
+  const [motorista, setMotorista] = useState(() => rascunho?.motorista ?? "");
 
   const [erro, setErro] = useState("");
   const [erroDeRede, setErroDeRede] = useState(false);
@@ -193,6 +222,35 @@ function SaidaCarregamento({
     tipo,
     quantidade: num,
   });
+
+  useEffect(() => {
+    try {
+      if (itens.length === 0 && cliente === "" && veiculoSel === "" && motorista === "") {
+        localStorage.removeItem(chaveRascunho);
+        return;
+      }
+      const dados: RascunhoCarregamento = {
+        carregamentoId,
+        itens,
+        cliente,
+        veiculoSel,
+        veiculoTerceiro,
+        veiculoTerceiroModelo,
+        motorista,
+      };
+      localStorage.setItem(chaveRascunho, JSON.stringify(dados));
+    } catch {
+      // localStorage indisponível/cheio: segue sem persistir, não trava o carrinho.
+    }
+  }, [chaveRascunho, carregamentoId, itens, cliente, veiculoSel, veiculoTerceiro, veiculoTerceiroModelo, motorista]);
+
+  function limparRascunhoSalvo() {
+    try {
+      localStorage.removeItem(chaveRascunho);
+    } catch {
+      // sem problema: o pior caso é reaparecer um rascunho vazio, inofensivo.
+    }
+  }
 
   function escolherVeiculo(sel: string) {
     setVeiculoSel(sel);
@@ -315,6 +373,7 @@ function SaidaCarregamento({
         veiculoTerceiroModelo: veiculoSel === "terceiro" ? veiculoTerceiroModelo.trim() || undefined : undefined,
         motorista: motorista.trim() || undefined,
       });
+      limparRascunhoSalvo();
       setProtocolo(r.protocolo);
       setNumeroComprovante(r.numeroComprovante);
       setQuandoMs(Date.now());
@@ -402,11 +461,21 @@ function SaidaCarregamento({
         onVoltar={() => setPasso("itens")}
         rodape={
           <div className="flex flex-col gap-3">
-            <BotaoGrande variante="saida" onClick={onVoltar}>
-              Descartar e sair
-            </BotaoGrande>
+            {/* "Continuar editando" vem primeiro — em toda outra tela do
+                Operador o botão do rodapé avança o fluxo; aqui é a única
+                exceção com dois botões, e o reflexo treinado não pode cair
+                em cima da ação destrutiva. */}
             <BotaoGrande variante="neutro" onClick={() => setPasso("itens")}>
               Continuar editando
+            </BotaoGrande>
+            <BotaoGrande
+              variante="saida"
+              onClick={() => {
+                limparRascunhoSalvo();
+                onVoltar();
+              }}
+            >
+              Descartar e sair
             </BotaoGrande>
           </div>
         }
@@ -683,7 +752,7 @@ function SaidaCarregamento({
     const linhas: LinhaResumo[] = [
       { rotulo: "Tipo", valor: `${rotulo} (saída)` },
       { rotulo: "Cliente", valor: cliente.trim() },
-      { rotulo: "Veículo", valor: rotularVeiculo() },
+      { rotulo: "Veículo", valor: rotularVeiculo(), mono: veiculoSel !== "" },
       ...(motorista.trim() ? [{ rotulo: "Motorista", valor: motorista.trim() }] : []),
       { rotulo: "Câmara", valor: camaraNome },
     ];

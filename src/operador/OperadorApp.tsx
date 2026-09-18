@@ -22,6 +22,9 @@ export function OperadorApp() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(chaveLocal));
   const sessao = useQuery(api.operador.acesso.sessaoAtual, token ? { token } : "skip");
   const sair = useMutation(api.operador.acesso.sair);
+  // Some Casey volta pro PIN sem entender por quê (sessão caiu sozinha por
+  // inatividade) — a saída manual (botão "Sair") não mostra essa mensagem.
+  const [expirouPorInatividade, setExpirouPorInatividade] = useState(false);
 
   // "Voltar" físico do celular navega dentro do app (um passo por vez), em vez de
   // sair do fluxo. Ativo enquanto o app do operador estiver montado.
@@ -38,6 +41,7 @@ export function OperadorApp() {
   function aoEntrar(novoToken: string) {
     localStorage.setItem(chaveLocal, novoToken);
     setToken(novoToken);
+    setExpirouPorInatividade(false);
   }
 
   function aoSair() {
@@ -50,6 +54,7 @@ export function OperadorApp() {
   // só faz a UI perceber sozinha, sem esperar uma ação falhar.
   useOciosidade(token !== null && sessao != null, () => {
     if (token) void sair({ token }).catch(() => {});
+    setExpirouPorInatividade(true);
     aoSair();
   });
 
@@ -69,12 +74,26 @@ export function OperadorApp() {
     );
   } else if (!token) {
     // Sem token, ou token existente ainda validando/já inválido.
-    conteudo = <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
+    conteudo = (
+      <PinScreen
+        qrToken={qrToken!}
+        camaraNome={camara.nome}
+        aoEntrar={aoEntrar}
+        mensagemInicial={expirouPorInatividade ? "Sua sessão expirou por inatividade. Entre de novo." : undefined}
+      />
+    );
   } else if (sessao === undefined) {
     conteudo = <Centro>Carregando…</Centro>;
   } else if (sessao === null) {
     // Efeito acima vai limpar; enquanto isso, mostra o PIN.
-    conteudo = <PinScreen qrToken={qrToken!} camaraNome={camara.nome} aoEntrar={aoEntrar} />;
+    conteudo = (
+      <PinScreen
+        qrToken={qrToken!}
+        camaraNome={camara.nome}
+        aoEntrar={aoEntrar}
+        mensagemInicial={expirouPorInatividade ? "Sua sessão expirou por inatividade. Entre de novo." : undefined}
+      />
+    );
   } else {
     conteudo = <SessaoOperador token={token} sessao={sessao} aoSair={aoSair} />;
   }

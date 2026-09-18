@@ -80,7 +80,7 @@ export function ContagemFlow({
   if (estado.situacao === "pendente") {
     return (
       <Tela titulo="Contagem" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
-        <AvisoOperador>Já existe uma contagem desta câmara aguardando o Admin. Fale com ele.</AvisoOperador>
+        <AvisoOperador tom="aviso">Já existe uma contagem desta câmara aguardando o Admin. Fale com ele.</AvisoOperador>
       </Tela>
     );
   }
@@ -88,7 +88,7 @@ export function ContagemFlow({
   if (estado.situacao === "de_outro") {
     return (
       <Tela titulo="Contagem" camaraNome={camaraNome} operadorNome={nome} onVoltar={onVoltar}>
-        <AvisoOperador>Outra pessoa já está contando esta câmara agora.</AvisoOperador>
+        <AvisoOperador tom="aviso">Outra pessoa já está contando esta câmara agora.</AvisoOperador>
       </Tela>
     );
   }
@@ -146,6 +146,11 @@ function Preenchimento({
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
+  // Pede uma segunda confirmação antes de enviar se algum formato não foi
+  // tocado — sem isso, um campo pulado sem querer vira "contado zero" e pode
+  // gerar uma divergência de estoque falsa, aprovável pelo Admin sem ele
+  // saber que ninguém realmente contou aquele formato.
+  const [pedindoConfirmacao, setPedindoConfirmacao] = useState(false);
 
   useEffect(() => {
     try {
@@ -155,8 +160,19 @@ function Preenchimento({
     }
   }, [contado, chaveRascunho]);
 
+  const formatosEmBranco = (grid ?? []).flatMap((p) => p.formatos).filter((f) => !contado[f._id]?.trim());
+
+  function aoTocarFechar() {
+    if (formatosEmBranco.length > 0) {
+      setPedindoConfirmacao(true);
+      return;
+    }
+    void confirmar();
+  }
+
   async function confirmar() {
     if (!grid) return;
+    setPedindoConfirmacao(false);
     setErro("");
     setEnviando(true);
     try {
@@ -199,11 +215,29 @@ function Preenchimento({
       operadorNome={nome}
       onVoltar={onVoltar}
       rodape={
-        <BotaoGrande onClick={confirmar} disabled={enviando || grid === undefined}>
+        <BotaoGrande onClick={aoTocarFechar} disabled={enviando || grid === undefined}>
           {enviando ? "Enviando…" : "Fechar contagem"}
         </BotaoGrande>
       }
     >
+      {pedindoConfirmacao ? (
+        <div className="mb-4 flex flex-col gap-3">
+          <AvisoOperador tom="aviso">
+            {formatosEmBranco.length === 1
+              ? "1 formato ficou em branco e será registrado como contagem zero."
+              : `${formatosEmBranco.length} formatos ficaram em branco e serão registrados como contagem zero.`}{" "}
+            Confirma mesmo assim?
+          </AvisoOperador>
+          <div className="flex gap-3">
+            <BotaoGrande variante="neutro" onClick={() => setPedindoConfirmacao(false)}>
+              Revisar
+            </BotaoGrande>
+            <BotaoGrande onClick={confirmar} disabled={enviando}>
+              {enviando ? "Enviando…" : "Enviar mesmo assim"}
+            </BotaoGrande>
+          </div>
+        </div>
+      ) : null}
       {grid === undefined ? (
         <p className="text-base text-texto-suave">Carregando…</p>
       ) : grid.length === 0 ? (
@@ -217,23 +251,28 @@ function Preenchimento({
                 {p.formatos.length === 0 ? (
                   <p className="text-sm text-texto-suave">Sem formatos ativos.</p>
                 ) : (
-                  p.formatos.map((f) => (
-                    <label key={f._id} className="flex items-center justify-between gap-3">
-                      <span className="text-base text-texto">
-                        {rotuloFormato(f)}
-                        <span className="ml-1 text-sm text-texto-suave">
-                          ({f.pesoVariavel ? "kg" : nomeUnidade(f, 2)})
+                  p.formatos.map((f) => {
+                    const emBranco = !contado[f._id]?.trim();
+                    return (
+                      <label key={f._id} className="flex items-center justify-between gap-3">
+                        <span className="text-base text-texto">
+                          {rotuloFormato(f)}
+                          <span className="ml-1 text-sm text-texto-suave">
+                            ({f.pesoVariavel ? "kg" : nomeUnidade(f, 2)})
+                          </span>
                         </span>
-                      </span>
-                      <input
-                        inputMode="decimal"
-                        value={contado[f._id] ?? ""}
-                        onChange={(e) => setContado((c) => ({ ...c, [f._id]: e.target.value }))}
-                        placeholder="0"
-                        className="w-28 rounded-xl border border-borda bg-superficie px-3 py-3 text-center font-mono text-2xl text-texto outline-none focus:border-acento"
-                      />
-                    </label>
-                  ))
+                        <input
+                          inputMode="decimal"
+                          value={contado[f._id] ?? ""}
+                          onChange={(e) => setContado((c) => ({ ...c, [f._id]: e.target.value }))}
+                          placeholder="não contado"
+                          className={`w-28 rounded-xl border bg-superficie px-3 py-3 text-center font-mono text-2xl text-texto outline-none focus:border-acento placeholder:font-sans placeholder:text-xs placeholder:tracking-normal placeholder:text-texto-fraco ${
+                            emBranco ? "border-dashed border-aviso" : "border-borda"
+                          }`}
+                        />
+                      </label>
+                    );
+                  })
                 )}
               </div>
             </div>

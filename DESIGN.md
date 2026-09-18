@@ -10,7 +10,7 @@ colors:
   acento-escuro: "#0b647f"
   texto: "#16232a"
   texto-suave: "#55666d"
-  texto-fraco: "#869399"
+  texto-fraco: "#6b757c"
   borda: "#d7e1e4"
   borda-forte: "#bfcdd1"
   gelo: "#54b7d2"
@@ -149,7 +149,7 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 - **Superfície Fria** (`#e6edef`) e **Superfície Fria 2** (`#dce6e8`): painéis recuados, realce de linha no hover, item de menu ativo. É assim que se cria profundidade — por tom, não por sombra.
 - **Tinta** (`#16232a`): texto principal — cinza-azulado escuro, nunca preto puro.
 - **Tinta Suave** (`#55666d`): texto secundário, rótulos de campo.
-- **Tinta Fraca** (`#869399`): legendas, rótulos de mostrador, texto de terceiro nível.
+- **Tinta Fraca** (`#6b757c`): legendas, rótulos de mostrador, texto de terceiro nível. Escurecida a partir do `#869399` original para garantir contraste AA (4,5:1) sobre branco.
 - **Borda** (`#d7e1e4`) e **Borda Forte** (`#bfcdd1`): divisores e contornos; a borda forte marca contornos de selo/pill discretos.
 
 ### Named Rules
@@ -170,6 +170,7 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 - **Title** (Poppins 600, 0.9375rem / 15px): cabeçalho de painel/cartão ("Produção de hoje", "Estoque por produto").
 - **Body** (Inter 400, 0.875rem / 14px, `line-height: 1.5`): texto geral, células de tabela, descrições. Ênfase com peso 500/600, nunca com cor.
 - **Label** (IBM Plex Mono 600, 0.75rem / 12px, `letter-spacing: 0.05em`, versalete): cabeçalho de tabela, "eyebrow" de KPI, rótulos de seção. É a assinatura tipográfica do sistema.
+- **Micro-rótulo** (IBM Plex Mono 500/600, 0.625–0.6875rem / 10–11px, tracking largo, versalete): a mesma assinatura do Label, num espaço mais apertado onde 12px não cabe — crachá do operador no cabeçalho, "Passo N de M", eyebrow "Quantidade"/"Peso" do resumo de lançamento, cabeçalho de grupo de combobox. Continua Plex Mono/versalete/tracking; só o tamanho encolhe.
 - **Data** (IBM Plex Mono 600, até 1.875rem / 30px, `line-height: 1`): os números grandes de KPI e saldo. A unidade (kg, formatos) vem ao lado em Inter pequeno e fraco, para o número reinar sozinho.
 
 ### Named Rules

@@ -49,7 +49,7 @@ export function ConvitePwaIOS() {
     <div
       role="dialog"
       aria-label="Instalar o Estoque 065"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-borda bg-superficie px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.15)]"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-borda bg-superficie px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
     >
       <div className="flex items-start gap-3">
         <img src="/logo-065.png" alt="" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-borda" />

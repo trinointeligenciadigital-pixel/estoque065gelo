@@ -14,20 +14,28 @@ export function PinScreen({
   qrToken,
   camaraNome,
   aoEntrar,
+  mensagemInicial,
 }: {
   qrToken: string;
   camaraNome: string;
   aoEntrar: (token: string) => void;
+  // Ex.: "sessão expirou por inatividade" — explica por que a pessoa caiu
+  // aqui sem ter feito nada de errado, em vez de ela achar que é erro de PIN.
+  mensagemInicial?: string;
 }) {
   const entrar = useMutation(api.operador.acesso.entrar);
   const [pin, setPin] = useState("");
-  const [erro, setErro] = useState("");
+  const [erro, setErro] = useState(mensagemInicial ?? "");
+  // Distingue o aviso inicial ("sessão expirou") de um erro de PIN de
+  // verdade — o primeiro não é culpa da pessoa, não deveria soar como erro.
+  const [aviso, setAviso] = useState(Boolean(mensagemInicial));
   const [erros, setErros] = useState(0); // conta falhas p/ retrigar o tremor
   const [enviando, setEnviando] = useState(false);
 
   async function tentar(valor: string) {
     setEnviando(true);
     setErro("");
+    setAviso(false);
     try {
       const r = await entrar({ qrToken, pin: valor });
       if (r.ok) {
@@ -85,7 +93,13 @@ export function PinScreen({
         ))}
       </div>
 
-      <div role="alert" className="h-6 text-center text-base text-alerta">{erro}</div>
+      <div
+        role={aviso ? "status" : "alert"}
+        aria-live={aviso ? "polite" : "assertive"}
+        className={`h-6 text-center text-base ${aviso ? "text-aviso" : "text-alerta"}`}
+      >
+        {erro}
+      </div>
 
       <div className="grid w-full max-w-xs grid-cols-3 gap-3">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (

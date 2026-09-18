@@ -246,15 +246,20 @@ export function EstadoVazio({ mensagem, onVoltar }: { mensagem: string; onVoltar
   );
 }
 
-export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode; tom?: "erro" | "ok" }) {
-  // role/aria-live: leitor de tela anuncia erro (assertivo) e sucesso (educado).
+export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode; tom?: "erro" | "ok" | "aviso" }) {
+  // role/aria-live: só o erro de verdade é assertivo — "aviso" (atenção sem
+  // urgência: outra pessoa contando, quantidade fora do padrão) e "ok" são
+  // educados, pra não soar alarme onde não é erro (DESIGN.md, tom âmbar).
+  const estilos = {
+    erro: "bg-alerta/10 text-alerta",
+    aviso: "bg-aviso/10 text-aviso",
+    ok: "bg-entrada/10 text-entrada",
+  } as const;
   return (
     <div
       role={tom === "erro" ? "alert" : "status"}
       aria-live={tom === "erro" ? "assertive" : "polite"}
-      className={`rounded-xl px-4 py-3 text-base ${
-        tom === "erro" ? "bg-alerta/10 text-alerta" : "bg-entrada/10 text-entrada"
-      }`}
+      className={`rounded-xl px-4 py-3 text-base ${estilos[tom]}`}
     >
       {children}
     </div>

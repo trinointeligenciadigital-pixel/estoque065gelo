@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { ChevronRight } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
 import { data } from "../lib/data.ts";
+import { normalizarBusca } from "../lib/busca.ts";
 import { formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
 import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
 
@@ -67,6 +69,10 @@ export function RetornoFlow({
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
   const [protocolo, setProtocolo] = useState("");
+  // Busca por cliente/produto (mesmo padrão de ListaProdutos) — sem isso, uma
+  // câmara com vários patrocínios em aberto ao mesmo tempo só dá pra achar
+  // rolando a lista inteira.
+  const [busca, setBusca] = useState("");
 
   function escolher(p: Patrocinio) {
     setAlvo(p);
@@ -166,21 +172,47 @@ export function RetornoFlow({
         <EstadoVazio mensagem="Nenhum patrocínio em aberto nesta câmara." onVoltar={onVoltar} />
       ) : (
         <div className="flex flex-col gap-3">
-          {abertos.map((p) => (
-            <button
-              key={p.origemId}
-              onClick={() => escolher(p)}
-              className="flex flex-col gap-1 rounded-xl border border-borda bg-superficie px-4 py-3 text-left"
-            >
-              <span className="text-base font-medium text-texto">{p.clienteNome || "Sem cliente"}</span>
-              <span className="text-sm text-texto-suave">
-                {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
-              </span>
-              <span className="font-mono text-sm text-acento">
-                em aberto: {formatarQtd(p.aberto, p)}
-              </span>
-            </button>
-          ))}
+          {abertos.length > 4 ? (
+            <input
+              type="search"
+              inputMode="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar cliente ou produto…"
+              aria-label="Buscar cliente ou produto"
+              className="min-h-[56px] w-full rounded-xl border border-borda bg-superficie px-4 text-base text-texto outline-none focus:border-acento"
+            />
+          ) : null}
+          {(() => {
+            const termo = normalizarBusca(busca);
+            const filtrados = termo === ""
+              ? abertos
+              : abertos.filter(
+                  (p) => normalizarBusca(p.clienteNome).includes(termo) || normalizarBusca(p.produtoNome).includes(termo),
+                );
+            return filtrados.length === 0 ? (
+              <p className="text-base text-texto-suave">Nenhum resultado para "{busca}".</p>
+            ) : (
+              filtrados.map((p) => (
+                <button
+                  key={p.origemId}
+                  onClick={() => escolher(p)}
+                  className="flex items-center gap-3 rounded-xl border border-borda bg-superficie px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="text-base font-medium text-texto">{p.clienteNome || "Sem cliente"}</span>
+                    <span className="text-sm text-texto-suave">
+                      {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
+                    </span>
+                    <span className="font-mono text-sm text-acento">
+                      em aberto: {formatarQtd(p.aberto, p)}
+                    </span>
+                  </span>
+                  <ChevronRight size={22} className="shrink-0 text-texto-fraco" aria-hidden="true" />
+                </button>
+              ))
+            );
+          })()}
         </div>
       )}
     </Tela>

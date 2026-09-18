@@ -19,13 +19,23 @@ export function usePlausibilidade(args: {
   quantidade: number; // pacotes, ou kg se o formato for de peso variável
 }) {
   const [confirmouAviso, setConfirmouAviso] = useState(false);
+
+  // Espera uma pausa na digitação antes de checar (300ms) — sem isso, o botão
+  // do rodapé pode trocar de "Continuar" para "Confirmar mesmo assim" no meio
+  // de digitar um número de vários dígitos, bem embaixo do dedo.
+  const [quantidadeEstavel, setQuantidadeEstavel] = useState(args.quantidade);
+  useEffect(() => {
+    const t = setTimeout(() => setQuantidadeEstavel(args.quantidade), 300);
+    return () => clearTimeout(t);
+  }, [args.quantidade]);
+
   // Cada nova tentativa exige confirmação de novo — mudou o número (ou o
   // item), a confirmação anterior não vale mais pro número novo.
   useEffect(() => {
     setConfirmouAviso(false);
-  }, [args.produtoId, args.formatoId, args.quantidade]);
+  }, [args.produtoId, args.formatoId, quantidadeEstavel]);
 
-  const ativo = args.produtoId !== null && args.formatoId !== null && args.quantidade > 0;
+  const ativo = args.produtoId !== null && args.formatoId !== null && quantidadeEstavel > 0;
   const check = useQuery(
     api.operador.consulta.checarPlausibilidade,
     ativo
@@ -34,7 +44,7 @@ export function usePlausibilidade(args: {
           produtoId: args.produtoId!,
           formatoId: args.formatoId!,
           tipo: args.tipo,
-          quantidade: args.quantidade,
+          quantidade: quantidadeEstavel,
         }
       : "skip",
   );
