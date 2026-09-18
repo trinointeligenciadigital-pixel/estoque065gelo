@@ -21,6 +21,21 @@ function dataHoraOuTraco(ms: number | null): string {
   return ms ? dataHora(ms) : "—";
 }
 
+// Selo dos 3 estados de uma contagem — pendente ganha o âmbar de "atenção
+// sem urgência" (DESIGN.md), fechando o mesmo vocabulário que aprovada/
+// rejeitada já usavam só entre si. Sem isto, a fila de "Aguardando decisão"
+// não carregava nenhum sinal de estado, só texto neutro.
+function PillStatusContagem({ status }: { status: "pendente" | "aprovada" | "rejeitada" }) {
+  const estilo = {
+    pendente: "bg-aviso/10 text-aviso",
+    aprovada: "bg-entrada/10 text-entrada",
+    rejeitada: "bg-alerta/10 text-alerta",
+  }[status];
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${estilo}`}>{status}</span>
+  );
+}
+
 type Retomar = { contagemId: Id<"contagens">; camaraId: Id<"camaras"> };
 type Vista =
   | { tela: "lista" }
@@ -97,7 +112,10 @@ export function ContagensPage() {
           ) : (
             pendentes.map((c) => (
               <LinhaTabela key={c._id}>
-                <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
+                <td className="px-3 py-2.5">
+                  <span className="font-medium text-texto">{c.camaraNome}</span>{" "}
+                  <PillStatusContagem status="pendente" />
+                </td>
                 <td className="px-3 py-2.5 text-texto-suave">{c.abertaPorNome}</td>
                 <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.fechadaEm)}</td>
                 <td className="px-3 py-2.5 text-right">
@@ -118,13 +136,7 @@ export function ContagensPage() {
               <LinhaTabela key={c._id}>
                 <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
                 <td className="px-3 py-2.5">
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      c.status === "aprovada" ? "bg-entrada/10 text-entrada" : "bg-alerta/10 text-alerta"
-                    }`}
-                  >
-                    {c.status === "aprovada" ? "aprovada" : "rejeitada"}
-                  </span>
+                  <PillStatusContagem status={c.status === "aprovada" ? "aprovada" : "rejeitada"} />
                 </td>
                 <td className="px-3 py-2.5 text-texto-suave">{c.decididaPorNome}</td>
                 <td className="px-3 py-2.5 font-mono text-texto-suave">{dataHoraOuTraco(c.decididaEm)}</td>

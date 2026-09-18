@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { Trash2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina, Toast } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarContagem, formatarPeso, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
@@ -450,7 +450,6 @@ export function LancamentoPage() {
           ) : null}
 
           {erro ? <Aviso>{erro}</Aviso> : null}
-          {msg ? <Aviso tom="info">{msg}</Aviso> : null}
 
           <div className="flex justify-end">
             <Botao onClick={confirmar} disabled={!podeEnviar}>
@@ -459,6 +458,8 @@ export function LancamentoPage() {
           </div>
         </div>
       </Cartao>
+
+      {msg ? <Toast texto={msg} onFechar={() => setMsg("")} /> : null}
     </>
   );
 }

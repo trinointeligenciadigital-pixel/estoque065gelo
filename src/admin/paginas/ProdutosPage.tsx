@@ -214,7 +214,7 @@ function FormProduto({
           O estoque mínimo é definido em cada formato (por tamanho de pacote), na tela de Formatos.
         </p>
 
-        {avisoHomonimo ? <Aviso tom="info">{avisoHomonimo}</Aviso> : null}
+        {avisoHomonimo ? <Aviso tom="aviso">{avisoHomonimo}</Aviso> : null}
 
         {!novo ? (
           <MarcaAtivo

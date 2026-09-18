@@ -593,10 +593,18 @@ export function TituloPagina({ titulo, subtitulo, acao }: { titulo: string; subt
   );
 }
 
-export function Aviso({ children, tom = "erro" }: { children: ReactNode; tom?: "erro" | "info" }) {
-  return (
-    <p className={`text-sm ${tom === "erro" ? "text-alerta" : "text-texto-suave"}`}>{children}</p>
-  );
+// "ok" e "aviso" existiam antes só do lado do colaborador (AvisoOperador em
+// src/operador/ui.tsx) — sucesso e atenção não-bloqueante do Admin caíam os
+// dois em "info" (cinza neutro), sem diferença visual entre "deu certo" e
+// "só um lembrete". Mesma paleta semântica dos dois lados agora.
+export function Aviso({ children, tom = "erro" }: { children: ReactNode; tom?: "erro" | "aviso" | "ok" | "info" }) {
+  const cores = {
+    erro: "text-alerta",
+    aviso: "text-aviso",
+    ok: "text-entrada",
+    info: "text-texto-suave",
+  } as const;
+  return <p className={`text-sm ${cores[tom]}`}>{children}</p>;
 }
 
 export function Modal({
