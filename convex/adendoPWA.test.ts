@@ -200,15 +200,19 @@ describe("Tarefa 4 — protocolo em todo lançamento", () => {
       quantidade: 20,
     });
 
-    const achados = await admin.query(api.admin.historico.listar, { protocolo });
-    expect(achados).toHaveLength(1);
-    expect(achados[0].protocolo).toBe(protocolo);
+    const achados = await admin.query(api.admin.historico.listar, {
+      protocolo,
+      paginationOpts: { numItems: 500, cursor: null },
+    });
+    expect(achados.page).toHaveLength(1);
+    expect(achados.page[0].protocolo).toBe(protocolo);
 
     // Busca sem distinguir maiúsculo/minúsculo.
     const achadosMinusculo = await admin.query(api.admin.historico.listar, {
       protocolo: protocolo.toLowerCase(),
+      paginationOpts: { numItems: 500, cursor: null },
     });
-    expect(achadosMinusculo).toHaveLength(1);
+    expect(achadosMinusculo.page).toHaveLength(1);
   });
 });
 

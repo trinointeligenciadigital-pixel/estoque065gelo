@@ -1,14 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, SelecaoInline, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { ComprovanteCartao } from "../../shared/ComprovanteCartao.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPacotes, formatarPeso, rotuloFormato } from "../../lib/formato.ts";
+import { formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../../lib/comprovante.ts";
 
@@ -54,6 +54,7 @@ type MovRow = {
   formatoPesoKg: number;
   formatoPesoVariavel: boolean;
   formatoUnidadesPorPacote: number | null;
+  formatoUnidadeContagem: "pacote" | "unidade";
   camaraNome: string;
   quantidade: number;
   pesoKg: number;
@@ -114,6 +115,17 @@ function fimDoDia(s: string): number | undefined {
   return s ? new Date(`${s}T23:59:59.999`).getTime() : undefined;
 }
 
+// "AAAA-MM-DD" de um instante, no fuso de Cuiabá (RNF15) — mesmo cálculo do
+// link do gráfico do Painel (ver ymdCuiaba em PainelPage.tsx).
+const CUIABA_OFFSET_MS = -4 * 60 * 60 * 1000;
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
+function ymdCuiaba(ms: number): string {
+  const d = new Date(ms + CUIABA_OFFSET_MS);
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 export function HistoricoPage() {
   const opcoes = useQuery(api.admin.historico.opcoesFiltro);
   // Cabeçalho do comprovante (tarefa 7) — mesma leitura pública usada pelo operador.
@@ -132,8 +144,17 @@ export function HistoricoPage() {
   const [tipo, setTipo] = useState<Tipo | "">(() => (params.get("tipo") as Tipo) || "");
   const [operadorId, setOperadorId] = useState<Id<"operadores"> | "">(() => (params.get("operadorId") as Id<"operadores">) || "");
   const [autorClerkId, setAutorClerkId] = useState<string>(() => params.get("autorClerkId") ?? "");
-  const [de, setDe] = useState(() => params.get("de") ?? "");
-  const [ate, setAte] = useState(() => params.get("ate") ?? "");
+  // Sem NENHUM filtro na URL (visita direta à página, não um link vindo de
+  // outra tela) — o padrão é os últimos 30 dias. Sem isso, a consulta varria
+  // o histórico inteiro da fábrica desde o primeiro lançamento (parecia uma
+  // lista infinita pro Admin). Um link com contagemId ("Ver ajustes gerados"
+  // em Contagens) ou com de/ate explícitos (gráfico do Painel) já chega com
+  // algo na URL, então nunca cai nesse padrão.
+  const semNenhumFiltroNaUrl = params.toString() === "";
+  const [de, setDe] = useState(
+    () => params.get("de") ?? (semNenhumFiltroNaUrl ? ymdCuiaba(Date.now() - 29 * UM_DIA_MS) : ""),
+  );
+  const [ate, setAte] = useState(() => params.get("ate") ?? (semNenhumFiltroNaUrl ? ymdCuiaba(Date.now()) : ""));
   const [contagemId] = useState<Id<"contagens"> | "">(() => (params.get("contagemId") as Id<"contagens">) || "");
   // Busca por protocolo (tarefa 4 do adendo) — localiza qualquer lançamento,
   // inclusive ajuste e estorno, sem precisar saber câmara/produto/tipo.
@@ -162,25 +183,37 @@ export function HistoricoPage() {
     setSearchParams(next, { replace: true });
   }, [camaraId, produtoId, tipo, operadorId, autorClerkId, protocolo, de, ate, contagemId, setSearchParams]);
 
-  const movs = useQuery(api.admin.historico.listar, {
-    camaraId: camaraId || undefined,
-    produtoId: produtoId || undefined,
-    tipo: tipo || undefined,
-    operadorId: operadorId || undefined,
-    autorClerkId: autorClerkId || undefined,
-    contagemId: contagemId || undefined,
-    protocolo: protocolo.trim() || undefined,
-    de: inicioDoDia(de),
-    ate: fimDoDia(ate),
-  });
+  // Paginação real (RF61 — convex/admin/historico.ts não faz mais um
+  // .collect() com limite fixo). Cada mudança de filtro reinicia a paginação
+  // (o Convex detecta pelos args); "Carregar mais" busca a próxima página do
+  // mesmo índice usado no servidor.
+  const {
+    results: movs,
+    status: statusMovs,
+    loadMore,
+  } = usePaginatedQuery(
+    api.admin.historico.listar,
+    {
+      camaraId: camaraId || undefined,
+      produtoId: produtoId || undefined,
+      tipo: tipo || undefined,
+      operadorId: operadorId || undefined,
+      autorClerkId: autorClerkId || undefined,
+      contagemId: contagemId || undefined,
+      protocolo: protocolo.trim() || undefined,
+      de: inicioDoDia(de),
+      ate: fimDoDia(ate),
+    },
+    { initialNumItems: 100 },
+  );
 
   // Com produto ou contagem específicos já filtrados, mostrar as linhas
   // individuais (o Admin está procurando algo pontual). Sem esses filtros,
   // ajustes da mesma aprovação de contagem colapsam numa linha-resumo.
   const semAgrupar = produtoId !== "" || contagemId !== "";
   const linhas: LinhaAgrupada[] = semAgrupar
-    ? (movs ?? []).map((mov) => ({ tipo: "individual" as const, mov }))
-    : agruparPorLote(movs ?? []);
+    ? movs.map((mov) => ({ tipo: "individual" as const, mov }))
+    : agruparPorLote(movs);
 
   const filtrosAvancadosAtivos = [protocolo.trim() !== "", produtoId !== "", operadorId !== "" || autorClerkId !== ""].filter(
     Boolean,
@@ -204,10 +237,10 @@ export function HistoricoPage() {
   // linha faz parte de um carregamento (carregamentoId), agrupa TODAS as linhas
   // do mesmo carregamento presentes no resultado carregado — um comprovante só,
   // com todos os produtos e o peso total. Linha avulsa vira comprovante de 1 item.
-  function montarComprovante(m: NonNullable<typeof movs>[number]): DadosComprovante {
+  function montarComprovante(m: MovRow): DadosComprovante {
     const irmas =
       m.carregamentoId != null
-        ? (movs ?? []).filter((x) => x.carregamentoId === m.carregamentoId)
+        ? movs.filter((x) => x.carregamentoId === m.carregamentoId)
         : [m];
     const itens = irmas.map((x) => ({
       produtoNome: x.produtoNome,
@@ -218,6 +251,7 @@ export function HistoricoPage() {
         unidadesPorPacote: x.formatoUnidadesPorPacote,
       }),
       quantidadePacotes: x.formatoPesoVariavel ? null : x.quantidade,
+      unidadeContagem: x.formatoUnidadeContagem,
       pesoKg: x.pesoKg,
     }));
     return {
@@ -344,29 +378,44 @@ export function HistoricoPage() {
           { rotulo: "Comprovante", dir: true },
         ]}
       >
-        {movs === undefined ? (
+        {statusMovs === "LoadingFirstPage" ? (
           <LinhaMensagem colSpan={9}>Carregando…</LinhaMensagem>
         ) : movs.length === 0 ? (
           <LinhaMensagem colSpan={9}>Nenhuma movimentação com esses filtros.</LinhaMensagem>
         ) : (
-          linhas.map((l) =>
-            l.tipo === "individual" ? (
-              <LinhaMov
-                key={l.mov._id}
-                m={l.mov}
-                onComprovante={() => setComprovante(montarComprovante(l.mov))}
-                onEstornar={() => setEstornando(l.mov)}
-              />
-            ) : (
-              <LinhaGrupo
-                key={l.loteId}
-                itens={l.itens}
-                onComprovante={(m) => setComprovante(montarComprovante(m))}
-                onEstornar={(m) => setEstornando(m)}
-                onEstornarTransferencia={(loteId) => setEstornandoTransferLote(loteId)}
-              />
-            ),
-          )
+          <>
+            {linhas.map((l) =>
+              l.tipo === "individual" ? (
+                <LinhaMov
+                  key={l.mov._id}
+                  m={l.mov}
+                  onComprovante={() => setComprovante(montarComprovante(l.mov))}
+                  onEstornar={() => setEstornando(l.mov)}
+                />
+              ) : (
+                <LinhaGrupo
+                  key={l.loteId}
+                  itens={l.itens}
+                  onComprovante={(m) => setComprovante(montarComprovante(m))}
+                  onEstornar={(m) => setEstornando(m)}
+                  onEstornarTransferencia={(loteId) => setEstornandoTransferLote(loteId)}
+                />
+              ),
+            )}
+            {statusMovs === "CanLoadMore" || statusMovs === "LoadingMore" ? (
+              <tr>
+                <td colSpan={9} className="px-3 py-3 text-center">
+                  <Botao
+                    variante="neutro"
+                    onClick={() => loadMore(100)}
+                    disabled={statusMovs === "LoadingMore"}
+                  >
+                    {statusMovs === "LoadingMore" ? "Carregando…" : "Carregar mais"}
+                  </Botao>
+                </td>
+              </tr>
+            ) : null}
+          </>
         )}
       </Tabela>
 
@@ -428,7 +477,7 @@ function LinhaMov({
       <td className="px-3 py-2.5 text-texto">{m.produtoNome} <span className="text-texto-suave">/ {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
       <td className="px-3 py-2.5 text-texto-suave">{m.camaraNome}</td>
       <td className="px-3 py-2.5 text-right font-mono font-semibold text-texto">
-        {m.formatoPesoVariavel ? "—" : formatarPacotes(m.quantidade)}
+        {m.formatoPesoVariavel ? "—" : formatarQuantidade(m.quantidade, { pesoVariavel: false, unidadeContagem: m.formatoUnidadeContagem })}
       </td>
       <td className="px-3 py-2.5 text-right font-mono text-xs text-texto-suave">{formatarPeso(m.pesoKg)}</td>
       <td className="px-3 py-2.5 text-texto-suave">
@@ -603,7 +652,7 @@ function LinhaGrupoTransferencia({
               <span className="font-mono font-medium">
                 {origem.formatoPesoVariavel
                   ? formatarPeso(origem.pesoKg)
-                  : `${formatarPacotes(origem.quantidade)} · ${formatarPeso(origem.pesoKg)}`}
+                  : `${formatarQuantidade(origem.quantidade, { pesoVariavel: false, unidadeContagem: origem.formatoUnidadeContagem })} · ${formatarPeso(origem.pesoKg)}`}
               </span>{" "}
               · {origem.autor}
             </span>
@@ -668,13 +717,15 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
                 <span className="text-texto-suave"> · {preview.camaraNome}</span>
               </p>
               <p className="mt-1 font-mono text-sm text-texto">
-                {!preview.pesoVariavel ? <>{formatarPacotes(preview.impactoQuantidade)} · </> : null}
+                {!preview.pesoVariavel ? (
+                  <>{formatarQuantidade(preview.impactoQuantidade, { pesoVariavel: false, unidadeContagem: preview.formatoUnidadeContagem })} · </>
+                ) : null}
                 {formatarPeso(preview.impactoPesoKg)}
               </p>
               <p className="mt-2 text-xs text-texto-suave">
                 Saldo depois do estorno:{" "}
                 <span className="font-mono font-medium text-texto">
-                  {preview.pesoVariavel ? formatarPeso(preview.saldoDepois) : formatarPacotes(preview.saldoDepois)}
+                  {formatarQuantidade(preview.saldoDepois, { pesoVariavel: preview.pesoVariavel, unidadeContagem: preview.formatoUnidadeContagem })}
                 </span>
               </p>
             </div>
@@ -749,7 +800,9 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
                     / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.formatoPesoVariavel, unidadesPorPacote: p.formatoUnidadesPorPacote })}
                   </span>
                   <span className="ml-2 font-mono font-medium">
-                    {p.formatoPesoVariavel ? formatarPeso(p.pesoKg) : `${formatarPacotes(p.quantidade)} · ${formatarPeso(p.pesoKg)}`}
+                    {p.formatoPesoVariavel
+                      ? formatarPeso(p.pesoKg)
+                      : `${formatarQuantidade(p.quantidade, { pesoVariavel: false, unidadeContagem: p.formatoUnidadeContagem })} · ${formatarPeso(p.pesoKg)}`}
                   </span>
                 </p>
               ))}

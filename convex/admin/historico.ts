@@ -1,16 +1,26 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import { query } from "../_generated/server";
 import { exigirAdmin } from "../lib/auth";
 import { rotuloPlacaOuTexto } from "../lib/placa";
+import type { Doc } from "../_generated/dataModel";
 
 /*
   Histórico de movimentações do Admin (RF61). Somente leitura — não existe nenhuma
   mutation de edição/exclusão de movimentação em lugar nenhum (RF36, RF62). O Admin
   lê tudo, de todas as câmaras (RF64). Filtros: câmara, produto, tipo, período e
-  autor. A filtragem é em memória (aceitável no v1); o resultado é limitado.
-*/
+  autor.
 
-const LIMITE = 500;
+  Paginação real (auditoria de paginação): a base é sempre o índice
+  by_registrado_em (mais recente primeiro), com `de`/`ate` como intervalo do
+  próprio índice — não um `.collect()` de tabela inteira filtrado em memória
+  como antes. Os demais filtros (câmara, produto, tipo, operador, autor,
+  contagem) entram como `.filter()` do Convex sobre esse índice, antes do
+  `.paginate()`. Câmara deixou de ter índice dedicado aqui de propósito: com
+  uma fábrica só, poucas câmaras, o corte por data já limita o quanto o
+  `.filter()` precisa varrer — e assim a ordenação por data fica sempre
+  correta entre páginas, o que um índice separado por câmara não garantia.
+*/
 
 export const listar = query({
   args: {
@@ -37,59 +47,84 @@ export const listar = query({
     // pediu para ver justamente as linhas daquela contagem.
     contagemId: v.optional(v.id("contagens")),
     // Busca por protocolo (tarefa 4 do adendo) — qualquer lançamento (inclusive
-    // ajuste e estorno) pode ser localizado por ele. Não combina com o LIMITE
-    // dos outros filtros: é uma busca direta pelo índice, não uma varredura.
+    // ajuste e estorno) pode ser localizado por ele. É uma busca direta pelo
+    // índice dedicado, sempre poucos resultados — não passa pelo paginate.
     protocolo: v.optional(v.string()),
     de: v.optional(v.number()),
     ate: v.optional(v.number()),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     await exigirAdmin(ctx);
 
     const buscaProtocolo = args.protocolo?.trim().toUpperCase() || undefined;
 
-    // Busca por protocolo: pelo índice dedicado, ignora a escolha de índice
-    // por câmara/data (o protocolo já é específico o bastante). Sem protocolo,
-    // segue como antes — câmara se filtrada, senão por data (mais recente).
-    const base = buscaProtocolo
-      ? await ctx.db
-          .query("movimentacoes")
-          .withIndex("by_protocolo", (q) => q.eq("protocolo", buscaProtocolo))
-          .collect()
-      : args.camaraId
-        ? await ctx.db
-            .query("movimentacoes")
-            .withIndex("by_camara", (q) => q.eq("camaraId", args.camaraId!))
-            .collect()
-        : await ctx.db.query("movimentacoes").withIndex("by_registrado_em").collect();
+    // Os filtros que não são o intervalo de data ficam num predicado só,
+    // reaproveitado tanto na busca por protocolo (em memória — poucos
+    // resultados) quanto na consulta paginada (em Convex .filter()).
+    function combina(
+      m: Pick<Doc<"movimentacoes">, "camaraId" | "produtoId" | "tipo" | "operadorId" | "clerkId" | "contagemId">,
+    ): boolean {
+      return (
+        (!args.camaraId || m.camaraId === args.camaraId) &&
+        (!args.produtoId || m.produtoId === args.produtoId) &&
+        (!args.tipo || m.tipo === args.tipo) &&
+        (!args.operadorId || m.operadorId === args.operadorId) &&
+        (!args.autorClerkId || m.clerkId === args.autorClerkId) &&
+        (!args.contagemId || m.contagemId === args.contagemId)
+      );
+    }
 
-    const filtradas = base
-      .filter((m) => (args.camaraId ? m.camaraId === args.camaraId : true))
-      .filter((m) => (args.produtoId ? m.produtoId === args.produtoId : true))
-      .filter((m) => (args.tipo ? m.tipo === args.tipo : true))
-      .filter((m) => (args.operadorId ? m.operadorId === args.operadorId : true))
-      .filter((m) => (args.autorClerkId ? m.clerkId === args.autorClerkId : true))
-      .filter((m) => (args.contagemId ? m.contagemId === args.contagemId : true))
-      .filter((m) => (args.de !== undefined ? m.registradoEm >= args.de : true))
-      .filter((m) => (args.ate !== undefined ? m.registradoEm <= args.ate : true))
-      .sort((a, b) => b.registradoEm - a.registradoEm)
-      .slice(0, LIMITE);
+    let page: Doc<"movimentacoes">[];
+    let isDone: boolean;
+    let continueCursor: string;
 
-    // "Este lançamento já foi estornado?" nunca é um campo cacheado (regra
-    // arquitetural 1/2 — movimentacoes é append-only, sem patch) — é sempre
-    // esta leitura: existe algum estorno com estornoDe === este _id? Varre
-    // TODOS os estornos (não só os desta página), porque o estorno pode estar
-    // fora do filtro atual mesmo que o original esteja dentro.
-    const todosEstornos = await ctx.db
-      .query("movimentacoes")
-      .withIndex("by_tipo", (q) => q.eq("tipo", "estorno"))
-      .collect();
-    const idsEstornados = new Set(
-      todosEstornos.map((e) => e.estornoDe).filter((id) => id !== undefined),
-    );
+    if (buscaProtocolo) {
+      const achados = await ctx.db
+        .query("movimentacoes")
+        .withIndex("by_protocolo", (q) => q.eq("protocolo", buscaProtocolo))
+        .collect();
+      page = achados.filter(combina);
+      isDone = true;
+      continueCursor = "";
+    } else {
+      let consulta = ctx.db
+        .query("movimentacoes")
+        .withIndex("by_registrado_em", (q) => {
+          if (args.de !== undefined && args.ate !== undefined) {
+            return q.gte("registradoEm", args.de).lte("registradoEm", args.ate);
+          }
+          if (args.de !== undefined) return q.gte("registradoEm", args.de);
+          if (args.ate !== undefined) return q.lte("registradoEm", args.ate);
+          return q;
+        })
+        .order("desc");
 
-    return await Promise.all(
-      filtradas.map(async (m) => {
+      if (args.camaraId || args.produtoId || args.tipo || args.operadorId || args.autorClerkId || args.contagemId) {
+        consulta = consulta.filter((q) =>
+          q.and(
+            ...(args.camaraId ? [q.eq(q.field("camaraId"), args.camaraId)] : []),
+            ...(args.produtoId ? [q.eq(q.field("produtoId"), args.produtoId)] : []),
+            ...(args.tipo ? [q.eq(q.field("tipo"), args.tipo)] : []),
+            ...(args.operadorId ? [q.eq(q.field("operadorId"), args.operadorId)] : []),
+            ...(args.autorClerkId ? [q.eq(q.field("clerkId"), args.autorClerkId)] : []),
+            ...(args.contagemId ? [q.eq(q.field("contagemId"), args.contagemId)] : []),
+          ),
+        );
+      }
+
+      const resultado = await consulta.paginate(args.paginationOpts);
+      page = resultado.page;
+      isDone = resultado.isDone;
+      continueCursor = resultado.continueCursor;
+    }
+
+    const linhas = await Promise.all(
+      page.map(async (m) => {
+        // "Este lançamento já foi estornado?" nunca é um campo cacheado (regra
+        // arquitetural 1/2 — movimentacoes é append-only, sem patch): é sempre
+        // esta leitura, pelo índice by_estorno_de — um lookup pontual por
+        // linha, não mais uma varredura de todos os estornos já registrados.
         const produto = await ctx.db.get(m.produtoId);
         const formato = await ctx.db.get(m.formatoId);
         const camara = await ctx.db.get(m.camaraId);
@@ -99,6 +134,10 @@ export const listar = query({
         // terceiro — tarefa 3). Registro anterior a esta correção pode ter
         // texto livre que não é placa nenhuma; rotuloPlacaOuTexto devolve
         // como veio, sem inventar uma placa que não existe.
+        const estorno = await ctx.db
+          .query("movimentacoes")
+          .withIndex("by_estorno_de", (q) => q.eq("estornoDe", m._id))
+          .first();
         const veiculoProprio = m.veiculoId ? await ctx.db.get(m.veiculoId) : null;
         const veiculo = veiculoProprio
           ? `${veiculoProprio.placa}${veiculoProprio.modelo ? ` · ${veiculoProprio.modelo}` : ""}`
@@ -118,6 +157,7 @@ export const listar = query({
           formatoPesoKg: formato?.pesoKg ?? 0,
           formatoPesoVariavel: formato?.pesoVariavel ?? false,
           formatoUnidadesPorPacote: formato?.unidadesPorPacote ?? null,
+          formatoUnidadeContagem: formato?.unidadeContagem ?? "pacote",
           camaraNome: camara?.nome ?? "—",
           quantidade: m.quantidade,
           pesoKg: m.pesoKg,
@@ -146,7 +186,7 @@ export const listar = query({
           contagemId: m.contagemId ?? null,
           // Estorno (tarefa 6): `estornado` é derivado (ver acima), nunca lido de
           // um campo — não existe "estornadoPor" gravado em lugar nenhum.
-          estornado: idsEstornados.has(m._id),
+          estornado: estorno !== null,
           estornoDeProtocolo: original ? (original.protocolo ?? original.chaveIdempotencia.slice(0, 8).toUpperCase()) : null,
           // Protocolo (tarefa 4 do adendo): campo próprio, nunca o _id interno
           // (RNF13). Registro anterior a este campo cai no cálculo antigo (8
@@ -158,6 +198,8 @@ export const listar = query({
         };
       }),
     );
+
+    return { page: linhas, isDone, continueCursor };
   },
 });
 

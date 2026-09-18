@@ -133,10 +133,12 @@ describe("Tarefa 3 — autor nominal em todo lançamento", () => {
       quantidade: 3,
     });
 
-    const historico = await admin.query(api.admin.historico.listar, {});
-    expect(historico).toHaveLength(1);
-    expect(historico[0].autor).toBe("Alisson Sousa");
-    expect(historico[0].autorTipo).toBe("admin");
+    const historico = await admin.query(api.admin.historico.listar, {
+      paginationOpts: { numItems: 500, cursor: null },
+    });
+    expect(historico.page).toHaveLength(1);
+    expect(historico.page[0].autor).toBe("Alisson Sousa");
+    expect(historico.page[0].autorTipo).toBe("admin");
   });
 });
 
@@ -437,8 +439,10 @@ describe("Tarefa 6 — estorno de lançamento", () => {
     const original = await t.run((ctx) => ctx.db.get(movimentacaoId));
     expect(original?.sinal).toBe(1); // original NUNCA muda (append-only)
 
-    const historico = await admin.query(api.admin.historico.listar, {});
-    const linhaOriginal = historico.find((m) => m._id === movimentacaoId)!;
+    const historico = await admin.query(api.admin.historico.listar, {
+      paginationOpts: { numItems: 500, cursor: null },
+    });
+    const linhaOriginal = historico.page.find((m) => m._id === movimentacaoId)!;
     expect(linhaOriginal.estornado).toBe(true); // derivado, não um campo gravado
   });
 
