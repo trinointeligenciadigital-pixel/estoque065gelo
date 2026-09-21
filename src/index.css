@@ -199,6 +199,39 @@
   }
 }
 
+/*
+  Superfícies do navegador que nenhum componente desenha: foco, seleção de
+  texto e barra de rolagem. Sem isto, cada uma ficaria com o padrão do sistema
+  operacional (azul-royal, cinza grosso) e destoaria da paleta.
+*/
+@layer base {
+  /* Foco de teclado padrão para links e botões que não trazem o próprio. As
+     classes do Tailwind (utilities) continuam mandando quando existem. */
+  :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+}
+/* Campos (Admin e colaborador): a borda já vira ciano no foco; o contorno de
+   1px por fora fecha um anel de 2px (contraste de foco ≥ 3:1) sem glow nem
+   sombra. Fora da camada do Tailwind de propósito, para vencer o `outline-none`
+   dos campos. */
+input:not([type="checkbox"], [type="radio"], [type="file"]):focus-visible,
+textarea:focus-visible,
+button[aria-haspopup="listbox"]:focus-visible {
+  outline: 1px solid var(--color-acento);
+  outline-offset: 0;
+}
+::selection {
+  background: color-mix(in srgb, var(--color-acento) 22%, white);
+  color: var(--color-texto);
+}
+.admin-raiz,
+.admin-raiz * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-borda-forte) transparent;
+}
+
 html,
 body,
 #root {

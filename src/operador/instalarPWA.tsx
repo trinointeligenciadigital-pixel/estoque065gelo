@@ -63,7 +63,7 @@ export function ConvitePwaIOS() {
         <button
           onClick={dispensar}
           aria-label="Dispensar"
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
         >
           <X size={20} aria-hidden="true" />
         </button>

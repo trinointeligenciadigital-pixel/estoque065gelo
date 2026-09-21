@@ -119,7 +119,7 @@ function BotaoCancelarFluxo({ rotulo, onClick }: { rotulo: string; onClick: () =
     <div className="mb-3 flex justify-end">
       <button
         onClick={onClick}
-        className="min-h-[44px] px-1 text-base font-medium text-texto-suave underline-offset-4 outline-none transition hover:text-alerta hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+        className="min-h-[44px] px-1 text-base font-medium text-texto-suave underline-offset-4 outline-none transition hover:text-alerta hover:underline focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
       >
         Cancelar {rotulo.toLowerCase()}
       </button>
@@ -837,7 +837,7 @@ function LinhaItem({
       <button
         onClick={onEditar}
         aria-label={`Editar ${produtoNome}`}
-        className="flex min-h-[56px] min-w-0 flex-1 items-start justify-between gap-3 rounded-l-xl px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acento"
+        className="flex min-h-[56px] min-w-0 flex-1 items-start justify-between gap-3 rounded-l-xl px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-acento"
       >
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-medium text-texto">{produtoNome}</span>
@@ -862,7 +862,7 @@ function LinhaItem({
       <button
         onClick={() => setConfirmando(true)}
         aria-label={`Remover ${produtoNome}`}
-        className="mr-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+        className="mr-1 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
       >
         <Trash2 size={20} aria-hidden="true" />
       </button>

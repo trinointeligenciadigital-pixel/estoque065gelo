@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, LinhaMensagem, LinhaMostrarMais, LinhaTabela, Modal, Selecao, Tabela, TituloPagina, useJanela } from "../../shared/ui.tsx";
+import { Aviso, Botao, LinhaMensagem, LinhaMostrarMais, LinhaTabela, Modal, Segmentado, Selecao, Tabela, TituloPagina, useJanela } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
@@ -90,19 +90,15 @@ export function ContagensPage() {
         </section>
       ) : null}
 
-      <div className="mb-3 inline-flex rounded-lg border border-borda bg-superficie p-0.5">
-        {(["pendentes", "historico"] as const).map((a) => (
-          <button
-            key={a}
-            onClick={() => setAba(a)}
-            aria-pressed={aba === a}
-            className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-              aba === a ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
-            }`}
-          >
-            {a === "pendentes" ? "Aguardando decisão" : "Histórico"}
-          </button>
-        ))}
+      <div className="mb-3">
+        <Segmentado
+          valor={aba}
+          onChange={setAba}
+          opcoes={[
+            { v: "pendentes", l: "Aguardando decisão" },
+            { v: "historico", l: "Histórico" },
+          ]}
+        />
       </div>
 
       {aba === "pendentes" ? (
@@ -252,7 +248,7 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
   return (
     <>
       <div className="mb-2">
-        <button onClick={onVoltar} className="text-sm text-acento">← Contagens</button>
+        <button onClick={onVoltar} className="text-sm text-acento hover:underline">← Contagens</button>
       </div>
       <TituloPagina
         titulo={`Contagem — ${contagem.camaraNome}`}

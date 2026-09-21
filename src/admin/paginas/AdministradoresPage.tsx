@@ -128,7 +128,7 @@ export function AdministradoresPage() {
           </Botao>
         </div>
         {msgConvite ? (
-          <p className={`mt-2.5 text-sm ${msgConvite.ok ? "text-entrada" : "text-alerta"}`}>{msgConvite.texto}</p>
+          <p role={msgConvite.ok ? "status" : "alert"} className={`mt-2.5 text-sm ${msgConvite.ok ? "text-entrada" : "text-alerta"}`}>{msgConvite.texto}</p>
         ) : (
           <p className="mt-2.5 text-xs text-texto-suave">
             A pessoa recebe um e-mail, cria a senha e vira Admin no primeiro acesso.

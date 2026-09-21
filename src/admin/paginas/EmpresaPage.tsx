@@ -91,7 +91,12 @@ export function EmpresaPage() {
   }
 
   if (empresa === undefined) {
-    return <TituloPagina titulo="Empresa" subtitulo="Dados que aparecem no cabeçalho do comprovante de saída." />;
+    return (
+      <>
+        <TituloPagina titulo="Empresa" subtitulo="Dados que aparecem no cabeçalho do comprovante de saída." />
+        <p className="text-sm text-texto-suave">Carregando…</p>
+      </>
+    );
   }
 
   return (
@@ -118,9 +123,9 @@ export function EmpresaPage() {
             onChange={(e) => setInscricaoEstadual(e.target.value)}
             mono
           />
-          <Campo label="Telefone" value={telefone} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} placeholder="(65) 3333-4444" />
-          <Campo label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(mascaraTelefone(e.target.value))} placeholder="(65) 99999-9999" />
-          <Campo label="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Campo label="Telefone" type="tel" inputMode="tel" value={telefone} onChange={(e) => setTelefone(mascaraTelefone(e.target.value))} placeholder="(65) 3333-4444" />
+          <Campo label="WhatsApp" type="tel" inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(mascaraTelefone(e.target.value))} placeholder="(65) 99999-9999" />
+          <Campo label="E-mail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <Campo label="Endereço completo" value={endereco} onChange={(e) => setEndereco(e.target.value)} />
         </div>
 
@@ -151,7 +156,7 @@ export function EmpresaPage() {
           <Botao onClick={salvarFormulario} disabled={salvando}>
             {salvando ? "Salvando…" : "Salvar"}
           </Botao>
-          {salvo ? <span className="text-sm text-entrada">Salvo.</span> : null}
+          <span role="status" className="text-sm text-entrada">{salvo ? "Salvo." : ""}</span>
         </div>
       </Cartao>
     </>

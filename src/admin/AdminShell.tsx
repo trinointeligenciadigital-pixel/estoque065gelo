@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { UserButton } from "@clerk/clerk-react";
 import {
@@ -40,6 +40,11 @@ const CHAVE_COLAPSADA = "estoque065:admin-sidebar-colapsada";
   da 065, a navegação (Operação + Cadastros), o usuário e o crédito da Trino.
   Visual "painel de instrumentos de câmara fria".
 
+  Teclado: há um link "Pular para o conteúdo" no início; a gaveta do celular
+  fecha com Esc, leva o foco para dentro ao abrir e o devolve ao botão de menu
+  ao fechar; fechada, sai da ordem de Tab (invisible) em vez de ficar só
+  deslocada para fora da tela.
+
   Responsiva em três estados:
   - Celular/tablet estreito (<lg): a barra vira uma gaveta (drawer) fora da
     tela, aberta por um botão de menu no cabeçalho fixo; um véu escurece o
@@ -63,6 +68,8 @@ export function AdminShell({
   });
   const [abertaMobile, setAbertaMobile] = useState(false);
   const { pathname } = useLocation();
+  const botaoMenuRef = useRef<HTMLButtonElement>(null);
+  const botaoFecharRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     try {
@@ -76,15 +83,50 @@ export function AdminShell({
   // cima da tela seguinte.
   useEffect(() => {
     setAbertaMobile(false);
+    // Página nova começa no topo (a rolagem do documento sobrevive à troca de rota).
+    window.scrollTo(0, 0);
   }, [pathname]);
 
+  // Gaveta aberta: foco entra nela e Esc fecha; ao fechar por Esc o foco volta
+  // ao botão que a abriu (fechar por navegação deixa o foco seguir a página).
+  useEffect(() => {
+    if (!abertaMobile) return;
+    // Pequena espera: a gaveta acabou de sair de `visibility: hidden` e o
+    // navegador só aceita foco depois do primeiro quadro da transição.
+    const t = setTimeout(() => botaoFecharRef.current?.focus(), 60);
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setAbertaMobile(false);
+      botaoMenuRef.current?.focus();
+    }
+    document.addEventListener("keydown", aoTeclar);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("keydown", aoTeclar);
+    };
+  }, [abertaMobile]);
+
   return (
-    <div className="min-h-full bg-fundo lg:flex">
+    <div className="admin-raiz min-h-full bg-fundo lg:flex">
+      <a
+        href="#conteudo"
+        onClick={(e) => {
+          // Sem mexer na URL: só leva o foco ao conteúdo.
+          e.preventDefault();
+          document.getElementById("conteudo")?.focus();
+        }}
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:rounded focus:border focus:border-borda focus:bg-superficie focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-acento"
+      >
+        Pular para o conteúdo
+      </a>
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-borda bg-superficie px-4 py-3 lg:hidden">
         <button
+          ref={botaoMenuRef}
           onClick={() => setAbertaMobile(true)}
-          className="-ml-1.5 rounded-lg p-1.5 text-texto-suave transition hover:bg-superficie-fria hover:text-texto"
+          className="-ml-2 rounded-lg p-2 text-texto-suave transition hover:bg-superficie-fria hover:text-texto"
           aria-label="Abrir menu"
+          aria-expanded={abertaMobile}
+          aria-controls="menu-lateral"
         >
           <Menu size={22} aria-hidden="true" />
         </button>
@@ -111,8 +153,9 @@ export function AdminShell({
       ) : null}
 
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-borda bg-superficie p-3 transition-[transform,width] duration-200 ease-out print:hidden lg:sticky lg:translate-x-0 ${
-          abertaMobile ? "translate-x-0" : "-translate-x-full"
+        id="menu-lateral"
+        className={`fixed top-0 left-0 z-50 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-borda bg-superficie p-3 transition-[transform,width,visibility] duration-200 ease-out print:hidden lg:visible lg:sticky lg:translate-x-0 ${
+          abertaMobile ? "visible translate-x-0" : "invisible -translate-x-full"
         } ${colapsada ? "lg:w-[72px]" : "lg:w-56"}`}
       >
         <div className={`flex items-center gap-2.5 px-2 pb-4 ${colapsada ? "lg:justify-center lg:px-0" : ""}`}>
@@ -126,8 +169,9 @@ export function AdminShell({
             <div className="truncate text-[11px] text-texto-fraco">065 Gelo · Cuiabá-MT</div>
           </div>
           <button
+            ref={botaoFecharRef}
             onClick={() => setAbertaMobile(false)}
-            className="ml-auto rounded-lg p-1 text-texto-suave transition hover:bg-superficie-fria hover:text-texto lg:hidden"
+            className="ml-auto rounded-lg p-1.5 text-texto-suave transition hover:bg-superficie-fria hover:text-texto lg:hidden"
             aria-label="Fechar menu"
           >
             <X size={18} aria-hidden="true" />
@@ -197,7 +241,7 @@ export function AdminShell({
         </div>
       </aside>
 
-      <main key={pathname} className="animate-conteudo-entra min-w-0 flex-1 p-4 sm:p-6">
+      <main id="conteudo" tabIndex={-1} key={pathname} className="animate-conteudo-entra min-w-0 flex-1 p-4 outline-none sm:p-6">
         <Routes>
           <Route index element={<Navigate to="/painel" replace />} />
           <Route path="painel" element={<PainelPage />} />
@@ -237,7 +281,7 @@ function ItemMenu({
       aria-label={rotulo}
       title={colapsada ? rotulo : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+        `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
           colapsada ? "lg:justify-center lg:px-0" : ""
         } ${
           isActive

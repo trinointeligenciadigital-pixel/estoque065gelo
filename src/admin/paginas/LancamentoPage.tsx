@@ -289,7 +289,7 @@ export function LancamentoPage() {
                   <button
                     onClick={() => removerItem(it.chave)}
                     aria-label={`Remover ${it.produtoNome}`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acento"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-texto-suave transition outline-none hover:bg-superficie-fria hover:text-alerta focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-acento"
                   >
                     <Trash2 size={16} aria-hidden="true" />
                   </button>

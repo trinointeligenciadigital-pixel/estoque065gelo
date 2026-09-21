@@ -4,7 +4,7 @@ import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Cartao, LinhaMensagem, LinhaTabela, Modal, SelecaoInline, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, Cartao, LinhaCarregarMais, LinhaMensagem, LinhaTabela, Modal, SelecaoInline, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { ComprovanteCartao } from "../../shared/ComprovanteCartao.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
@@ -304,6 +304,8 @@ export function HistoricoPage() {
         <button
           type="button"
           onClick={() => setMaisFiltros((v) => !v)}
+          aria-expanded={maisFiltros}
+          aria-controls="filtros-avancados"
           className="mt-3 text-xs font-medium text-acento hover:underline"
         >
           {maisFiltros
@@ -314,7 +316,7 @@ export function HistoricoPage() {
         </button>
 
         {maisFiltros ? (
-          <div className="mt-3 grid grid-cols-2 gap-3 border-t border-borda pt-3 md:grid-cols-3">
+          <div id="filtros-avancados" className="mt-3 grid grid-cols-2 gap-3 border-t border-borda pt-3 md:grid-cols-3">
             <Filtro label="Protocolo">
               <input
                 type="text"
@@ -400,18 +402,19 @@ export function HistoricoPage() {
               ),
             )}
             {statusMovs === "CanLoadMore" || statusMovs === "LoadingMore" ? (
+              <LinhaCarregarMais
+                colSpan={9}
+                carregando={statusMovs === "LoadingMore"}
+                resumo={`${movs.length} ${movs.length === 1 ? "movimentação carregada" : "movimentações carregadas"} · há mais no período`}
+                onClick={() => loadMore(100)}
+              />
+            ) : (
               <tr>
-                <td colSpan={9} className="px-3 py-3 text-center">
-                  <Botao
-                    variante="neutro"
-                    onClick={() => loadMore(100)}
-                    disabled={statusMovs === "LoadingMore"}
-                  >
-                    {statusMovs === "LoadingMore" ? "Carregando…" : "Carregar mais"}
-                  </Botao>
+                <td colSpan={9} className="px-3 py-2.5 text-center text-xs text-texto-fraco">
+                  {movs.length} {movs.length === 1 ? "movimentação" : "movimentações"} · fim da lista
                 </td>
               </tr>
-            ) : null}
+            )}
           </>
         )}
       </Tabela>
@@ -573,7 +576,7 @@ function LinhaGrupo({
           <button
             onClick={() => setAberto((v) => !v)}
             aria-expanded={aberto}
-            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
           >
             <ChevronRight
               size={14}
@@ -656,7 +659,7 @@ function LinhaGrupoTransferencia({
           <button
             onClick={onToggle}
             aria-expanded={aberto}
-            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="flex w-full items-center gap-1.5 text-left text-texto outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
           >
             <ChevronRight
               size={14}

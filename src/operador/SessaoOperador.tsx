@@ -133,7 +133,7 @@ export function SessaoOperador({
         {temContagemAberta ? (
           <button
             onClick={() => setTela("contagem")}
-            className="mb-4 flex w-full flex-col gap-0.5 rounded-xl border border-acento bg-acento/5 px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+            className="mb-4 flex w-full flex-col gap-0.5 rounded-xl border border-acento bg-acento/5 px-4 py-3 text-left transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
           >
             <span className="flex items-center gap-2 text-base font-medium text-texto">
               <ClipboardList size={18} aria-hidden="true" />

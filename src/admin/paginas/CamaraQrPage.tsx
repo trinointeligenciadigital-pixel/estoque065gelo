@@ -2,7 +2,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Botao } from "../../shared/ui.tsx";
+import { Botao, BotaoLink } from "../../shared/ui.tsx";
 
 /*
   Visualização e impressão do QR de uma câmara (RF19). O QR codifica a URL que o
@@ -23,7 +23,7 @@ export function CamaraQrPage() {
     return (
       <div>
         <p className="text-sm text-texto-suave">Câmara não encontrada.</p>
-        <Link to="/camaras" className="text-sm text-acento">Voltar</Link>
+        <Link to="/camaras" className="text-sm text-acento hover:underline">Voltar</Link>
       </div>
     );
   }
@@ -33,7 +33,7 @@ export function CamaraQrPage() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-2 print:hidden">
-        <Link to="/camaras"><Botao variante="neutro">Voltar</Botao></Link>
+        <BotaoLink to="/camaras">Voltar</BotaoLink>
         <Botao onClick={() => window.print()}>Imprimir</Botao>
       </div>
 

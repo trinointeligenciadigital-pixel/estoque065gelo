@@ -106,7 +106,7 @@ export function Tela({
           {onVoltar ? (
             <button
               onClick={onVoltar}
-              className="-ml-2 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+              className="-ml-2 flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-texto-suave transition outline-none hover:bg-superficie-fria focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
               aria-label="Voltar"
             >
               <ChevronLeft size={26} aria-hidden="true" />
@@ -184,7 +184,7 @@ export function BotaoGrande({
   } as const;
   return (
     <button
-      className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 ${cores[variante]} ${className}`}
+      className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-xl px-4 text-base font-medium transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 ${cores[variante]} ${className}`}
       {...props}
     >
       {children}
@@ -228,7 +228,7 @@ export function AzulejoAcao({
     <button
       onClick={onClick}
       style={{ animationDelay: `${atraso}ms` }}
-      className={`animate-conteudo-entra flex min-h-[108px] flex-col justify-between gap-5 rounded-2xl p-4 text-left transition-all duration-150 outline-none hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:scale-[0.97] active:brightness-95 ${tileClasses} ${largo ? "col-span-2" : ""}`}
+      className={`animate-conteudo-entra flex min-h-[108px] flex-col justify-between gap-5 rounded-2xl p-4 text-left transition-all duration-150 outline-none hover:brightness-105 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:scale-[0.97] active:brightness-95 ${tileClasses} ${largo ? "col-span-2" : ""}`}
     >
       <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${chipClasses}`}>
         <Icone size={22} aria-hidden="true" />
@@ -259,7 +259,7 @@ export function OpcaoGrande({
       onClick={onClick}
       disabled={disabled}
       aria-pressed={selecionado}
-      className={`flex min-h-[56px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 disabled:active:brightness-100 ${
+      className={`flex min-h-[56px] w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 disabled:active:brightness-100 ${
         selecionado ? "border-acento bg-acento/5" : "border-borda bg-superficie"
       }`}
     >
@@ -484,7 +484,7 @@ function TeclaPasso({
   return (
     <button
       type="button"
-      className="flex min-h-[56px] w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-numero tabular-nums text-3xl leading-none text-texto transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
+      className="flex min-h-[56px] w-16 shrink-0 items-center justify-center rounded-xl border border-borda bg-superficie font-numero tabular-nums text-3xl leading-none text-texto transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:bg-fundo disabled:opacity-40"
       {...props}
     >
       {children}

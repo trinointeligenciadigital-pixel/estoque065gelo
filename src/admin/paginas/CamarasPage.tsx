@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, BotaoLink, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 
 type Camara = { _id: Id<"camaras">; nome: string; qrToken: string; ativo: boolean };
@@ -42,9 +41,7 @@ export function CamarasPage() {
               <td className="px-3 py-2.5"><Etiqueta ativo={c.ativo} /></td>
               <td className="px-3 py-2.5 text-right">
                 <div className="flex justify-end gap-2">
-                  <Link to={`/camaras/${c._id}/qr`}>
-                    <Botao variante="neutro">Ver QR</Botao>
-                  </Link>
+                  <BotaoLink to={`/camaras/${c._id}/qr`}>Ver QR</BotaoLink>
                   <Botao variante="neutro" onClick={() => setEditando(c)}>Editar</Botao>
                 </div>
               </td>

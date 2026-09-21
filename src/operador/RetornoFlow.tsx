@@ -197,7 +197,7 @@ export function RetornoFlow({
                 <button
                   key={p.origemId}
                   onClick={() => escolher(p)}
-                  className="flex items-center gap-3 rounded-xl border border-borda bg-superficie px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+                  className="flex items-center gap-3 rounded-xl border border-borda bg-superficie px-4 py-3 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
                 >
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="text-base font-medium text-texto">{p.clienteNome || "Sem cliente"}</span>

@@ -1,12 +1,23 @@
 import { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 
 /*
   Kit de UI do painel do Admin — denso (RNF12). Inter no texto; números em
-  IBM Plex Mono via a prop `mono` nos campos. Sem gradiente, sem sombra
-  exagerada, sem emoji: ferramenta de trabalho.
+  Space Grotesk tabular via a prop `mono` nos campos (nome histórico da prop).
+  Sem gradiente, sem sombra exagerada, sem emoji: ferramenta de trabalho.
 */
+
+type VarianteBotao = "primario" | "neutro" | "perigo";
+
+const baseBotao =
+  "inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-50";
+const estilosBotao: Record<VarianteBotao, string> = {
+  primario: "bg-acento text-white hover:brightness-95 active:brightness-90",
+  neutro: "border border-borda bg-superficie text-texto hover:bg-fundo active:bg-superficie-fria",
+  perigo: "border border-alerta text-alerta hover:bg-alerta/5 active:bg-alerta/10",
+};
 
 export function Botao({
   children,
@@ -14,19 +25,70 @@ export function Botao({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variante?: "primario" | "neutro" | "perigo";
+  variante?: VarianteBotao;
 }) {
-  const base =
-    "inline-flex items-center justify-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-50";
-  const estilos = {
-    primario: "bg-acento text-white hover:brightness-95",
-    neutro: "border border-borda bg-superficie text-texto hover:bg-fundo",
-    perigo: "border border-alerta text-alerta hover:bg-alerta/5",
-  } as const;
   return (
-    <button className={`${base} ${estilos[variante]} ${className}`} {...props}>
+    <button className={`${baseBotao} ${estilosBotao[variante]} ${className}`} {...props}>
       {children}
     </button>
+  );
+}
+
+// Navegação com cara de botão. Antes era <Link><Botao/></Link> — um botão
+// dentro de um link: dois pontos de foco para o mesmo destino e HTML inválido.
+export function BotaoLink({
+  to,
+  children,
+  variante = "neutro",
+  className = "",
+}: {
+  to: string;
+  children: ReactNode;
+  variante?: VarianteBotao;
+  className?: string;
+}) {
+  return (
+    <Link to={to} className={`${baseBotao} ${estilosBotao[variante]} ${className}`}>
+      {children}
+    </Link>
+  );
+}
+
+// Seletor segmentado com o "marcador" deslizando de uma opção à outra — colunas
+// de largura igual, para o marcador andar em passos exatos de 100%. Usado no
+// período do Painel, na unidade do estoque e nas abas de Contagens.
+export function Segmentado<T extends string | number>({
+  opcoes,
+  valor,
+  onChange,
+  compacto = false,
+}: {
+  opcoes: { v: T; l: string }[];
+  valor: T;
+  onChange: (v: T) => void;
+  compacto?: boolean;
+}) {
+  const idx = Math.max(0, opcoes.findIndex((o) => o.v === valor));
+  return (
+    <div className="relative inline-grid auto-cols-[1fr] grid-flow-col rounded-lg border border-borda bg-superficie p-0.5">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0.5 left-0.5 rounded-md bg-superficie-fria-2 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        style={{ width: `calc((100% - 4px) / ${opcoes.length})`, transform: `translateX(${idx * 100}%)` }}
+      />
+      {opcoes.map((o) => (
+        <button
+          key={o.v}
+          onClick={() => onChange(o.v)}
+          aria-pressed={valor === o.v}
+          className={`relative rounded-md font-medium whitespace-nowrap transition-colors outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            compacto ? "px-2.5 py-1 text-[12px]" : "px-3 py-1.5 text-[13px]"
+          } ${valor === o.v ? "text-acento" : "text-texto-suave hover:text-texto"}`}
+        >
+          {o.l}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -546,6 +608,7 @@ export function Tabela({ colunas, children }: { colunas: ColunaTabela[]; childre
                 return (
                   <th
                     key={i}
+                    scope="col"
                     className={`px-3 pt-0.5 pb-2.5 font-mono text-xs font-semibold tracking-[0.05em] whitespace-nowrap text-texto-suave uppercase ${
                       col.dir ? "text-right" : "text-left"
                     }`}
@@ -611,6 +674,33 @@ export function LinhaMostrarMais({
   );
 }
 
+// Rodapé de paginação por servidor (Histórico): mesmo visual do "Mostrar mais"
+// das listas em janela, mas sem saber quantas faltam — só se ainda há mais.
+export function LinhaCarregarMais({
+  colSpan,
+  carregando,
+  resumo,
+  onClick,
+}: {
+  colSpan: number;
+  carregando: boolean;
+  resumo: string;
+  onClick: () => void;
+}) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-3 py-3 text-center">
+        <Botao variante="neutro" onClick={onClick} disabled={carregando}>
+          {carregando ? "Carregando…" : "Carregar mais"}
+        </Botao>
+        <p role="status" className="mt-1.5 text-xs text-texto-fraco">
+          {resumo}
+        </p>
+      </td>
+    </tr>
+  );
+}
+
 export function LinhaMensagem({ colSpan, children }: { colSpan: number; children: ReactNode }) {
   return (
     <tr>
@@ -644,7 +734,12 @@ export function Aviso({ children, tom = "erro" }: { children: ReactNode; tom?: "
     ok: "text-entrada",
     info: "text-texto-suave",
   } as const;
-  return <p className={`text-sm ${cores[tom]}`}>{children}</p>;
+  // Erro é anunciado na hora pelo leitor de tela; os demais tons são só "status".
+  return (
+    <p role={tom === "erro" ? "alert" : "status"} className={`text-sm ${cores[tom]}`}>
+      {children}
+    </p>
+  );
 }
 
 export function Modal({
@@ -737,7 +832,7 @@ export function Modal({
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold text-texto">{titulo}</h2>
             <button
-              className="rounded text-texto-suave transition outline-none hover:text-texto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40"
+              className="-m-1.5 rounded p-1.5 text-texto-suave transition outline-none hover:text-texto focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento disabled:cursor-not-allowed disabled:opacity-40"
               onClick={onFechar}
               disabled={fecharDesabilitado}
               aria-label="Fechar"

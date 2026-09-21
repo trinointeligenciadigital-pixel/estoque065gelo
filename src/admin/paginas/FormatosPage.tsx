@@ -33,7 +33,7 @@ export function FormatosPage() {
   return (
     <>
       <div className="mb-2">
-        <Link to="/produtos" className="text-sm text-acento">← Produtos</Link>
+        <Link to="/produtos" className="text-sm text-acento hover:underline">← Produtos</Link>
       </div>
       <TituloPagina
         titulo={produto ? `Formatos — ${produto.nome}` : "Formatos"}

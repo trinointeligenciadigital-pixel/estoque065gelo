@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, BotaoLink, Campo, CampoBusca, Etiqueta, LinhaMensagem, LinhaTabela, MarcaAtivo, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { rotuloProduto } from "../../lib/produto.ts";
 
@@ -76,7 +75,7 @@ export function ProdutosPage() {
               <td className="px-3 py-2.5"><Etiqueta ativo={p.ativo} /></td>
               <td className="px-3 py-2.5 text-right">
                 <div className="flex justify-end gap-2">
-                  <Link to={`/produtos/${p._id}/formatos`}><Botao variante="neutro">Formatos</Botao></Link>
+                  <BotaoLink to={`/produtos/${p._id}/formatos`}>Formatos</BotaoLink>
                   <Botao variante="neutro" onClick={() => setEditando(p)}>Editar</Botao>
                 </div>
               </td>

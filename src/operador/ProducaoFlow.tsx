@@ -363,7 +363,7 @@ function LinhaProduto({ produto, onClick }: { produto: ProdutoGrid; onClick: () 
   return (
     <button
       onClick={onClick}
-      className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-borda bg-superficie px-4 py-2.5 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
+      className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-borda bg-superficie px-4 py-2.5 text-left transition outline-none hover:bg-superficie-fria focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95"
     >
       <span className="min-w-0 flex-1 truncate text-base font-medium text-texto">{produto.nome}</span>
       {produto.saldo ? (
