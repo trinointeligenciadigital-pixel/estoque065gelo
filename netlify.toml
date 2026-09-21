@@ -7,7 +7,7 @@
 #
 # Precisa, no painel do Netlify (Site configuration → Environment variables):
 #   CONVEX_DEPLOY_KEY          chave de publicação de PRODUÇÃO do Convex (escopo: só Production)
-#   VITE_CLERK_PUBLISHABLE_KEY chave publishable do Clerk (pk_...)
+#   VITE_CLERK_PUBLISHABLE_KEY chave publishable do Clerk (pk_test_ enquanto não houver domínio próprio)
 # Roteiro completo em docs/06-go-live.md, seção "Publicação automática".
 
 [build]

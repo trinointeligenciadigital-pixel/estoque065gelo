@@ -79,7 +79,8 @@ raiz do projeto, já traz essa receita — falta só ligar o Netlify ao GitHub e
    crie:
    - `CONVEX_DEPLOY_KEY` = a chave do passo 1. Marque como **secreta** e deixe valer só
      para **Production** (pré-visualizações nunca devem receber essa chave).
-   - `VITE_CLERK_PUBLISHABLE_KEY` = a chave publishable do Clerk.
+   - `VITE_CLERK_PUBLISHABLE_KEY` = a chave publishable do Clerk **que o sistema já usa hoje**
+     (`pk_test_...`, da instância de desenvolvimento — veja a nota abaixo).
    - Não precisa criar `VITE_CONVEX_URL`: a publicação a preenche sozinha.
 3. **Ligar ao GitHub.** Em **Site configuration → Build & deploy → Continuous
    deployment → Link repository**, escolha GitHub, o repositório `estoque065gelo` e a
@@ -87,6 +88,17 @@ raiz do projeto, já traz essa receita — falta só ligar o Netlify ao GitHub e
    nada.
 4. **Teste.** Faça qualquer envio para a `main` e acompanhe em **Deploys** no Netlify. O
    log mostra primeiro "Deploying Convex functions" e depois o build do site.
+
+> **Clerk sem domínio próprio.** O Clerk só cria uma instância de *produção* para um
+> domínio que você registrou (ex.: `estoque.suaempresa.com.br`); endereços `*.netlify.app`
+> ou `*.vercel.app` não servem. Enquanto o site ficar no endereço do Netlify, continue
+> usando a instância de **desenvolvimento** do Clerk (chaves `pk_test_` / `sk_test_`, as
+> mesmas de hoje): funciona normalmente para poucos administradores, mas tem limite de
+> usuários e mostra o aviso "development keys" no console do navegador. Isso vale
+> também para o `CLERK_SECRET_KEY` do passo 1.1 (use a `sk_test_`). Quando a 065 Gelo
+> tiver um domínio próprio, aponte-o para o Netlify, crie a instância de produção no
+> Clerk e troque só essas chaves (e o `CLERK_JWT_ISSUER_DOMAIN` no Convex de produção).
+> Com cadastro público aberto qualquer login vira Admin — o passo 1.2 vale nos dois casos.
 
 Se a publicação falhar, o site **continua na versão anterior** (o Netlify só troca quando
 o build termina certo). Para voltar atrás: **Deploys →** versão anterior **→ Publish
