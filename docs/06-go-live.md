@@ -66,6 +66,34 @@ Publique em Netlify ou Vercel (qualquer um). Configuração:
 Ao final, abra o endereço no computador e confirme que a tela de login do Admin
 aparece.
 
+### 1.4 Publicação automática (Netlify + Convex, uma vez)
+
+Depois de configurado, todo envio (`git push`) para a branch `main` publica **o servidor
+(Convex de produção) e o site**, sozinhos e na ordem certa. O arquivo `netlify.toml`, na
+raiz do projeto, já traz essa receita — falta só ligar o Netlify ao GitHub e dar a chave.
+
+1. **Chave de publicação do Convex.** No painel do Convex (dashboard.convex.dev), abra o
+   projeto → escolha o ambiente **Production** → **Settings → Deploy Keys** → gere uma
+   *Production Deploy Key* e copie. Ela é secreta: não cole em chat nem no código.
+2. **Variáveis no Netlify.** No site, em **Site configuration → Environment variables**,
+   crie:
+   - `CONVEX_DEPLOY_KEY` = a chave do passo 1. Marque como **secreta** e deixe valer só
+     para **Production** (pré-visualizações nunca devem receber essa chave).
+   - `VITE_CLERK_PUBLISHABLE_KEY` = a chave publishable do Clerk.
+   - Não precisa criar `VITE_CONVEX_URL`: a publicação a preenche sozinha.
+3. **Ligar ao GitHub.** Em **Site configuration → Build & deploy → Continuous
+   deployment → Link repository**, escolha GitHub, o repositório `estoque065gelo` e a
+   branch `main`. As configurações de build vêm do `netlify.toml`; não precisa digitar
+   nada.
+4. **Teste.** Faça qualquer envio para a `main` e acompanhe em **Deploys** no Netlify. O
+   log mostra primeiro "Deploying Convex functions" e depois o build do site.
+
+Se a publicação falhar, o site **continua na versão anterior** (o Netlify só troca quando
+o build termina certo). Para voltar atrás: **Deploys →** versão anterior **→ Publish
+deploy**. Atenção: isso volta o site, mas **não desfaz** funções do servidor já publicadas
+no Convex; por isso, mudanças no servidor devem ser compatíveis com o site antigo por um
+tempo (só acrescentar, não remover).
+
 > **Depois de definir o endereço final, trocar o link do convite (uma vez):** o link
 > que os administradores convidados recebem por e-mail está fixo no código, ainda
 > apontando para o site de teste. Peça para trocar o `APP_URL` em

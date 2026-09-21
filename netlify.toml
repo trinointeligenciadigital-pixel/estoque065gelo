@@ -1,0 +1,31 @@
+# Publicação automática (Netlify) — a cada envio para a branch `main` no GitHub.
+#
+# Em produção, `npx convex deploy --cmd "npm run build"` faz duas coisas na ordem
+# certa: (1) publica as funções do servidor no Convex de PRODUÇÃO e (2) roda o
+# build do site já apontando para esse mesmo servidor (ele preenche
+# VITE_CONVEX_URL sozinho). Assim o site novo nunca fala com um servidor antigo.
+#
+# Precisa, no painel do Netlify (Site configuration → Environment variables):
+#   CONVEX_DEPLOY_KEY          chave de publicação de PRODUÇÃO do Convex (escopo: só Production)
+#   VITE_CLERK_PUBLISHABLE_KEY chave publishable do Clerk (pk_...)
+# Roteiro completo em docs/06-go-live.md, seção "Publicação automática".
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+
+[build.environment]
+  # Vite 8 e TypeScript 7 pedem Node moderno; o padrão do Netlify pode ser mais antigo.
+  NODE_VERSION = "22"
+
+# Só o ambiente de produção (branch main) toca no servidor de produção.
+[context.production]
+  command = "npx convex deploy --cmd 'npm run build'"
+
+# Pré-visualizações (pull requests e outras branches) só montam o site, sem
+# publicar nada no Convex — a chave de produção nem é exposta a elas.
+[context.deploy-preview]
+  command = "npm run build"
+
+[context.branch-deploy]
+  command = "npm run build"
