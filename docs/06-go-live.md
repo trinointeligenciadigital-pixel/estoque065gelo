@@ -34,9 +34,10 @@ npx convex env set CLERK_SECRET_KEY <chave-secreta-de-producao> --prod
 ```
 
 > **Onde pegar a chave:** no painel do Clerk (dashboard.clerk.com), no aplicativo do
-> Estoque 065, em **API Keys**, copie a **Secret key** do ambiente de **produção**
-> (começa com `sk_live_...`). Troque `<chave-secreta-de-producao>` por ela no comando
-> acima. Essa chave é secreta — não a compartilhe nem a coloque no site (frontend).
+> Estoque 065, em **API Keys**, copie a **Secret key** (começa com `sk_test_...` na
+> instância de desenvolvimento, que é a que o sistema usa enquanto não houver domínio
+> próprio — veja a nota do passo 1.4; com domínio próprio seria `sk_live_...`). Troque
+> `<chave-secreta-de-producao>` por ela no comando acima. Essa chave é secreta — não a compartilhe nem a coloque no site (frontend).
 
 ### 1.2 Trancar o cadastro no Clerk (CRÍTICO)
 
@@ -58,7 +59,7 @@ Publique em Netlify ou Vercel (qualquer um). Configuração:
 - **Publish directory:** `dist`
 - **Variáveis de ambiente** (as de produção):
   - `VITE_CONVEX_URL` = a URL de produção do passo 1.1
-  - `VITE_CLERK_PUBLISHABLE_KEY` = a chave publishable de produção do Clerk
+  - `VITE_CLERK_PUBLISHABLE_KEY` = a chave publishable do Clerk (`pk_test_...`, veja a nota do passo 1.4)
 - **Redirecionamento de rotas (SPA):** todas as rotas devem cair no `index.html`.
   No Netlify, crie um arquivo `public/_redirects` com a linha `/* /index.html 200`.
   Na Vercel isso já é automático para apps Vite.
