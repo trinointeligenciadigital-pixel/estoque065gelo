@@ -31,10 +31,20 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 
   Devolve um bucket por dia, incluindo dias com zero, para o gráfico ter um eixo
   contínuo. `dia` é o início do dia local (em ms UTC), do mais antigo ao mais novo.
+
+  Recorte opcional (câmara, categoria e/ou produto): sem nenhum filtro soma a
+  fábrica inteira, exatamente como antes. Com filtro, só entram as movimentações
+  do recorte — a regra de soma (quais tipos contam) não muda. Filtros combinam
+  por "E": câmara + categoria + produto têm que casar todos.
 */
 export const movimentoPorPeriodo = query({
-  args: { dias: v.number() },
-  handler: async (ctx, { dias }) => {
+  args: {
+    dias: v.number(),
+    camaraId: v.optional(v.id("camaras")),
+    categoria: v.optional(v.union(v.literal("saborizado"), v.literal("cubo"), v.literal("escamado"))),
+    produtoId: v.optional(v.id("produtos")),
+  },
+  handler: async (ctx, { dias, camaraId, categoria, produtoId }) => {
     await exigirAdmin(ctx);
 
     // Só 1, 7 ou 30 dias — evita varredura arbitrária vinda do cliente.
@@ -51,6 +61,12 @@ export const movimentoPorPeriodo = query({
       .withIndex("by_registrado_em", (q) => q.gte("registradoEm", inicioJanela))
       .collect();
 
+    // A categoria mora no produto, não no ledger — só carrega o mapa quando o
+    // filtro de categoria foi pedido.
+    const categoriaDoProduto = categoria
+      ? new Map((await ctx.db.query("produtos").collect()).map((p) => [p._id, p.categoria]))
+      : null;
+
     // Buckets: um por dia, do mais antigo ao mais novo, zerados.
     const buckets = new Map<number, { producaoKg: number; saidasKg: number; qtdProducao: number }>();
     for (let i = 0; i < n; i++) {
@@ -61,6 +77,9 @@ export const movimentoPorPeriodo = query({
     let saidasKg = 0;
     let qtdLancamentos = 0;
     for (const m of movs) {
+      if (camaraId && m.camaraId !== camaraId) continue;
+      if (produtoId && m.produtoId !== produtoId) continue;
+      if (categoriaDoProduto && categoriaDoProduto.get(m.produtoId) !== categoria) continue;
       const dia = inicioDoDiaCuiaba(m.registradoEm);
       const b = buckets.get(dia);
       if (!b) continue; // fora da janela (borda)

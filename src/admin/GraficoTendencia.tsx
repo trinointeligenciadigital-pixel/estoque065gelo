@@ -112,9 +112,12 @@ function estiloCaminho(d: string, animar: boolean): CSSProperties {
 
 export function GraficoTendencia({
   serie,
+  filtrado = false,
   hrefDoDia,
 }: {
   serie: PontoTendencia[];
+  // Há recorte (câmara/tipo/produto) ativo — só muda o texto do estado vazio.
+  filtrado?: boolean;
   // Ao fixar um dia (clicar), o balão mostra um link para este endereço — usado
   // para abrir o Histórico já filtrado naquela data.
   hrefDoDia?: (diaMs: number) => string;
@@ -145,8 +148,14 @@ export function GraficoTendencia({
   if (semMovimento) {
     return (
       <p className="py-10 text-center text-[13px] text-texto-suave">
-        Nenhuma produção ou saída nos últimos {n} dias. O gráfico ganha forma assim que os
-        lançamentos do dia a dia começarem.
+        {filtrado ? (
+          <>Nenhuma produção ou saída nos últimos {n} dias com este filtro. Tire ou troque o filtro para ver o restante.</>
+        ) : (
+          <>
+            Nenhuma produção ou saída nos últimos {n} dias. O gráfico ganha forma assim que os
+            lançamentos do dia a dia começarem.
+          </>
+        )}
       </p>
     );
   }
@@ -375,7 +384,7 @@ function SerieToggle({ cor, rotulo, ativo, onClick }: { cor: string; rotulo: str
     <button
       onClick={onClick}
       aria-pressed={ativo}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
         ativo ? "border-borda-forte text-texto" : "border-borda text-texto-fraco line-through"
       }`}
     >

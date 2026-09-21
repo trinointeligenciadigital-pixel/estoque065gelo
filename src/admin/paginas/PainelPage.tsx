@@ -1,8 +1,9 @@
-import { Component, useState, type CSSProperties, type ReactNode } from "react";
+import { Component, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Cartao, LinhaTabela, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { Cartao, LinhaTabela, Segmentado, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { useNumeroAnimado } from "../movimento.ts";
 import { dataHora } from "../../lib/data.ts";
@@ -43,14 +44,34 @@ function PainelConteudo() {
   const r = useQuery(api.admin.painel.resumo);
   const [soAbaixo, setSoAbaixo] = useState(false);
   const [dias, setDias] = useState(7);
-  const mov = useQuery(api.admin.painel.movimentoPorPeriodo, { dias });
+  // Recorte do MOVIMENTO (gráfico + cartões Produção/Saídas): câmara, tipo e
+  // produto. Vazio = fábrica inteira. Independe do filtro de "Estoque por
+  // produto" mais abaixo, que só reorganiza aquela lista.
+  const [movCamara, setMovCamara] = useState("");
+  const [movCategoria, setMovCategoria] = useState("");
+  const [movProduto, setMovProduto] = useState("");
+  const movBruto = useQuery(api.admin.painel.movimentoPorPeriodo, {
+    dias,
+    ...(movCamara ? { camaraId: movCamara as Id<"camaras"> } : {}),
+    ...(movCategoria ? { categoria: movCategoria as "saborizado" | "cubo" | "escamado" } : {}),
+    ...(movProduto ? { produtoId: movProduto as Id<"produtos"> } : {}),
+  });
+  // Ao trocar de recorte a query fica `undefined` por um instante; em vez de
+  // cair no esqueleto (e refazer a subida inteira do gráfico) segue mostrando o
+  // recorte anterior, esmaecido, até o novo chegar — aí as curvas deslizam de um
+  // recorte ao outro. Só vale dentro do mesmo período: trocar Hoje/7/30 continua
+  // mostrando o esqueleto, porque é outro eixo.
+  const ultimoMov = useRef(movBruto);
+  if (movBruto !== undefined) ultimoMov.current = movBruto;
+  const mov = movBruto ?? (ultimoMov.current?.dias === dias ? ultimoMov.current : undefined);
+  const atualizandoMov = movBruto === undefined && mov !== undefined;
   // Destaque pacotes/kg do bloco "Estoque por produto" (correção "pacote
   // prevalece, quilo agrega") — muda qual unidade aparece grande na linha de
   // formato E a ordenação da lista. Padrão pacotes: é o que alguém separa.
   const [unidadeDestaque, setUnidadeDestaque] = useState<"pacotes" | "kg">("pacotes");
   // Filtro por câmara fria e por tipo de produto — só o bloco "Estoque por
-  // produto"; os KPIs e o gráfico continuam somando a fábrica inteira, porque
-  // é o número que responde "quanto tem, no total, agora".
+  // produto"; Estoque total e Abaixo do mínimo continuam somando a fábrica
+  // inteira, porque é o número que responde "quanto tem, no total, agora".
   const [camaraFiltro, setCamaraFiltro] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState("");
 
@@ -75,6 +96,25 @@ function PainelConteudo() {
   const camarasDisponiveis = [...new Map(r.produtos.map((p) => [p.camaraId, p.camaraNome])).entries()].sort(
     (a, b) => a[1].localeCompare(b[1]),
   );
+
+  // Recorte do movimento: opções do seletor de produto acompanham a câmara e o
+  // tipo já escolhidos, e o texto do recorte ativo é escrito na tela (gráfico e
+  // cartões) para nunca haver dúvida de "de quê" é o número.
+  const produtosDoRecorte = r.produtos
+    .filter((p) => (movCamara ? p.camaraId === movCamara : true))
+    .filter((p) => (movCategoria ? p.categoria === movCategoria : true))
+    .slice()
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  const produtoDoRecorte = movProduto ? r.produtos.find((p) => p._id === movProduto) : undefined;
+  const partesRecorte = [
+    movCamara ? camarasDisponiveis.find(([id]) => id === movCamara)?.[1] : undefined,
+    movCategoria ? rotuloCat[movCategoria] : undefined,
+    produtoDoRecorte
+      ? rotuloProduto(produtoDoRecorte.nome, produtoDoRecorte.camaraNome, homonimos.has(produtoDoRecorte.nome.trim().toLowerCase()))
+      : undefined,
+  ].filter((x): x is string => Boolean(x));
+  const recorteMov = partesRecorte.join(" › ");
+  const movFiltrado = partesRecorte.length > 0;
 
   // Abaixo do mínimo primeiro — o que importa fica no topo da lista (que rola
   // por dentro quando há muitos produtos). Dentro disso, a ordem segue a
@@ -114,18 +154,74 @@ function PainelConteudo() {
         }
       />
 
-      {/* Filtro de período — governa só os cartões de Movimento e o gráfico */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
-        <span className="text-[12px] text-texto-fraco">Movimento nos últimos:</span>
-        <SegPeriodo dias={dias} onChange={setDias} />
+      {/* Período e recorte — governam só os cartões de Movimento (Produção e
+          Saídas) e o gráfico de tendência */}
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-texto-fraco">Movimento nos últimos:</span>
+          <SegPeriodo dias={dias} onChange={setDias} />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-[12px] text-texto-fraco">Filtrar:</span>
+          <SelecaoInline
+            value={movCamara}
+            onChange={(e) => {
+              setMovCamara(e.target.value);
+              setMovProduto(""); // o produto escolhido pode ser de outra câmara
+            }}
+            className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[12px]"
+          >
+            <option value="">Todas as câmaras</option>
+            {camarasDisponiveis.map(([id, nome]) => (
+              <option key={id} value={id}>{nome}</option>
+            ))}
+          </SelecaoInline>
+          <SelecaoInline
+            value={movCategoria}
+            onChange={(e) => {
+              setMovCategoria(e.target.value);
+              setMovProduto("");
+            }}
+            className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[12px]"
+          >
+            <option value="">Todos os tipos</option>
+            {Object.entries(rotuloCat).map(([k, rot]) => (
+              <option key={k} value={k}>{rot}</option>
+            ))}
+          </SelecaoInline>
+          <SelecaoInline
+            value={movProduto}
+            onChange={(e) => setMovProduto(e.target.value)}
+            className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[12px]"
+          >
+            <option value="">Todos os produtos</option>
+            {produtosDoRecorte.map((p) => (
+              <option key={p._id} value={p._id}>
+                {rotuloProduto(p.nome, p.camaraNome, homonimos.has(p.nome.trim().toLowerCase()))}
+              </option>
+            ))}
+          </SelecaoInline>
+          {movFiltrado ? (
+            <button
+              onClick={() => {
+                setMovCamara("");
+                setMovCategoria("");
+                setMovProduto("");
+              }}
+              className="text-[12px] font-medium text-acento hover:text-acento-escuro"
+            >
+              Limpar
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* KPIs — Estado (agora) à esquerda, Movimento (período) à direita */}
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi i={0} rotulo="Estoque total" numero={r.kpis.estoqueTotalKg} formato={formatarPeso} rodape="soma por peso · agora" />
         <KpiAbaixoMinimo qtd={r.qtdAbaixoMinimo} soAbaixo={soAbaixo} onAlternar={() => setSoAbaixo((v) => !v)} />
-        <Kpi i={2} rotulo={`Produção · ${rotuloPeriodo}`} numero={t?.producaoKg} formato={formatarPeso} cor="text-entrada" rodape={t ? pluralizar(t.qtdLancamentos, "lançamento", "lançamentos") : "carregando…"} />
-        <Kpi i={3} rotulo={`Saídas · ${rotuloPeriodo}`} numero={t?.saidasKg} formato={formatarPeso} rodape="venda · patrocínio · perda" />
+        <Kpi i={2} rotulo={`Produção · ${rotuloPeriodo}`} numero={t?.producaoKg} formato={formatarPeso} cor="text-entrada" rodape={t ? `${pluralizar(t.qtdLancamentos, "lançamento", "lançamentos")}${movFiltrado ? ` · ${recorteMov}` : ""}` : "carregando…"} />
+        <Kpi i={3} rotulo={`Saídas · ${rotuloPeriodo}`} numero={t?.saidasKg} formato={formatarPeso} rodape={movFiltrado ? `venda · patrocínio · perda · ${recorteMov}` : "venda · patrocínio · perda"} />
       </div>
 
       {/* Por categoria (RF58) */}
@@ -149,15 +245,26 @@ function PainelConteudo() {
       <Cartao className="bloco-entra mb-3 p-5 [--i:5]">
         <PanelHead
           titulo="Tendência"
-          extra={<span className="font-mono text-[11px] text-texto-fraco">Produção × Saídas · {rotuloPeriodo}</span>}
+          extra={
+            <span className="font-mono text-[11px] text-texto-fraco">
+              Produção × Saídas · {rotuloPeriodo}
+              {movFiltrado ? <span className="text-texto-suave"> · {recorteMov}</span> : " · fábrica inteira"}
+            </span>
+          }
         />
         {mov === undefined ? (
           <div className="h-56 animate-pulse rounded-lg bg-superficie-fria motion-reduce:animate-none" />
         ) : (
-          <GraficoTendencia
-            serie={mov.serie}
-            hrefDoDia={(dia) => `/historico?de=${ymdCuiaba(dia)}&ate=${ymdCuiaba(dia)}`}
-          />
+          <div
+            aria-busy={atualizandoMov}
+            className={`transition-opacity duration-200 ${atualizandoMov ? "opacity-60" : ""}`}
+          >
+            <GraficoTendencia
+              serie={mov.serie}
+              filtrado={movFiltrado}
+              hrefDoDia={(dia) => `/historico?de=${ymdCuiaba(dia)}&ate=${ymdCuiaba(dia)}`}
+            />
+          </div>
         )}
       </Cartao>
 
@@ -259,7 +366,7 @@ function PainelConteudo() {
                   : "Nenhum produto ativo. Cadastre em Produtos."}
             </Vazio>
           ) : (
-            <div className="flex max-h-[460px] flex-col gap-2.5 overflow-y-auto pr-1">
+            <div tabIndex={0} role="region" aria-label="Estoque por produto" className="flex max-h-[460px] flex-col gap-2.5 overflow-y-auto pr-1">
               {produtos.map((p, idx) => (
                 <div key={p._id} className={`rounded-lg p-3 ${p.abaixoMinimo ? "bg-alerta/5" : "bg-superficie-fria"}`}>
                   {(() => {
@@ -420,43 +527,6 @@ function veiculoRotulo(m: {
   return <span className="text-texto-fraco">Terceiro — não identificado</span>;
 }
 
-// Seletor segmentado com o "marcador" deslizando de uma opção à outra — colunas
-// de largura igual, para o marcador andar em passos exatos de 100%.
-function Segmentado<T extends string | number>({
-  opcoes,
-  valor,
-  onChange,
-  compacto = false,
-}: {
-  opcoes: { v: T; l: string }[];
-  valor: T;
-  onChange: (v: T) => void;
-  compacto?: boolean;
-}) {
-  const idx = Math.max(0, opcoes.findIndex((o) => o.v === valor));
-  return (
-    <div className="relative inline-grid auto-cols-fr grid-flow-col rounded-lg border border-borda bg-superficie p-0.5">
-      <span
-        aria-hidden="true"
-        className="absolute inset-y-0.5 left-0.5 rounded-md bg-superficie-fria-2 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-        style={{ width: `calc((100% - 4px) / ${opcoes.length})`, transform: `translateX(${idx * 100}%)` }}
-      />
-      {opcoes.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          aria-pressed={valor === o.v}
-          className={`relative rounded-md font-medium whitespace-nowrap transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-            compacto ? "px-2.5 py-1 text-[12px]" : "px-3 py-1.5 text-[13px]"
-          } ${valor === o.v ? "text-acento" : "text-texto-suave hover:text-texto"}`}
-        >
-          {o.l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function SegPeriodo({ dias, onChange }: { dias: number; onChange: (d: number) => void }) {
   return (
     <Segmentado
@@ -552,9 +622,14 @@ function KpiAbaixoMinimo({ qtd, soAbaixo, onAlternar }: { qtd: number; soAbaixo:
   const exibido = useNumeroAnimado(qtd, { duracao: 500, atraso: 40 });
   return (
     <button
-      onClick={() => qtd > 0 && onAlternar()}
-      className={`bloco-entra flex flex-col gap-2.5 rounded-[10px] border p-4 text-left transition-colors [--i:1] ${
-        qtd > 0 ? "border-alerta bg-alerta/5 hover:bg-alerta/10" : "cursor-default border-borda bg-superficie"
+      onClick={onAlternar}
+      // Sem nada abaixo do mínimo não há o que filtrar — o botão fica inerte (e
+      // fora do Tab). Se o filtro já estava ligado e o último formato voltou ao
+      // normal, o botão continua ativo para o Admin conseguir desligá-lo.
+      disabled={qtd === 0 && !soAbaixo}
+      aria-pressed={qtd > 0 || soAbaixo ? soAbaixo : undefined}
+      className={`bloco-entra flex flex-col gap-2.5 rounded-[10px] border p-4 text-left transition-colors [--i:1] disabled:cursor-default ${
+        qtd > 0 ? "border-alerta bg-alerta/5 hover:bg-alerta/10" : "border-borda bg-superficie"
       }`}
     >
       <Eyebrow>Abaixo do mínimo</Eyebrow>
@@ -583,7 +658,7 @@ function Th({ cols }: { cols: string[] }) {
   return (
     <tr className="border-b border-borda text-left">
       {cols.map((c, i) => (
-        <th key={i} className={`pb-2.5 pr-3 font-mono text-xs font-semibold tracking-[0.05em] whitespace-nowrap text-texto-suave uppercase ${i === cols.length - 2 ? "text-right" : "text-left"}`}>
+        <th key={i} scope="col" className={`pb-2.5 pr-3 font-mono text-xs font-semibold tracking-[0.05em] whitespace-nowrap text-texto-suave uppercase ${i === cols.length - 2 ? "text-right" : "text-left"}`}>
           {c}
         </th>
       ))}
@@ -633,7 +708,7 @@ function ErroPainel() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-4 inline-flex items-center justify-center rounded-lg bg-acento px-4 py-2 text-sm font-medium text-white transition outline-none hover:bg-acento-escuro focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+            className="mt-4 inline-flex items-center justify-center rounded-lg bg-acento px-4 py-2 text-sm font-medium text-white transition outline-none hover:bg-acento-escuro focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
           >
             Recarregar
           </button>
