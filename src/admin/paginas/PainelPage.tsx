@@ -104,7 +104,7 @@ function PainelConteudo() {
               className="flex items-center gap-2.5 rounded-[10px] border border-acento bg-acento/5 px-3.5 py-2"
             >
               <span className="font-numero tabular-nums text-lg font-semibold text-acento">{r.qtdContagensPendentes}</span>
-              <span className="text-[11.5px] leading-tight text-texto-suave">
+              <span className="text-[12px] leading-tight text-texto-suave">
                 {r.qtdContagensPendentes === 1 ? "contagem" : "contagens"}
                 <br />
                 aguardando decisão
@@ -116,7 +116,7 @@ function PainelConteudo() {
 
       {/* Filtro de período — governa só os cartões de Movimento e o gráfico */}
       <div className="mb-3 flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
-        <span className="text-[11.5px] text-texto-fraco">Movimento nos últimos:</span>
+        <span className="text-[12px] text-texto-fraco">Movimento nos últimos:</span>
         <SegPeriodo dias={dias} onChange={setDias} />
       </div>
 
@@ -212,7 +212,7 @@ function PainelConteudo() {
             <SelecaoInline
               value={camaraFiltro}
               onChange={(e) => setCamaraFiltro(e.target.value)}
-              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[11.5px]"
+              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[12px]"
             >
               <option value="">Todas as câmaras</option>
               {camarasDisponiveis.map(([id, nome]) => (
@@ -222,7 +222,7 @@ function PainelConteudo() {
             <SelecaoInline
               value={categoriaFiltro}
               onChange={(e) => setCategoriaFiltro(e.target.value)}
-              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[11.5px]"
+              className="!w-auto !min-w-[132px] !px-2 !py-1 !text-[12px]"
             >
               <option value="">Todos os tipos</option>
               {Object.entries(rotuloCat).map(([k, rot]) => (
@@ -289,7 +289,7 @@ function PainelConteudo() {
                         <span className="flex items-baseline gap-1">
                           <span className="font-numero tabular-nums text-sm font-semibold text-texto">{destaqueProduto}</span>
                           {mostrarPacotes ? (
-                            <span className="text-[10.5px] text-texto-fraco">· {formatarPeso(p.pesoTotalKg)}</span>
+                            <span className="text-[11px] text-texto-fraco">· {formatarPeso(p.pesoTotalKg)}</span>
                           ) : null}
                         </span>
                       </div>
@@ -330,7 +330,7 @@ function PainelConteudo() {
                                 {destaque}
                               </span>
                               {secundario ? (
-                                <span className={`text-[10.5px] ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
+                                <span className={`text-[11px] ${f.abaixoMinimo ? "text-alerta" : "text-texto-fraco"}`}>
                                   · {secundario}
                                 </span>
                               ) : null}
@@ -447,7 +447,7 @@ function Segmentado<T extends string | number>({
           onClick={() => onChange(o.v)}
           aria-pressed={valor === o.v}
           className={`relative rounded-md font-medium whitespace-nowrap transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
-            compacto ? "px-2.5 py-1 text-[11.5px]" : "px-3 py-1.5 text-[12.5px]"
+            compacto ? "px-2.5 py-1 text-[12px]" : "px-3 py-1.5 text-[13px]"
           } ${valor === o.v ? "text-acento" : "text-texto-suave hover:text-texto"}`}
         >
           {o.l}
@@ -510,22 +510,40 @@ function BulletMinimo({ saldo, minimo, abaixo, atraso = 0 }: { saldo: number; mi
 }
 
 function Eyebrow({ children }: { children: ReactNode }) {
-  return <span className="font-mono text-[10.5px] font-medium tracking-[0.11em] text-texto-fraco uppercase">{children}</span>;
+  return <span className="font-mono text-[11px] font-medium tracking-[0.11em] text-texto-fraco uppercase">{children}</span>;
 }
 
 // O número "sobe" até o valor ao abrir, ao trocar de período e quando um
 // lançamento novo chega. Leitor de tela recebe só o valor final (o número
 // animado fica escondido dele).
+// "53.319,0 kg" → ["53.319,0", "kg"] — o número grande ganha o cartão inteiro
+// (30px, 11 caracteres não cabem em ~140px no celular); a unidade fica pequena
+// ao lado, como no DESIGN.md ("Data").
+function separarUnidade(txt: string): [string, string] {
+  const i = txt.lastIndexOf(" ");
+  return i < 0 ? [txt, ""] : [txt.slice(0, i), txt.slice(i + 1)];
+}
+
 function Kpi({ i, rotulo, numero, formato, cor = "text-texto", rodape }: { i: number; rotulo: string; numero: number | undefined; formato: (n: number) => string; cor?: string; rodape: string }) {
   const exibido = useNumeroAnimado(numero, { atraso: i * 40 });
   return (
     <div className="bloco-entra flex flex-col gap-2.5 rounded-[10px] border border-borda bg-superficie p-4" style={{ "--i": i } as CSSProperties}>
       <Eyebrow>{rotulo}</Eyebrow>
-      <span className={`font-numero text-3xl leading-none font-semibold tabular-nums ${cor}`}>
-        <span aria-hidden="true">{numero === undefined ? "—" : formato(exibido)}</span>
+      <span className={`font-numero text-2xl leading-none font-semibold tabular-nums sm:text-3xl ${cor}`}>
+        <span aria-hidden="true">
+          {numero === undefined ? "—" : (() => {
+            const [n, un] = separarUnidade(formato(exibido));
+            return (
+              <>
+                {n}
+                {un ? <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{un}</span> : null}
+              </>
+            );
+          })()}
+        </span>
         <span className="sr-only">{numero === undefined ? "carregando" : formato(numero)}</span>
       </span>
-      <span className="text-[11.5px] text-texto-fraco">{rodape}</span>
+      <span className="text-[12px] text-texto-fraco">{rodape}</span>
     </div>
   );
 }
@@ -540,12 +558,12 @@ function KpiAbaixoMinimo({ qtd, soAbaixo, onAlternar }: { qtd: number; soAbaixo:
       }`}
     >
       <Eyebrow>Abaixo do mínimo</Eyebrow>
-      <span className={`font-numero text-3xl leading-none font-semibold tabular-nums ${qtd > 0 ? "text-alerta" : "text-texto"}`}>
+      <span className={`font-numero text-2xl leading-none font-semibold tabular-nums sm:text-3xl ${qtd > 0 ? "text-alerta" : "text-texto"}`}>
         <span aria-hidden="true">{Math.round(exibido)}</span>
         <span className="sr-only">{qtd}</span>
         <span className="ml-1.5 font-sans text-xs font-medium text-texto-fraco">{qtd === 1 ? "formato" : "formatos"}</span>
       </span>
-      <span className={`text-[11.5px] ${qtd > 0 ? "text-alerta" : "text-texto-fraco"}`}>
+      <span className={`text-[12px] ${qtd > 0 ? "text-alerta" : "text-texto-fraco"}`}>
         {qtd > 0 ? (soAbaixo ? "mostrando só estes ✓" : "ver quais →") : "tudo acima do mínimo"}
       </span>
     </button>
@@ -575,9 +593,9 @@ function Th({ cols }: { cols: string[] }) {
 
 function Pill({ children, tom }: { children: ReactNode; tom: "entrada" | "venda" | "patroc" | "perda" }) {
   const estilo = {
-    entrada: "bg-entrada/10 text-entrada",
+    entrada: "bg-entrada/10 text-entrada-texto",
     venda: "border border-borda-forte text-texto-suave",
-    patroc: "bg-acento/10 text-acento",
+    patroc: "bg-acento/10 text-acento-escuro",
     perda: "bg-alerta/10 text-alerta",
   }[tom];
   return <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${estilo}`}>{children}</span>;

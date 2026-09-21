@@ -16,6 +16,7 @@ colors:
   gelo: "#54b7d2"
   gelo-trilho: "#cfdde0"
   entrada: "#2f7d52"
+  entrada-texto: "#276b45"
   saida: "#b23a32"
   aviso: "#a9761e"
   aviso-texto: "#8a5f12"
@@ -174,6 +175,7 @@ Paleta clara de "câmara fria vista pelo gelo": neutros levemente azulados, um �
 - **Body** (Inter 400, 0.875rem / 14px, `line-height: 1.5`): texto geral, células de tabela, descrições. Ênfase com peso 500/600, nunca com cor.
 - **Label** (IBM Plex Mono 600, 0.75rem / 12px, `letter-spacing: 0.05em`, versalete): cabeçalho de tabela, "eyebrow" de KPI, rótulos de seção. É a assinatura tipográfica do sistema.
 - **Micro-rótulo** (IBM Plex Mono 500/600, 0.625–0.6875rem / 10–11px, tracking largo, versalete): a mesma assinatura do Label, num espaço mais apertado onde 12px não cabe — crachá do operador no cabeçalho, "Passo N de M", eyebrow "Quantidade"/"Peso" do resumo de lançamento, cabeçalho de grupo de combobox. Continua Plex Mono/versalete/tracking; só o tamanho encolhe.
+- **Degraus de tamanho permitidos** (em px): 10 · 11 · 12 · 13 · 14 · 15 (títulos de painel), mais o 28 do login. Nada de meio pixel (10,5 / 11,5 / 12,5 / 13,5 foram fundidos no degrau mais próximo em 2026-09). **Piso: 11px no colaborador** (celular sob sol forte, mono maiúsculo de 10px não se lê); 10px só no Admin denso e no comprovante denso.
 - **Data** (Space Grotesk 600, até 1.875rem / 30px, `line-height: 1`, `font-variant-numeric: tabular-nums`): os números grandes de KPI e saldo. A unidade (kg, formatos) vem ao lado em Inter pequeno e fraco, para o número reinar sozinho.
 
 ### Named Rules

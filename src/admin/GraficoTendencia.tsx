@@ -346,12 +346,12 @@ export function GraficoTendencia({
           <div className="mb-1 text-[11px] font-semibold text-texto">
             {rotuloDia(serie[ativo].dia)} <span className="font-normal text-texto-fraco">· {diaSemana(serie[ativo].dia)}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11.5px]">
+          <div className="flex items-center gap-1.5 text-[12px]">
             <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-entrada)" }} />
             <span className="text-texto-suave">Produção</span>
             <span className="ml-auto pl-3 font-numero tabular-nums font-semibold text-texto">{formatarPeso(serie[ativo].producaoKg)}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11.5px]">
+          <div className="flex items-center gap-1.5 text-[12px]">
             <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-saida)" }} />
             <span className="text-texto-suave">Saídas</span>
             <span className="ml-auto pl-3 font-numero tabular-nums font-semibold text-texto">{formatarPeso(serie[ativo].saidasKg)}</span>
@@ -375,7 +375,7 @@ function SerieToggle({ cor, rotulo, ativo, onClick }: { cor: string; rotulo: str
     <button
       onClick={onClick}
       aria-pressed={ativo}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
         ativo ? "border-borda-forte text-texto" : "border-borda text-texto-fraco line-through"
       }`}
     >

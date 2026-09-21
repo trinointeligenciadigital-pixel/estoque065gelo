@@ -34,7 +34,7 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
   const qtd = denso ? "text-sm" : "text-base";
   const total = denso ? "text-xl" : "text-2xl";
   const eyebrow = denso ? "text-[10px]" : "text-[11px]";
-  const selo = denso ? "text-[10.5px]" : "text-[11px]";
+  const selo = "text-[11px]";
   const logo = denso ? "h-9 w-9" : "h-10 w-10";
 
   return (

@@ -379,7 +379,7 @@ export function HistoricoPage() {
           <LinhaMensagem colSpan={9}>Nenhuma movimentação com esses filtros.</LinhaMensagem>
         ) : (
           <>
-            {linhas.map((l) =>
+            {linhas.map((l, idx) =>
               l.tipo === "individual" ? (
                 <LinhaMov
                   key={l.mov._id}
@@ -394,6 +394,8 @@ export function HistoricoPage() {
                   onComprovante={(m) => setComprovante(montarComprovante(m))}
                   onEstornar={(m) => setEstornando(m)}
                   onEstornarTransferencia={(loteId) => setEstornandoTransferLote(loteId)}
+                  // O último grupo da página pode ter mais itens na próxima.
+                  parcial={statusMovs === "CanLoadMore" && idx === linhas.length - 1}
                 />
               ),
             )}
@@ -536,11 +538,13 @@ function LinhaGrupo({
   onComprovante,
   onEstornar,
   onEstornarTransferencia,
+  parcial = false,
 }: {
   itens: MovRow[];
   onComprovante: (m: MovRow) => void;
   onEstornar: (m: MovRow) => void;
   onEstornarTransferencia: (loteId: string) => void;
+  parcial?: boolean;
 }) {
   const [aberto, setAberto] = useState(false);
   const primeiro = itens[0];
@@ -577,7 +581,8 @@ function LinhaGrupo({
               aria-hidden="true"
             />
             <span>
-              {rotulo} · {primeiro.camaraNome} · {itens.length} {itens.length === 1 ? "item" : "itens"} ·{" "}
+              {rotulo} · {primeiro.camaraNome} · {itens.length} {itens.length === 1 ? "item" : "itens"}
+              {parcial ? " até aqui (há mais na próxima página)" : ""} ·{" "}
               <span className="font-numero tabular-nums font-medium">{formatarPeso(pesoTotal)}</span> · {primeiro.autor}
             </span>
           </button>
@@ -750,7 +755,7 @@ function ModalEstorno({ m, onFechar }: { m: MovRow; onFechar: () => void }) {
                   value={motivoTexto}
                   onChange={(e) => setMotivoTexto(e.target.value)}
                   rows={3}
-                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
+                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-base sm:text-sm text-texto outline-none focus:border-acento"
                   placeholder="ex.: digitei 1.130 pacotes em vez de 113"
                 />
               </label>
@@ -828,7 +833,7 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
                   value={motivoTexto}
                   onChange={(e) => setMotivoTexto(e.target.value)}
                   rows={3}
-                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
+                  className="rounded border border-borda bg-superficie px-2 py-1.5 text-base sm:text-sm text-texto outline-none focus:border-acento"
                   placeholder="ex.: transferi pro lugar errado"
                 />
               </label>
@@ -850,7 +855,7 @@ function ModalEstornoTransferencia({ loteId, onFechar }: { loteId: string; onFec
 }
 
 const inputCls =
-  "rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento";
+  "rounded border border-borda bg-superficie px-2 py-1.5 text-base sm:text-sm text-texto outline-none focus:border-acento";
 
 function Filtro({ label, children }: { label: string; children: ReactNode }) {
   return (

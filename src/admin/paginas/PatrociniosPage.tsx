@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { CampoBusca, LinhaMensagem, LinhaTabela, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { CampoBusca, LinhaMensagem, LinhaMostrarMais, LinhaTabela, Tabela, TituloPagina, useJanela } from "../../shared/ui.tsx";
 import { data } from "../../lib/data.ts";
 import { formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 
@@ -23,6 +23,9 @@ export function PatrociniosPage() {
       (p.clienteNome ?? "").toLowerCase().includes(buscaNorm) ||
       p.produtoNome.toLowerCase().includes(buscaNorm),
   );
+  // Só 50 linhas na tela por vez (a lista cresce com os anos); a busca acima
+  // continua olhando a lista inteira e volta a janela ao início.
+  const { visiveis, restantes, mostrarMais } = useJanela(filtrados, 50, buscaNorm);
 
   return (
     <>
@@ -50,7 +53,8 @@ export function PatrociniosPage() {
         ) : filtrados.length === 0 ? (
           <LinhaMensagem colSpan={7}>Nada encontrado para "{busca}".</LinhaMensagem>
         ) : (
-          filtrados.map((p) => (
+          <>
+          {visiveis.map((p) => (
             <LinhaTabela key={p._id}>
               <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{data(p.registradoEm)}</td>
               <td className="px-3 py-2.5 font-medium text-texto">{p.clienteNome || "—"}</td>
@@ -62,7 +66,7 @@ export function PatrociniosPage() {
               <td className="px-3 py-2.5 text-right font-numero tabular-nums text-texto">{formatarQtd(p.consumido, p.unidade, p.formatoUnidadeContagem)}</td>
               <td className="px-3 py-2.5">
                 {p.emAberto ? (
-                  <span className="inline-block rounded-full bg-acento/10 px-2 py-0.5 text-[11px] font-semibold text-acento">
+                  <span className="inline-block rounded-full bg-acento/10 px-2 py-0.5 text-[11px] font-semibold text-acento-escuro">
                     em aberto
                   </span>
                 ) : (
@@ -72,7 +76,9 @@ export function PatrociniosPage() {
                 )}
               </td>
             </LinhaTabela>
-          ))
+          ))}
+          <LinhaMostrarMais colSpan={7} restantes={restantes} onClick={mostrarMais} />
+          </>
         )}
       </Tabela>
     </>

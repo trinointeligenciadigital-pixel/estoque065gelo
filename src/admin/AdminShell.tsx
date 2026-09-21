@@ -111,7 +111,7 @@ export function AdminShell({
       ) : null}
 
       <aside
-        className={`fixed top-0 left-0 z-50 flex h-screen w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-borda bg-superficie p-3 transition-[transform,width] duration-200 ease-out print:hidden lg:sticky lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 flex h-dvh w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-borda bg-superficie p-3 transition-[transform,width] duration-200 ease-out print:hidden lg:sticky lg:translate-x-0 ${
           abertaMobile ? "translate-x-0" : "-translate-x-full"
         } ${colapsada ? "lg:w-[72px]" : "lg:w-56"}`}
       >
@@ -123,7 +123,7 @@ export function AdminShell({
           />
           <div className={`min-w-0 leading-tight ${colapsada ? "lg:hidden" : ""}`}>
             <div className="font-titulo truncate text-[15px] font-semibold text-texto">Estoque 065</div>
-            <div className="truncate text-[10.5px] text-texto-fraco">065 Gelo · Cuiabá-MT</div>
+            <div className="truncate text-[11px] text-texto-fraco">065 Gelo · Cuiabá-MT</div>
           </div>
           <button
             onClick={() => setAbertaMobile(false)}
@@ -141,7 +141,7 @@ export function AdminShell({
           <ItemMenu para="/historico" rotulo="Histórico" Icone={ScrollText} colapsada={colapsada} />
           <ItemMenu para="/patrocinios" rotulo="Patrocínios" Icone={Gift} colapsada={colapsada} />
           <div
-            className={`px-3 pt-4 pb-1.5 font-mono text-[9.5px] font-medium tracking-[0.12em] text-texto-fraco uppercase ${
+            className={`px-3 pt-4 pb-1.5 font-mono text-[10px] font-medium tracking-[0.12em] text-texto-fraco uppercase ${
               colapsada ? "lg:hidden" : ""
             }`}
           >
@@ -159,12 +159,12 @@ export function AdminShell({
           <div className={`flex items-center gap-2.5 border-t border-borda px-1 pt-3 ${colapsada ? "lg:justify-center" : ""}`}>
             <UserButton />
             <div className={`min-w-0 leading-tight ${colapsada ? "lg:hidden" : ""}`}>
-              <div className="truncate text-[12.5px] font-semibold text-texto">{usuario.nome}</div>
+              <div className="truncate text-[13px] font-semibold text-texto">{usuario.nome}</div>
               <div className="text-[11px] text-texto-fraco">Administrador</div>
             </div>
           </div>
           <div className={`px-1 pt-3.5 ${colapsada ? "lg:hidden" : ""}`}>
-            <div className="font-mono text-[8.5px] font-medium tracking-[0.11em] text-texto-fraco uppercase">
+            <div className="font-mono text-[10px] font-medium tracking-[0.11em] text-texto-fraco uppercase">
               Desenvolvido por
             </div>
             {/* Logo quadrado (720×720) recortado só na faixa da palavra, via
@@ -237,7 +237,7 @@ function ItemMenu({
       aria-label={rotulo}
       title={colapsada ? rotulo : undefined}
       className={({ isActive }) =>
-        `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13.5px] transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+        `flex items-center gap-2.5 rounded-lg px-3 py-2 text-[14px] transition-colors outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
           colapsada ? "lg:justify-center lg:px-0" : ""
         } ${
           isActive

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { Aviso, Botao, LinhaMensagem, LinhaTabela, Modal, Selecao, Tabela, TituloPagina } from "../../shared/ui.tsx";
+import { Aviso, Botao, LinhaMensagem, LinhaMostrarMais, LinhaTabela, Modal, Selecao, Tabela, TituloPagina, useJanela } from "../../shared/ui.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
 import { formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
@@ -28,7 +28,7 @@ function dataHoraOuTraco(ms: number | null): string {
 function PillStatusContagem({ status }: { status: "pendente" | "aprovada" | "rejeitada" }) {
   const estilo = {
     pendente: "bg-aviso/10 text-aviso-texto",
-    aprovada: "bg-entrada/10 text-entrada",
+    aprovada: "bg-entrada/10 text-entrada-texto",
     rejeitada: "bg-alerta/10 text-alerta",
   }[status];
   return (
@@ -57,6 +57,8 @@ export function ContagensPage() {
   });
   const [aba, setAba] = useState<"pendentes" | "historico">("pendentes");
   const voltar = () => setVista({ tela: "lista" });
+  // Aba Histórico cresce a cada contagem decidida: 50 por vez.
+  const jan = useJanela(historico ?? [], 50);
 
   if (vista.tela === "detalhe") {
     return <Detalhe id={vista.id} onVoltar={voltar} />;
@@ -94,7 +96,7 @@ export function ContagensPage() {
             key={a}
             onClick={() => setAba(a)}
             aria-pressed={aba === a}
-            className={`rounded-md px-3 py-1.5 text-[12.5px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
+            className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento ${
               aba === a ? "bg-superficie-fria-2 text-acento" : "text-texto-suave hover:text-texto"
             }`}
           >
@@ -132,7 +134,8 @@ export function ContagensPage() {
           ) : historico.length === 0 ? (
             <LinhaMensagem colSpan={6}>Nenhuma contagem decidida ainda.</LinhaMensagem>
           ) : (
-            historico.map((c) => (
+            <>
+            {jan.visiveis.map((c) => (
               <LinhaTabela key={c._id}>
                 <td className="px-3 py-2.5 font-medium text-texto">{c.camaraNome}</td>
                 <td className="px-3 py-2.5">
@@ -145,7 +148,9 @@ export function ContagensPage() {
                   <Botao variante="neutro" onClick={() => setVista({ tela: "detalhe", id: c._id })}>Ver</Botao>
                 </td>
               </LinhaTabela>
-            ))
+            ))}
+            <LinhaMostrarMais colSpan={6} restantes={jan.restantes} onClick={jan.mostrarMais} />
+            </>
           )}
         </Tabela>
       )}
@@ -306,7 +311,7 @@ function Detalhe({ id, onVoltar }: { id: Id<"contagens">; onVoltar: () => void }
             <input
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              className="rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento"
+              className="rounded border border-borda bg-superficie px-2 py-1.5 text-base sm:text-sm text-texto outline-none focus:border-acento"
               placeholder="motivo da decisão, se quiser registrar"
             />
           </label>
@@ -451,7 +456,7 @@ function NovaContagem({ retomar, onFechar }: { retomar?: Retomar; onFechar: () =
                           value={contado[f._id] ?? ""}
                           onChange={(e) => setContado((c) => ({ ...c, [f._id]: e.target.value }))}
                           placeholder="0"
-                          className="w-24 rounded border border-borda bg-superficie px-2 py-1.5 text-right font-numero tabular-nums text-sm text-texto outline-none focus:border-acento"
+                          className="w-24 rounded border border-borda bg-superficie px-2 py-1.5 text-right font-numero tabular-nums text-base sm:text-sm text-texto outline-none focus:border-acento"
                         />
                       </label>
                     ))}

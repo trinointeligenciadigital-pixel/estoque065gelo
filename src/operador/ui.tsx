@@ -135,7 +135,7 @@ export function Tela({
                 // preenchimento de régua, nunca em letra). Texto em acento-escuro:
                 // o acento puro sobre o próprio tom a 10% dá 4,2:1 (abaixo de 4,5
                 // para 10px); o escuro dá 5,9:1.
-                <span className="max-w-32 truncate rounded-full bg-acento/10 px-2 py-0.5 font-mono text-[10px] font-medium tracking-[0.06em] text-acento-escuro uppercase">
+                <span className="max-w-32 truncate rounded-full bg-acento/10 px-2 py-0.5 font-mono text-[11px] font-medium tracking-[0.06em] text-acento-escuro uppercase">
                   {camaraAtual}
                 </span>
               ) : null}
@@ -144,7 +144,7 @@ export function Tela({
         </div>
         {temProgresso ? (
           <div className="mt-2.5 flex items-center gap-2.5" role="group" aria-label={`Passo ${etapa} de ${totalEtapas}`}>
-            <span className="shrink-0 font-mono text-[10.5px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
+            <span className="shrink-0 font-mono text-[11px] font-medium tracking-[0.08em] text-texto-fraco uppercase">
               Passo {etapa} de {totalEtapas}
             </span>
             <div className="flex flex-1 gap-1" aria-hidden="true">
@@ -291,7 +291,7 @@ export function AvisoOperador({ children, tom = "erro" }: { children: ReactNode;
   const estilos = {
     erro: "bg-alerta/10 text-alerta",
     aviso: "bg-aviso/10 text-aviso-texto",
-    ok: "bg-entrada/10 text-entrada",
+    ok: "bg-entrada/10 text-entrada-texto",
   } as const;
   return (
     <div

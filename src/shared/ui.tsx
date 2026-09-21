@@ -40,7 +40,7 @@ export function Campo({
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-texto-suave">{label}</span>
       <input
-        className={`rounded border border-borda bg-superficie px-2 py-1.5 text-sm text-texto outline-none focus:border-acento ${
+        className={`rounded border border-borda bg-superficie px-2 py-1.5 text-base sm:text-sm text-texto outline-none focus:border-acento ${
           mono ? "font-numero tabular-nums" : ""
         } ${className}`}
         {...props}
@@ -74,7 +74,7 @@ export function CampoBusca({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full rounded border border-borda bg-superficie py-1.5 pr-2 pl-8 text-sm text-texto outline-none focus:border-acento"
+        className="w-full rounded border border-borda bg-superficie py-1.5 pr-2 pl-8 text-base sm:text-sm text-texto outline-none focus:border-acento"
       />
     </div>
   );
@@ -296,7 +296,7 @@ function SelectBase({
                 onChange={(e) => setBusca(e.target.value)}
                 aria-activedescendant={opcaoAtivaId}
                 placeholder="Buscar…"
-                className="w-full rounded border border-borda bg-fundo px-2 py-1 text-xs text-texto outline-none focus:border-acento"
+                className="w-full rounded border border-borda bg-fundo px-2 py-1 text-base sm:text-xs text-texto outline-none focus:border-acento"
               />
             </div>
           ) : null}
@@ -488,7 +488,7 @@ export function Etiqueta({ ativo }: { ativo: boolean }) {
   return (
     <span
       className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        ativo ? "bg-entrada/10 text-entrada" : "border border-borda-forte text-texto-fraco"
+        ativo ? "bg-entrada/10 text-entrada-texto" : "border border-borda-forte text-texto-fraco"
       }`}
     >
       {ativo ? "ativo" : "inativo"}
@@ -567,6 +567,46 @@ export function LinhaTabela({ children, className = "" }: { children: ReactNode;
   return (
     <tr className={`border-b border-borda/60 transition-colors last:border-0 hover:bg-superficie-fria ${className}`}>
       {children}
+    </tr>
+  );
+}
+
+// Janela de exibição para listas que crescem com o tempo (Patrocínios,
+// Contagens decididas): desenha só os primeiros `passo` e libera mais sob
+// demanda, em vez de montar milhares de linhas de uma vez. A lista completa
+// continua em memória — a busca de Patrocínios precisa enxergar tudo. A janela
+// volta ao início quando `reiniciarCom` muda (ex.: o texto da busca).
+export function useJanela<T>(lista: T[], passo = 50, reiniciarCom?: unknown) {
+  const [limite, setLimite] = useState(passo);
+  useEffect(() => {
+    setLimite(passo);
+  }, [reiniciarCom, passo]);
+  return {
+    visiveis: lista.slice(0, limite),
+    restantes: Math.max(0, lista.length - limite),
+    mostrarMais: () => setLimite((l) => l + passo),
+  };
+}
+
+export function LinhaMostrarMais({
+  colSpan,
+  restantes,
+  passo = 50,
+  onClick,
+}: {
+  colSpan: number;
+  restantes: number;
+  passo?: number;
+  onClick: () => void;
+}) {
+  if (restantes <= 0) return null;
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-3 py-3 text-center">
+        <Botao variante="neutro" onClick={onClick}>
+          Mostrar mais {Math.min(passo, restantes)} · restam {restantes}
+        </Botao>
+      </td>
     </tr>
   );
 }

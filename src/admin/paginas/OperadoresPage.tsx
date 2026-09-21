@@ -81,7 +81,7 @@ export function OperadoresPage() {
             {inativos.length > 0 ? (
               <>
                 <tr aria-hidden="true">
-                  <td colSpan={6} className="bg-superficie-fria px-3 py-1.5 font-mono text-[10.5px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
+                  <td colSpan={6} className="bg-superficie-fria px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.1em] text-texto-fraco uppercase">
                     Inativos · {inativos.length}
                   </td>
                 </tr>
@@ -110,7 +110,7 @@ export function OperadoresPage() {
 }
 
 function Tag({ children }: { children: ReactNode }) {
-  return <span className="rounded bg-acento/10 px-1.5 py-0.5 text-xs text-acento">{children}</span>;
+  return <span className="rounded bg-acento/10 px-1.5 py-0.5 text-xs text-acento-escuro">{children}</span>;
 }
 
 function LinhaOperador({

@@ -24,6 +24,7 @@
   --color-gelo-trilho: #cfdde0; /* trilho das réguas */
 
   --color-entrada: #2f7d52; /* verde discreto — produção, retorno */
+  --color-entrada-texto: #276b45; /* verde p/ TEXTO sobre entrada a 10%: 5,6:1 (o #2f7d52 dá 4,41) */
   --color-saida: #b23a32; /* venda, patrocínio, perda */
   --color-aviso: #a9761e; /* âmbar — atenção (perto do mínimo); só p/ preenchimento/borda */
   --color-aviso-texto: #8a5f12; /* âmbar p/ TEXTO: 5,6:1 no branco, 4,9:1 sobre aviso a 10% (o #a9761e dá 3,96 / 3,53) */
@@ -210,6 +211,14 @@ body {
   color: var(--color-texto);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Space Grotesk é proporcional: sem isto, "1" e "8" têm larguras diferentes e
+   as colunas de peso/quantidade (resumo, comprovante, carrinho, tabelas) não
+   alinham pelo dígito. tnum liga os algarismos tabulares — a "Regra do Número
+   Vivo" do DESIGN.md exige, e era só aplicada à mão em 2 lugares. */
+.font-numero {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Clerk aplica a própria sombra ao cartão de login por CSS interno, mais forte
