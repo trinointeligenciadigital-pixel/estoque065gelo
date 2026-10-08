@@ -1,16 +1,17 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Check, ChevronRight, MessageCircle, Undo2 } from "lucide-react";
+import { Check, ChevronRight, Download, MessageCircle, Undo2 } from "lucide-react";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Aviso, Botao, Cartao, LinhaCarregarMais, LinhaMensagem, LinhaTabela, Modal, SelecaoInline, Tabela, TituloPagina } from "../../shared/ui.tsx";
-import { ComprovanteCartao } from "../../shared/ComprovanteCartao.tsx";
+import { ComprovanteCartao, ComprovanteParaImagem } from "../../shared/ComprovanteCartao.tsx";
 import { mensagemErro } from "../../lib/erros.ts";
 import { dataHora } from "../../lib/data.ts";
-import { formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
+import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 import { nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
-import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../../lib/comprovante.ts";
+import { textoComprovante, totalContagemComprovante, type DadosComprovante } from "../../lib/comprovante.ts";
+import { baixarImagem, enviarComprovante, nomeArquivoComprovante, useImagemComprovante } from "../../lib/imagemComprovante.ts";
 
 /*
   Histórico (RF61, RF62). Somente leitura: nenhuma linha tem ação de editar ou
@@ -87,22 +88,36 @@ type MovRow = {
 
 type LinhaAgrupada =
   | { tipo: "individual"; mov: MovRow }
-  | { tipo: "grupo"; loteId: string; itens: MovRow[] };
+  | { tipo: "grupo"; loteId: string; itens: MovRow[] }
+  | { tipo: "carregamento"; carregamentoId: string; itens: MovRow[] };
 
 // Colapsa linhas com o mesmo loteId (ajustes de uma mesma aprovação de
-// contagem) numa entrada de grupo; o resto segue individual. Preserva a
-// ordem de chegada (movs já vem ordenado por data, mais recente primeiro).
+// contagem, transferência) ou o mesmo carregamentoId (venda/patrocínio com
+// vários produtos — um carregamento é um comprovante só) numa entrada de
+// grupo; o resto segue individual. O ledger continua com uma movimentação por
+// produto — isto só junta na LEITURA. Preserva a ordem de chegada (movs já vem
+// ordenado por data, mais recente primeiro).
 function agruparPorLote(movs: MovRow[]): LinhaAgrupada[] {
   const vistos = new Set<string>();
   const resultado: LinhaAgrupada[] = [];
   for (const m of movs) {
-    if (m.loteId === null) {
-      resultado.push({ tipo: "individual", mov: m });
+    if (m.loteId !== null) {
+      const chave = `lote:${m.loteId}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      resultado.push({ tipo: "grupo", loteId: m.loteId, itens: movs.filter((x) => x.loteId === m.loteId) });
       continue;
     }
-    if (vistos.has(m.loteId)) continue;
-    vistos.add(m.loteId);
-    resultado.push({ tipo: "grupo", loteId: m.loteId, itens: movs.filter((x) => x.loteId === m.loteId) });
+    if (m.carregamentoId !== null) {
+      const chave = `carr:${m.carregamentoId}`;
+      if (vistos.has(chave)) continue;
+      vistos.add(chave);
+      const itens = movs.filter((x) => x.loteId === null && x.carregamentoId === m.carregamentoId);
+      // Carregamento de um produto só não precisa de linha-resumo.
+      resultado.push(itens.length > 1 ? { tipo: "carregamento", carregamentoId: m.carregamentoId, itens } : { tipo: "individual", mov: m });
+      continue;
+    }
+    resultado.push({ tipo: "individual", mov: m });
   }
   return resultado;
 }
@@ -389,6 +404,14 @@ export function HistoricoPage() {
                   onComprovante={() => setComprovante(montarComprovante(l.mov))}
                   onEstornar={() => setEstornando(l.mov)}
                 />
+              ) : l.tipo === "carregamento" ? (
+                <LinhaGrupoCarregamento
+                  key={l.carregamentoId}
+                  itens={l.itens}
+                  onComprovante={() => setComprovante(montarComprovante(l.itens[0]))}
+                  onEstornar={(m) => setEstornando(m)}
+                  parcial={statusMovs === "CanLoadMore" && idx === linhas.length - 1}
+                />
               ) : (
                 <LinhaGrupo
                   key={l.loteId}
@@ -453,7 +476,9 @@ function LinhaMov({
   indentado = false,
 }: {
   m: MovRow;
-  onComprovante: () => void;
+  // Ausente = sem botão Comprovante (item dentro de um carregamento agrupado:
+  // o comprovante é do carregamento inteiro, na linha-resumo).
+  onComprovante?: () => void;
   onEstornar: () => void;
   indentado?: boolean;
 }) {
@@ -517,7 +542,7 @@ function LinhaMov({
       </td>
       <td className="px-3 py-2.5 text-right">
         <div className="flex justify-end gap-2">
-          {m.tipo === "venda" || m.tipo === "patrocinio" ? (
+          {onComprovante && (m.tipo === "venda" || m.tipo === "patrocinio") ? (
             <Botao variante="neutro" onClick={onComprovante}>Comprovante</Botao>
           ) : null}
           {podeEstornar(m) ? (
@@ -528,6 +553,95 @@ function LinhaMov({
         </div>
       </td>
     </LinhaTabela>
+  );
+}
+
+// Linha-resumo de um carregamento (venda/patrocínio com vários produtos): uma
+// linha só, com o total e o comprovante do carregamento inteiro — expansível
+// para os produtos. O estorno continua por produto (cada linha expandida tem o
+// seu), igual ao servidor (admin/estorno.ts estorna um lançamento por vez).
+function LinhaGrupoCarregamento({
+  itens,
+  onComprovante,
+  onEstornar,
+  parcial = false,
+}: {
+  itens: MovRow[];
+  onComprovante: () => void;
+  onEstornar: (m: MovRow) => void;
+  parcial?: boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const primeiro = itens[0];
+  const pesoTotal = itens.reduce((acc, it) => acc + it.pesoKg, 0);
+  // Mesma regra do total do comprovante: não soma pacote com unidade.
+  const contagem = totalContagemComprovante({
+    itens: itens.map((it) => ({
+      produtoNome: it.produtoNome,
+      formatoNome: it.formatoNome,
+      quantidadePacotes: it.formatoPesoVariavel ? null : it.quantidade,
+      unidadeContagem: it.formatoUnidadeContagem,
+      pesoKg: it.pesoKg,
+    })),
+  } as DadosComprovante);
+  const estornados = itens.filter((it) => it.estornado).length;
+  const camaras = [...new Set(itens.map((it) => it.camaraNome))].join(", ");
+
+  return (
+    <>
+      <LinhaTabela className={estornados === itens.length ? "opacity-60" : ""}>
+        <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">
+          {dataHora(primeiro.registradoEm)}
+          <span className="block font-mono text-texto-fraco">{primeiro.protocolo}</span>
+        </td>
+        <td className="px-3 py-2.5">
+          <span className="text-saida">− {rotuloTipo[primeiro.tipo] ?? primeiro.tipo}</span>
+          {estornados > 0 ? (
+            <span className="ml-1.5 rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+              {estornados === itens.length ? "estornado" : `${estornados} de ${itens.length} estornado${estornados > 1 ? "s" : ""}`}
+            </span>
+          ) : null}
+        </td>
+        <td className="px-3 py-2.5">
+          <button
+            onClick={() => setAberto((v) => !v)}
+            aria-expanded={aberto}
+            className="flex items-center gap-1.5 text-left text-texto outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento"
+          >
+            <ChevronRight
+              size={14}
+              className={`shrink-0 text-texto-suave transition-transform ${aberto ? "rotate-90" : ""}`}
+              aria-hidden="true"
+            />
+            <span>
+              {itens.length} produtos
+              {parcial ? <span className="text-texto-suave"> até aqui (há mais na próxima página)</span> : null}
+            </span>
+          </button>
+        </td>
+        <td className="px-3 py-2.5 text-texto-suave">{camaras}</td>
+        <td className="px-3 py-2.5 text-right font-numero tabular-nums font-semibold text-texto">
+          {contagem !== null ? formatarContagem(contagem.total, { pesoVariavel: false, unidadeContagem: contagem.modo }) : "—"}
+        </td>
+        <td className="px-3 py-2.5 text-right font-numero tabular-nums text-xs text-texto-suave">{formatarPeso(pesoTotal)}</td>
+        <td className="px-3 py-2.5 text-texto-suave">
+          {primeiro.clienteNome ?? "—"}
+          {primeiro.observacao ? ` · ${primeiro.observacao}` : ""}
+        </td>
+        <td className="px-3 py-2.5">
+          <span className="font-medium text-texto">{primeiro.autor}</span>{" "}
+          <span className="rounded-full border border-borda-forte px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-texto-fraco uppercase">
+            {primeiro.autorTipo === "admin" ? "Admin" : "Colaborador"}
+          </span>
+        </td>
+        <td className="px-3 py-2.5 text-right">
+          <div className="flex justify-end gap-2">
+            <Botao variante="neutro" onClick={onComprovante}>Comprovante</Botao>
+          </div>
+        </td>
+      </LinhaTabela>
+      {aberto ? itens.map((m) => <LinhaMov key={m._id} m={m} onEstornar={() => onEstornar(m)} indentado />) : null}
+    </>
   );
 }
 
@@ -869,11 +983,16 @@ function Filtro({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-// Comprovante de uma saída, para reenviar depois. Mesmo texto do operador
-// (src/lib/comprovante.ts); aqui no kit denso do Admin.
+// Comprovante de uma saída, para reenviar depois. Mesmo cartão do operador
+// (ComprovanteCartao); aqui no kit denso do Admin. Enviar manda a IMAGEM do
+// cartão pelo menu de compartilhar (src/lib/imagemComprovante.ts); "Copiar
+// texto" continua copiando o texto.
 function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
+  const [aviso, setAviso] = useState("");
   const texto = textoComprovante(dados);
+  const modeloImagem = useRef<HTMLDivElement>(null);
+  const { imagem, gerando } = useImagemComprovante(modeloImagem, dados);
 
   async function copiar() {
     try {
@@ -885,16 +1004,27 @@ function ComprovanteModal({ dados, onFechar }: { dados: DadosComprovante; onFech
     }
   }
 
+  async function enviar() {
+    setAviso("");
+    const r = await enviarComprovante(dados, imagem);
+    if (r === "baixado") setAviso("Imagem salva no computador — anexe na conversa do WhatsApp.");
+  }
+
   return (
     <Modal titulo="Comprovante de saída" onFechar={onFechar}>
       <div className="flex flex-col gap-4">
         <ComprovanteCartao dados={dados} denso />
-        <div className="flex justify-end gap-2">
+        <ComprovanteParaImagem ref={modeloImagem} dados={dados} />
+        {aviso ? <p className="text-xs text-texto-suave" role="status">{aviso}</p> : null}
+        <div className="flex flex-wrap justify-end gap-2">
           <Botao variante="neutro" onClick={copiar}>
-            {copiado ? <><Check size={15} aria-hidden="true" /> Copiado</> : "Copiar"}
+            {copiado ? <><Check size={15} aria-hidden="true" /> Copiado</> : "Copiar texto"}
           </Botao>
-          <Botao onClick={() => window.open(linkWhatsappComprovante(dados), "_blank", "noopener")}>
-            <MessageCircle size={15} aria-hidden="true" /> Enviar no WhatsApp
+          <Botao variante="neutro" onClick={() => imagem && baixarImagem(imagem, nomeArquivoComprovante(dados))} disabled={!imagem}>
+            <Download size={15} aria-hidden="true" /> Baixar imagem
+          </Botao>
+          <Botao onClick={enviar} disabled={gerando}>
+            <MessageCircle size={15} aria-hidden="true" /> {gerando ? "Preparando…" : "Enviar no WhatsApp"}
           </Botao>
         </div>
       </div>

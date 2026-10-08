@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import {
   cabecalhoEmpresaEstruturado,
   linhasContexto,
@@ -8,6 +9,7 @@ import {
 } from "../lib/comprovante.ts";
 import { dataHoraComprovante } from "../lib/data.ts";
 import { formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
+import { LARGURA_IMAGEM_COMPROVANTE } from "../lib/imagemComprovante.ts";
 
 /*
   Corpo visual do comprovante de saída — compartilhado entre a tela de sucesso
@@ -20,7 +22,10 @@ import { formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
   comprovante (cliente, motorista) precisa achar primeiro, e antes ela tinha a
   mesma aparência que o cabeçalho da empresa e o bloco de contexto ao redor.
 */
-export function ComprovanteCartao({ dados, denso = false }: { dados: DadosComprovante; denso?: boolean }) {
+export const ComprovanteCartao = forwardRef<HTMLDivElement, { dados: DadosComprovante; denso?: boolean }>(function ComprovanteCartao(
+  { dados, denso = false },
+  ref,
+) {
   const contexto = linhasContexto(dados);
   const contagem = totalContagemComprovante(dados);
   const empresa = dados.empresa;
@@ -38,7 +43,7 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
   const logo = denso ? "h-9 w-9" : "h-10 w-10";
 
   return (
-    <div className={`overflow-hidden ${denso ? "rounded-lg" : "rounded-xl"} border border-borda bg-superficie`}>
+    <div ref={ref} className={`overflow-hidden ${denso ? "rounded-lg" : "rounded-xl"} border border-borda bg-superficie`}>
       {/* De quem → pra quem → o quê (tarefa 7), em quatro blocos fixos que nunca
           truncam — o único documento que sai da empresa e chega ao cliente por
           WhatsApp não pode chegar anônimo, nem cortado no telefone. */}
@@ -140,4 +145,19 @@ export function ComprovanteCartao({ dados, denso = false }: { dados: DadosCompro
       <p className={`border-t border-borda ${pad} ${padY} text-center ${selo} text-texto-fraco`}>{SELO_NAO_FISCAL}</p>
     </div>
   );
-}
+});
+
+// Cópia fora da tela, em largura fixa, que serve de "modelo" para a imagem
+// enviada no WhatsApp (src/lib/imagemComprovante.ts) — assim a imagem sai igual
+// no celular estreito e no modal largo do Admin. Invisível e fora da leitura
+// de tela (o cartão visível já está na página).
+export const ComprovanteParaImagem = forwardRef<HTMLDivElement, { dados: DadosComprovante }>(function ComprovanteParaImagem(
+  { dados },
+  ref,
+) {
+  return (
+    <div aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: LARGURA_IMAGEM_COMPROVANTE, pointerEvents: "none" }}>
+      <ComprovanteCartao ref={ref} dados={dados} />
+    </div>
+  );
+});

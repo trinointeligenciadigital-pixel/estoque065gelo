@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -12,8 +12,9 @@ import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer, BotaoDesfazerCarregamento } from "./desfazer.tsx";
 import { RetornoFlow } from "./RetornoFlow.tsx";
 import { Check, MessageCircle, Trash2 } from "lucide-react";
-import { linkWhatsappComprovante, textoComprovante, type DadosComprovante } from "../lib/comprovante.ts";
-import { ComprovanteCartao } from "../shared/ComprovanteCartao.tsx";
+import { textoComprovante, type DadosComprovante } from "../lib/comprovante.ts";
+import { enviarComprovante, useImagemComprovante } from "../lib/imagemComprovante.ts";
+import { ComprovanteCartao, ComprovanteParaImagem } from "../shared/ComprovanteCartao.tsx";
 
 /*
   Lançar saída (RF28–RF35) e ponto de entrada do retorno (RF38–RF41). Tipos:
@@ -1237,15 +1238,21 @@ function ComprovanteSaida({
   const [copiado, setCopiado] = useState(false);
   const marcarCompartilhado = useMutation(api.operador.desfazer.marcarComprovanteCompartilhado);
   const texto = textoComprovante(dados);
-  const link = linkWhatsappComprovante(dados);
+  // Imagem do comprovante, gerada assim que a tela abre (ver imagemComprovante.ts).
+  const modeloImagem = useRef<HTMLDivElement>(null);
+  const { imagem, gerando } = useImagemComprovante(modeloImagem, dados);
+  const [aviso, setAviso] = useState("");
 
   function avisarCompartilhado() {
     onCompartilhado();
     marcarCompartilhado({ token, carregamentoId }).catch(() => {});
   }
 
-  function abrirWhatsapp() {
-    window.open(link, "_blank", "noopener");
+  async function abrirWhatsapp() {
+    setAviso("");
+    const r = await enviarComprovante(dados, imagem);
+    if (r === "cancelado") return;
+    if (r === "baixado") setAviso("Imagem do comprovante salva no aparelho — anexe na conversa do WhatsApp.");
     avisarCompartilhado();
   }
 
@@ -1263,10 +1270,12 @@ function ComprovanteSaida({
   return (
     <div className="flex flex-col gap-3">
       <ComprovanteCartao dados={dados} />
+      <ComprovanteParaImagem ref={modeloImagem} dados={dados} />
 
-      <BotaoGrande variante="primario" onClick={abrirWhatsapp}>
-        <MessageCircle size={20} aria-hidden="true" /> Enviar comprovante no WhatsApp
+      <BotaoGrande variante="primario" onClick={abrirWhatsapp} disabled={gerando}>
+        <MessageCircle size={20} aria-hidden="true" /> {gerando ? "Preparando comprovante…" : "Enviar comprovante no WhatsApp"}
       </BotaoGrande>
+      {aviso ? <p className="text-center text-sm text-texto-suave" role="status">{aviso}</p> : null}
       <BotaoGrande variante="neutro" onClick={copiar}>
         {copiado ? (
           <>
