@@ -309,6 +309,16 @@ Precisam virar código nas functions:
     `carregamentoId` como chave de idempotência do lote. Perda e retorno seguem
     um item por vez. Saldo continua somado por formato — nada é agregado no carregamento.
 
+    **Exceção consciente (decisão do cliente, 2026-10-27): total de volumes do
+    comprovante.** O comprovante de um carregamento (e a linha-resumo dele no
+    Histórico) mostra um "Total: N pacotes" que soma a contagem de formatos
+    diferentes, desde que todos contem na mesma unidade (pacote com pacote,
+    unidade com unidade; misturou, cai só para o peso). É o número de volumes
+    que o cliente confere no caminhão, não um saldo: nunca é usado para validar
+    saída, para contagem nem para saldo consultável, que seguem por formato
+    (`saldoDoFormato`) e, entre formatos, só por peso. Ver
+    `totalContagemComprovante` em `src/lib/comprovante.ts`.
+
 13. **Geração de PIN invalida sessões existentes.** A mutation `gerarPinOperador` deve, na mesma transação: gerar o PIN, salvar o hash, e deletar todas as linhas de `sessoesOperador` daquele `operadorId` (via `by_operador_id`). O PIN em texto puro é retornado uma única vez, só para quem chamou a mutation (Admin autenticado); nunca é persistido em texto puro.
 
 14. **Estorno corrige sem patch no original (regra 10 continua valendo, sem exceção).**
