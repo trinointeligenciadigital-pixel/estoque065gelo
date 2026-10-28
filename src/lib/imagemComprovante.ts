@@ -40,7 +40,7 @@ export function nomeArquivoComprovante(d: DadosComprovante): string {
 
 function legenda(d: DadosComprovante): string {
   const numero = d.numeroComprovante !== null ? ` ${rotuloNumeroComprovante(d.numeroComprovante)}` : "";
-  return `Comprovante${numero} · ${d.rotulo} · ${data(d.quandoMs)}`;
+  return `Comprovante${numero} · ${d.rotulo} · ${data(d.dataMovimentoMs)}`;
 }
 
 // Gera (e regenera quando os dados mudam) o PNG do cartão apontado por `ref`.

@@ -9,6 +9,7 @@ import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, pesoLiquidoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 import { protocoloDe, proximoNumeroComprovante } from "../lib/protocolo";
 import { veiculoTerceiroValidado } from "../lib/placa";
+import { dataMovimentoValidada } from "../lib/dataMovimento";
 
 /*
   Lançamento manual pelo Admin (RF63). MESMAS regras do colaborador: saldo,
@@ -72,6 +73,8 @@ export const produtosParaLancamento = query({
 export const lancarProducao = mutation({
   args: {
     chaveIdempotencia: v.string(),
+    // Dia do movimento (RF65), "AAAA-MM-DD" em Cuiabá. Ausente = hoje.
+    dia: v.optional(v.string()),
     produtoId: v.id("produtos"),
     formatoId: v.id("formatos"),
     quantidade: v.optional(v.number()),
@@ -87,6 +90,8 @@ export const lancarProducao = mutation({
     }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [produto.camaraId], args.dia, agora);
     const protocolo = protocoloDe(args.chaveIdempotencia);
 
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
@@ -102,7 +107,8 @@ export const lancarProducao = mutation({
       registradoPorTipo: "admin",
       clerkId: usuario.clerkId,
       autorNome: usuario.nome,
-      registradoEm: Date.now(),
+      registradoEm: agora,
+      dataMovimento,
     });
     return { movimentacaoId, duplicado: false, protocolo };
   },
@@ -111,6 +117,8 @@ export const lancarProducao = mutation({
 export const lancarSaida = mutation({
   args: {
     chaveIdempotencia: v.string(),
+    // Dia do movimento (RF65), "AAAA-MM-DD" em Cuiabá. Ausente = hoje.
+    dia: v.optional(v.string()),
     tipo: v.union(v.literal("venda"), v.literal("patrocinio"), v.literal("perda")),
     produtoId: v.id("produtos"),
     formatoId: v.id("formatos"),
@@ -149,6 +157,8 @@ export const lancarSaida = mutation({
     }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [produto.camaraId], args.dia, agora);
 
     const disponivel = formato.pesoVariavel
       ? await pesoLiquidoDoFormato(ctx, args.produtoId, produto.camaraId, args.formatoId)
@@ -179,7 +189,8 @@ export const lancarSaida = mutation({
       registradoPorTipo: "admin",
       clerkId: usuario.clerkId,
       autorNome: usuario.nome,
-      registradoEm: Date.now(),
+      registradoEm: agora,
+      dataMovimento,
     });
     return { movimentacaoId, duplicado: false, protocolo };
   },
@@ -192,6 +203,8 @@ export const lancarSaida = mutation({
 export const lancarSaidaMultipla = mutation({
   args: {
     carregamentoId: v.string(),
+    // Dia do movimento (RF65) — um só para o carregamento inteiro.
+    dia: v.optional(v.string()),
     tipo: v.union(v.literal("venda"), v.literal("patrocinio")),
     itens: v.array(
       v.object({
@@ -244,6 +257,9 @@ export const lancarSaidaMultipla = mutation({
       });
     }
 
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, linhas.map((l) => l.camaraId), args.dia, agora);
+
     await validarSaldoLote(ctx, linhas);
 
     const cliente = args.clienteNome.trim() || undefined;
@@ -274,7 +290,8 @@ export const lancarSaidaMultipla = mutation({
         registradoPorTipo: "admin",
         clerkId: usuario.clerkId,
         autorNome: usuario.nome,
-        registradoEm: Date.now(),
+        registradoEm: agora,
+      dataMovimento,
       });
       movimentacaoIds.push(id);
     }

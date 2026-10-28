@@ -1,4 +1,4 @@
-import { dataHoraComprovante } from "./data.ts";
+import { data, dataHoraComprovante, diasDiferentes } from "./data.ts";
 import { formatarContagem, formatarPeso, type FormatoUnidade } from "./formato.ts";
 import { mascaraCnpj, mascaraTelefone } from "./mascaras.ts";
 
@@ -41,7 +41,10 @@ export type DadosEmpresaComprovante = {
 
 export type DadosComprovante = {
   rotulo: string; // "Venda" | "Patrocínio"
-  quandoMs: number;
+  quandoMs: number; // quando foi registrado
+  // Data do movimento (RF65) — o dia em que a carga saiu de fato. Igual ao
+  // dia de quandoMs na maioria das vezes; diferente quando foi lançado depois.
+  dataMovimentoMs: number;
   cliente: string;
   itens: ItemComprovante[];
   pesoTotalKg: number;
@@ -155,12 +158,23 @@ function linhasCabecalhoEmpresa(empresa: DadosEmpresaComprovante | null): string
   ];
 }
 
+// Data mostrada no comprovante (RF65). Mesmo dia do registro → a data e hora de
+// sempre. Lançado depois → o DIA do movimento em destaque (sem hora: ninguém
+// informou a hora) e o registro numa linha à parte, para não esconder nada.
+export function datasComprovante(d: DadosComprovante): { principal: string; registro: string | null } {
+  if (!diasDiferentes(d.dataMovimentoMs, d.quandoMs)) {
+    return { principal: dataHoraComprovante(d.quandoMs), registro: null };
+  }
+  return { principal: data(d.dataMovimentoMs), registro: `Registrado em ${dataHoraComprovante(d.quandoMs)}` };
+}
+
 // Texto pronto para WhatsApp / copiar. Usa *negrito* no título (sintaxe do WhatsApp).
 export function textoComprovante(d: DadosComprovante): string {
   return [
     ...linhasCabecalhoEmpresa(d.empresa),
     ...(d.numeroComprovante !== null ? [`Comprovante ${rotuloNumeroComprovante(d.numeroComprovante)}`] : []),
-    `${d.rotulo} · ${dataHoraComprovante(d.quandoMs)}`,
+    `${d.rotulo} · ${datasComprovante(d).principal}`,
+    ...(datasComprovante(d).registro ? [datasComprovante(d).registro!] : []),
     "",
     `Cliente: ${d.cliente || "—"}`,
     "Itens:",

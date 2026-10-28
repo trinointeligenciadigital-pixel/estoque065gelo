@@ -1,8 +1,9 @@
-import { createContext, useContext, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { createContext, useContext, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { ChevronLeft, type LucideIcon } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useVoltarHardware } from "./voltarHardware.ts";
 import { artigoUnidade, formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
+import { diasPermitidos, hoje, rotuloDia } from "../lib/data.ts";
 
 // Câmara real da sessão, disponível em toda tela sem precisar passar por
 // prop — a prop `camaraNome` do `Tela` abaixo é reaproveitada como subtítulo
@@ -410,6 +411,66 @@ export function ResumoLancamento({
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+// Data do movimento (RF65) na tela de conferência — nunca um passo a mais: o
+// padrão é Hoje, e só quem precisa toca em "Alterar". Botões grandes (mãos
+// frias, sem calendário pequeno). Data diferente de hoje fica em âmbar, para
+// não passar batido na conferência. `desde` corta os dias anteriores (retorno
+// não pode ser antes do patrocínio).
+export function SeletorDia({
+  dia,
+  onMudar,
+  desde,
+  disabled,
+}: {
+  dia: string;
+  onMudar: (dia: string) => void;
+  desde?: string;
+  disabled?: boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const ehHoje = dia === hoje();
+  const dias = diasPermitidos(desde);
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setAberto((a) => !a)}
+        disabled={disabled}
+        aria-expanded={aberto}
+        className={`flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 disabled:opacity-50 ${
+          ehHoje ? "border-borda bg-superficie" : "border-aviso bg-aviso/10"
+        }`}
+      >
+        <span className="text-base text-texto-suave">Data do movimento</span>
+        <span className="flex items-baseline gap-3">
+          <span className={`text-base font-semibold ${ehHoje ? "text-texto" : "text-aviso-texto"}`}>{rotuloDia(dia)}</span>
+          <span className="text-sm font-medium text-acento">{aberto ? "Fechar" : "Alterar"}</span>
+        </span>
+      </button>
+      {aberto ? (
+        <div className="mt-2 grid grid-cols-2 gap-2" role="group" aria-label="Escolha o dia do movimento">
+          {dias.map((d) => (
+            <button
+              key={d}
+              type="button"
+              aria-pressed={d === dia}
+              onClick={() => {
+                onMudar(d);
+                setAberto(false);
+              }}
+              className={`min-h-[56px] rounded-xl border px-3 text-base font-medium transition outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acento active:brightness-95 ${
+                d === dia ? "border-acento bg-acento/5 text-texto" : "border-borda bg-superficie text-texto"
+              }`}
+            >
+              {rotuloDia(d)}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

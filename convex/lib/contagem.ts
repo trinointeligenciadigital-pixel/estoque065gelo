@@ -121,6 +121,7 @@ export async function gerarAjustesDaContagem(
     const quantidade = formato.pesoVariavel ? 1 : magnitude;
     const pesoKg = formato.pesoVariavel ? magnitude : magnitude * formato.pesoKg;
 
+    const agoraRegistro = Date.now();
     await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: `ajuste:${contagem._id}:${it._id}`,
       protocolo,
@@ -137,7 +138,9 @@ export async function gerarAjustesDaContagem(
       registradoPorTipo: "admin",
       clerkId,
       autorNome,
-      registradoEm: Date.now(),
+      registradoEm: agoraRegistro,
+      // Gerado pelo sistema: o movimento é o próprio registro (RF65).
+      dataMovimento: agoraRegistro,
     });
     gerados++;
   }

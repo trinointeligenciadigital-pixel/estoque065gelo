@@ -143,6 +143,7 @@ Em conflito com o schema (`02-schema-convex.md`), o schema vence.
 | RF62 | O histórico é somente leitura. Nenhuma linha do histórico oferece ação de edição ou exclusão. | 4 | ✔ |
 | RF63 | O Admin pode lançar movimentações diretamente pelo painel, sujeito às mesmas regras de validação de saldo, idempotência e imutabilidade aplicadas ao colaborador. | 4 | |
 | RF64 | A leitura de movimentações pelo colaborador é restrita à própria câmara, às próprias movimentações, e às últimas 24h. O Admin lê tudo. | 3 | ✔ |
+| RF65 | Todo lançamento de entrada e saída (produção, venda, patrocínio, perda, retorno) tem uma **data do movimento**, preenchida com hoje e alterável pelo colaborador e pelo Admin. Aceita até 7 dias atrás, nunca futuro, nunca antes do fechamento da última contagem pendente/aprovada da câmara; o retorno nunca antes do patrocínio de origem. Validado no servidor. O timestamp de registro (RF37) continua gravado à parte. Painel, gráfico, KPIs de "hoje" e filtro de período do histórico usam a data do movimento; histórico e comprovante mostram as duas quando caem em dias diferentes. | 4 | ✔ |
 
 ---
 

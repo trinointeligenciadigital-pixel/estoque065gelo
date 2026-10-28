@@ -1,13 +1,13 @@
 import { forwardRef } from "react";
 import {
   cabecalhoEmpresaEstruturado,
+  datasComprovante,
   linhasContexto,
   rotuloNumeroComprovante,
   SELO_NAO_FISCAL,
   totalContagemComprovante,
   type DadosComprovante,
 } from "../lib/comprovante.ts";
-import { dataHoraComprovante } from "../lib/data.ts";
 import { formatarContagem, formatarPeso, nomeUnidade } from "../lib/formato.ts";
 import { LARGURA_IMAGEM_COMPROVANTE } from "../lib/imagemComprovante.ts";
 
@@ -76,8 +76,11 @@ export const ComprovanteCartao = forwardRef<HTMLDivElement, { dados: DadosCompro
           ) : null}
         </div>
         <div className={`mt-0.5 ${denso ? "text-sm" : "text-base"} font-semibold text-texto`}>
-          {dados.rotulo} <span className={`font-numero ${meta} font-normal text-texto-suave`}>{dataHoraComprovante(dados.quandoMs)}</span>
+          {dados.rotulo} <span className={`font-numero ${meta} font-normal text-texto-suave`}>{datasComprovante(dados).principal}</span>
         </div>
+        {datasComprovante(dados).registro ? (
+          <div className={`font-numero ${meta} text-texto-suave`}>{datasComprovante(dados).registro}</div>
+        ) : null}
       </div>
 
       {/* Itens carregados — faixa de rótulo tonal separa este bloco do resto,

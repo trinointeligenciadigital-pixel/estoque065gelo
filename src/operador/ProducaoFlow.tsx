@@ -5,7 +5,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
 import { normalizarBusca } from "../lib/busca.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, EstadoVazio, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, EstadoVazio, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, SeletorDia, Tela } from "./ui.tsx";
+import { hoje, rotuloDia } from "../lib/data.ts";
 import type { FormatoGrid, ProdutoGrid } from "./ui.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
 import { BotaoDesfazer } from "./desfazer.tsx";
@@ -40,6 +41,9 @@ export function ProducaoFlow({
   const [produto, setProduto] = useState<ProdutoGrid | null>(null);
   const [formato, setFormato] = useState<FormatoGrid | null>(null);
   const [valor, setValor] = useState("");
+  // Dia do movimento (RF65). Fica entre um "lançar outro" e o próximo —
+  // quem está lançando a produção de ontem costuma lançar vários de uma vez.
+  const [dia, setDia] = useState(hoje);
   const [chave, setChave] = useState("");
   const [erro, setErro] = useState("");
   const [erroDeRede, setErroDeRede] = useState(false);
@@ -117,6 +121,7 @@ export function ProducaoFlow({
       const r = await lancar({
         token,
         chaveIdempotencia: chave,
+        dia,
         produtoId: produto._id,
         formatoId: formato._id,
         quantidade: formato.pesoVariavel ? undefined : num,
@@ -151,6 +156,7 @@ export function ProducaoFlow({
               linhas={[
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: rotuloFormato(formato) },
+                { rotulo: "Data", valor: rotuloDia(dia) },
               ]}
             />
           </div>
@@ -261,6 +267,15 @@ export function ProducaoFlow({
             { rotulo: "Formato", valor: rotuloFormato(formato) },
             { rotulo: "Câmara", valor: camaraNome },
           ]}
+        />
+        <SeletorDia
+          dia={dia}
+          disabled={enviando}
+          // Outro dia = outro lançamento: chave nova, como ao mudar a quantidade.
+          onMudar={(d) => {
+            setDia(d);
+            setChave(crypto.randomUUID());
+          }}
         />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>

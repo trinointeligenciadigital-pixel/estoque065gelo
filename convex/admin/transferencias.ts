@@ -191,6 +191,7 @@ export const transferir = mutation({
       loteId,
       ...autor,
       registradoEm: agora,
+      dataMovimento: agora,
     });
     const entradaId = await ctx.db.insert("movimentacoes", {
       // Chave própria e determinística (nunca a mesma da perna de saída — o
@@ -208,6 +209,7 @@ export const transferir = mutation({
       loteId,
       ...autor,
       registradoEm: agora,
+      dataMovimento: agora,
     });
 
     return { saidaId, entradaId, protocolo, duplicado: false };

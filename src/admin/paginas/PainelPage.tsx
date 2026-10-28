@@ -6,7 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Cartao, LinhaTabela, Segmentado, SelecaoInline, TituloPagina } from "../../shared/ui.tsx";
 import { GraficoTendencia } from "../GraficoTendencia.tsx";
 import { useNumeroAnimado } from "../movimento.ts";
-import { dataHora } from "../../lib/data.ts";
+import { data, dataHora, hoje, diaDe } from "../../lib/data.ts";
 import { formatarContagem, formatarPeso, formatarQuantidade, rotuloFormato } from "../../lib/formato.ts";
 import { mesmoTexto, nomesHomonimos, rotuloProduto } from "../../lib/produto.ts";
 import { pluralizar } from "../../lib/plural.ts";
@@ -474,7 +474,7 @@ function PainelConteudo() {
                   <td className="py-2.5 pr-3 text-texto">{m.clienteNome ?? (m.motivoPerda ? `perda: ${m.motivoPerda}` : "—")}</td>
                   <td className="py-2.5 pr-3 text-texto-suave">{m.produtoNome} <span className="text-texto-fraco">· {rotuloFormato({ nome: m.formatoNome, pesoKg: m.formatoPesoKg, pesoVariavel: m.formatoPesoVariavel, unidadesPorPacote: m.formatoUnidadesPorPacote })}</span></td>
                   <td className="py-2.5 pr-3 text-texto-suave">{veiculoRotulo(m)}</td>
-                  <td className="py-2.5 pr-3 font-numero tabular-nums text-xs text-texto-suave">{hora(m.registradoEm)}</td>
+                  <td className="py-2.5 pr-3 font-numero tabular-nums text-xs text-texto-suave">{quandoSaida(m)}</td>
                   <td className="py-2.5 pr-3 text-right">
                     {m.formatoPesoVariavel ? (
                       <span className="font-numero tabular-nums text-texto">{formatarPeso(m.pesoKg)}</span>
@@ -502,6 +502,11 @@ function PainelConteudo() {
 // hora curta no fuso de Cuiabá
 function hora(ms: number): string {
   return dataHora(ms).split(" ")[1]?.slice(0, 5) ?? "";
+}
+// Saída de hoje: só a hora. De outro dia (inclusive lançada depois com data
+// retroativa, RF65): a data do movimento — a hora sozinha enganaria.
+function quandoSaida(m: { dataMovimento: number; registradoEm: number }): string {
+  return diaDe(m.dataMovimento) === hoje() ? hora(m.registradoEm) : data(m.dataMovimento);
 }
 function rotuloTipo(t: string): string {
   return t === "venda" ? "venda" : t === "patrocinio" ? "patrocínio" : "perda";

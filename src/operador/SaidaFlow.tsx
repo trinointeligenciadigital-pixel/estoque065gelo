@@ -5,7 +5,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { ehFalhaDeRede, mensagemErro } from "../lib/erros.ts";
 import { formatarContagem, formatarPeso, formatarQuantidade, nomeUnidade, rotuloFormato } from "../lib/formato.ts";
 import { mascaraPlaca, placaCompleta, rotuloPlacaOuTexto } from "../lib/mascaras.ts";
-import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, CampoQuantidade, kgDe, OpcaoGrande, primeiroNome, ResumoLancamento, SeletorDia, Tela } from "./ui.tsx";
+import { diasPermitidos, hoje, msDoDia, rotuloDia } from "../lib/data.ts";
 import type { FormatoGrid, ItemResumo, LinhaResumo, ProdutoGrid } from "./ui.tsx";
 import { ListaProdutos, ListaFormatos } from "./ProducaoFlow.tsx";
 import { mensagemPlausibilidade, usePlausibilidade } from "./plausibilidade.ts";
@@ -103,6 +104,7 @@ type RascunhoCarregamento = {
   veiculoTerceiro: string;
   veiculoTerceiroModelo: string;
   motorista: string;
+  dia?: string; // ausente em rascunho salvo antes do RF65 = hoje
 };
 
 function pesoDoItem(it: ItemCarrinho): number {
@@ -188,6 +190,11 @@ function SaidaCarregamento({
   const [veiculoTerceiro, setVeiculoTerceiro] = useState(() => rascunho?.veiculoTerceiro ?? "");
   const [veiculoTerceiroModelo, setVeiculoTerceiroModelo] = useState(() => rascunho?.veiculoTerceiroModelo ?? "");
   const [motorista, setMotorista] = useState(() => rascunho?.motorista ?? "");
+  // Dia do movimento (RF65). Rascunho de outro dia pode ter ficado com um dia
+  // que já saiu da janela de 7 — aí volta pra hoje.
+  const [dia, setDia] = useState(() =>
+    rascunho?.dia && diasPermitidos().includes(rascunho.dia) ? rascunho.dia : hoje(),
+  );
 
   const [erro, setErro] = useState("");
   const [erroDeRede, setErroDeRede] = useState(false);
@@ -238,12 +245,13 @@ function SaidaCarregamento({
         veiculoTerceiro,
         veiculoTerceiroModelo,
         motorista,
+        dia,
       };
       localStorage.setItem(chaveRascunho, JSON.stringify(dados));
     } catch {
       // localStorage indisponível/cheio: segue sem persistir, não trava o carrinho.
     }
-  }, [chaveRascunho, carregamentoId, itens, cliente, veiculoSel, veiculoTerceiro, veiculoTerceiroModelo, motorista]);
+  }, [chaveRascunho, carregamentoId, itens, cliente, veiculoSel, veiculoTerceiro, veiculoTerceiroModelo, motorista, dia]);
 
   function limparRascunhoSalvo() {
     try {
@@ -361,6 +369,7 @@ function SaidaCarregamento({
         token,
         carregamentoId,
         tipo,
+        dia,
         itens: itens.map((it) => ({
           chaveIdempotencia: it.chave,
           produtoId: it.produto._id,
@@ -393,6 +402,7 @@ function SaidaCarregamento({
     const dados: DadosComprovante = {
       rotulo,
       quandoMs,
+      dataMovimentoMs: msDoDia(dia, quandoMs),
       cliente: cliente.trim(),
       itens: itens.map((it) => ({
         produtoNome: it.produto.nome,
@@ -782,6 +792,7 @@ function SaidaCarregamento({
           itens={itensResumo}
           linhas={linhas}
         />
+        <SeletorDia dia={dia} onMudar={setDia} disabled={enviando} />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>
     );
@@ -900,6 +911,7 @@ function SaidaPerda({
   const [chave, setChave] = useState("");
   const [motivo, setMotivo] = useState<MotivoPerda | "">("");
   const [observacao, setObservacao] = useState("");
+  const [dia, setDia] = useState(hoje); // dia do movimento (RF65)
   const [erro, setErro] = useState("");
   const [erroDeRede, setErroDeRede] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -980,6 +992,7 @@ function SaidaPerda({
         token,
         chaveIdempotencia: chave,
         tipo: "perda",
+        dia,
         produtoId: produto._id,
         formatoId: formato._id,
         quantidade: formato.pesoVariavel ? undefined : num,
@@ -1018,6 +1031,7 @@ function SaidaPerda({
                 { rotulo: "Produto", valor: produto.nome },
                 { rotulo: "Formato", valor: rotuloFormato(formato) },
                 { rotulo: "Motivo", valor: rotuloMotivo(motivo as MotivoPerda) },
+                { rotulo: "Data", valor: rotuloDia(dia) },
               ]}
             />
           </div>
@@ -1182,6 +1196,15 @@ function SaidaPerda({
           quantidadePacotes={formato.pesoVariavel ? null : num}
           unidadeContagem={formato.unidadeContagem}
           linhas={linhas}
+        />
+        <SeletorDia
+          dia={dia}
+          disabled={enviando}
+          // Outro dia = outro lançamento: chave nova, como ao mudar a quantidade.
+          onMudar={(d) => {
+            setDia(d);
+            setChave(crypto.randomUUID());
+          }}
         />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>

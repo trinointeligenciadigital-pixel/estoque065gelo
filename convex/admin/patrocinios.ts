@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { exigirAdmin } from "../lib/auth";
+import { dataEfetiva } from "../lib/data";
 
 /*
   Consulta de patrocínio do Admin (RF42). Para cada patrocínio: quanto saiu, quanto
@@ -33,6 +34,7 @@ export const listar = query({
         return {
           _id: p._id,
           registradoEm: p.registradoEm,
+          dataMovimento: dataEfetiva(p),
           clienteNome: p.clienteNome ?? "",
           produtoNome: produto?.nome ?? "—",
           formatoNome: formato?.nome ?? "—",
@@ -48,7 +50,7 @@ export const listar = query({
       }),
     );
 
-    resultado.sort((a, b) => b.registradoEm - a.registradoEm);
+    resultado.sort((a, b) => b.dataMovimento - a.dataMovimento);
     return resultado;
   },
 });

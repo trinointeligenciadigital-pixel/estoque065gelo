@@ -6,7 +6,7 @@ import {
   pesoLiquidoDoFormato,
   pesoTotalDoProduto,
 } from "../lib/saldo";
-import { inicioDoDiaCuiaba } from "../lib/data";
+import { inicioDoDiaCuiaba, dataEfetiva } from "../lib/data";
 
 /*
   Painel do Admin (RF57–RF60). Regra crítica RF57: o saldo de cada produto agrega
@@ -56,6 +56,9 @@ export const movimentoPorPeriodo = query({
     // (UTC−4, sem horário de verão), então subtrair DIA_MS mantém o alinhamento.
     const inicioJanela = inicioHoje - (n - 1) * DIA_MS;
 
+    // Agrupa pela DATA DO MOVIMENTO (RF65). Como dataMovimento ≤ registradoEm,
+    // tudo que tem data na janela também foi registrado nela ou depois — o
+    // mesmo índice by_registrado_em cobre, sem precisar de índice novo.
     const movs = await ctx.db
       .query("movimentacoes")
       .withIndex("by_registrado_em", (q) => q.gte("registradoEm", inicioJanela))
@@ -80,7 +83,7 @@ export const movimentoPorPeriodo = query({
       if (camaraId && m.camaraId !== camaraId) continue;
       if (produtoId && m.produtoId !== produtoId) continue;
       if (categoriaDoProduto && categoriaDoProduto.get(m.produtoId) !== categoria) continue;
-      const dia = inicioDoDiaCuiaba(m.registradoEm);
+      const dia = inicioDoDiaCuiaba(dataEfetiva(m));
       const b = buckets.get(dia);
       if (!b) continue; // fora da janela (borda)
       if (m.tipo === "producao") {
@@ -217,7 +220,8 @@ export const resumo = query({
     let saidasHojeKg = 0;
     const producaoHojeMovs: typeof janela = [];
     for (const m of janela) {
-      if (m.registradoEm < inicioHoje) continue;
+      // "Hoje" = movimento de hoje (RF65), não só registrado hoje.
+      if (dataEfetiva(m) < inicioHoje) continue;
       if (m.tipo === "producao") {
         produzidoHojeKg += m.pesoKg;
         producaoHojeMovs.push(m);
@@ -240,6 +244,7 @@ export const resumo = query({
         quantidade: m.quantidade,
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,
+        dataMovimento: dataEfetiva(m),
       }));
 
     const saidasRecentes = janela
@@ -269,6 +274,7 @@ export const resumo = query({
         quantidade: m.quantidade,
         pesoKg: m.pesoKg,
         registradoEm: m.registradoEm,
+        dataMovimento: dataEfetiva(m),
       }));
 
     const estoqueTotalKg = linhas.reduce((acc, l) => acc + l.pesoTotalKg, 0);

@@ -56,7 +56,7 @@ export function PatrociniosPage() {
           <>
           {visiveis.map((p) => (
             <LinhaTabela key={p._id}>
-              <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{data(p.registradoEm)}</td>
+              <td className="px-3 py-2.5 font-numero tabular-nums text-xs text-texto-suave">{data(p.dataMovimento)}</td>
               <td className="px-3 py-2.5 font-medium text-texto">{p.clienteNome || "—"}</td>
               <td className="px-3 py-2.5 text-texto-suave">
                 {p.produtoNome} / {rotuloFormato({ nome: p.formatoNome, pesoKg: p.formatoPesoKg, pesoVariavel: p.unidade === "kg", unidadesPorPacote: p.formatoUnidadesPorPacote })}

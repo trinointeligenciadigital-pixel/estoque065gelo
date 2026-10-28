@@ -7,6 +7,7 @@ import { Aviso, Botao, Campo, Cartao, Selecao, TituloPagina, Toast } from "../..
 import { mensagemErro } from "../../lib/erros.ts";
 import { formatarContagem, formatarPeso, nomeUnidade, rotuloFormato } from "../../lib/formato.ts";
 import { mascaraPlaca, placaCompleta } from "../../lib/mascaras.ts";
+import { diasPermitidos, hoje, rotuloDia } from "../../lib/data.ts";
 
 /*
   Lançamento manual pelo Admin (RF63). Mesmas validações do colaborador: saldo,
@@ -60,6 +61,9 @@ export function LancamentoPage() {
   const [motivo, setMotivo] = useState<MotivoPerda | "">("");
   const [observacao, setObservacao] = useState("");
   const [itens, setItens] = useState<ItemCarregamento[]>([]);
+  // Dia do movimento (RF65). NÃO volta pra hoje depois de cada lançamento —
+  // quem passa a limpo os papéis de ontem lança vários seguidos com a mesma data.
+  const [dia, setDia] = useState(hoje);
   const [chave, setChave] = useState(() => crypto.randomUUID());
   const [carregamentoId, setCarregamentoId] = useState(() => crypto.randomUUID());
   const [erro, setErro] = useState("");
@@ -197,6 +201,7 @@ export function LancamentoPage() {
         await lancarSaidaMultipla({
           carregamentoId,
           tipo,
+          dia,
           itens: itensParaEnviar.map((it) => ({
             chaveIdempotencia: it.chave,
             produtoId: it.produtoId,
@@ -235,6 +240,7 @@ export function LancamentoPage() {
       if (!produto || !formato) return;
       const comum = {
         chaveIdempotencia: chave,
+        dia,
         produtoId: produto._id,
         formatoId: formato._id,
         quantidade: formato.pesoVariavel ? undefined : numVal,
@@ -273,6 +279,27 @@ export function LancamentoPage() {
             <option value="perda">Perda (saída)</option>
             <option value="transferencia">Transferência (entre câmaras)</option>
           </Selecao>
+
+          {/* Transferência é interna e sempre "agora" — não tem data do movimento. */}
+          {!ehTransferencia ? (
+            <div className="flex items-end gap-3">
+              <Campo
+                label="Data do movimento"
+                type="date"
+                mono
+                value={dia}
+                min={diasPermitidos().at(-1)}
+                max={hoje()}
+                onChange={(e) => setDia(e.target.value || hoje())}
+                className="w-44"
+              />
+              {dia !== hoje() ? (
+                <span className="pb-1.5 text-sm font-medium text-aviso-texto">
+                  {rotuloDia(dia)} — não é hoje · até 7 dias atrás
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Itens já anexados ao carregamento (venda/patrocínio) */}
           {ehCarregamento && itens.length > 0 ? (

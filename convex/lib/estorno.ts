@@ -89,6 +89,7 @@ export async function inserirEstorno(
   // "Recalcula o saldo": não há nada a fazer além deste insert — o saldo
   // nunca é cacheado (regra arquitetural 1), toda leitura soma o ledger
   // inteiro, então a reversão já é o recálculo.
+  const agoraRegistro = Date.now();
   const estornoId = await ctx.db.insert("movimentacoes", {
     chaveIdempotencia,
     protocolo,
@@ -105,7 +106,9 @@ export async function inserirEstorno(
     clerkId: autor.registradoPorTipo === "admin" ? autor.clerkId : undefined,
     operadorId: autor.registradoPorTipo === "operador" ? autor.operadorId : undefined,
     autorNome: autor.autorNome,
-    registradoEm: Date.now(),
+    registradoEm: agoraRegistro,
+    // Gerado pelo sistema: o movimento é o próprio registro (RF65).
+    dataMovimento: agoraRegistro,
   });
 
   return { estornoId, duplicado: false, protocolo };
@@ -184,6 +187,7 @@ export async function inserirEstornoTransferencia(
     }
     algumNovo = true;
     const sinal = perna.sinal === 1 ? (-1 as const) : (1 as const);
+    const agoraRegistro = Date.now();
     const id = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia,
       protocolo,
@@ -201,7 +205,9 @@ export async function inserirEstornoTransferencia(
       clerkId: autor.registradoPorTipo === "admin" ? autor.clerkId : undefined,
       operadorId: autor.registradoPorTipo === "operador" ? autor.operadorId : undefined,
       autorNome: autor.autorNome,
-      registradoEm: Date.now(),
+      registradoEm: agoraRegistro,
+      // Gerado pelo sistema: o movimento é o próprio registro (RF65).
+      dataMovimento: agoraRegistro,
     });
     estornoIds.push(id);
   }

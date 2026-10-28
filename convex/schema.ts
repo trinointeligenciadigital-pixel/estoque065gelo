@@ -274,6 +274,13 @@ export default defineSchema({
     // sprint de auditoria; migrarAutorLegado (convex/migracoes.ts) preenche.
     autorNome: v.optional(v.string()),
     registradoEm: v.number(),
+    // Data do movimento (RF65): quando o gelo REALMENTE entrou/saiu — pode ser
+    // até 7 dias antes de registradoEm (nunca futuro, nunca antes da última
+    // contagem fechada da câmara). Painel e Histórico agrupam por ela;
+    // registradoEm segue sendo a hora da gravação, para auditoria. Ausente =
+    // lançamento anterior a este campo; a leitura usa registradoEm
+    // (dataEfetiva, convex/lib/data.ts) — sem migração, que seria patch no ledger.
+    dataMovimento: v.optional(v.number()),
   })
     .index("by_chave_idempotencia", ["chaveIdempotencia"])
     .index("by_produto_camara", ["produtoId", "camaraId"])

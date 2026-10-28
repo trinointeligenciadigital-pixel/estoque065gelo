@@ -207,6 +207,15 @@ export default defineSchema({
     // sprint de auditoria; migrarAutorLegado (convex/migracoes.ts) preenche.
     autorNome: v.optional(v.string()),
     registradoEm: v.number(),
+    // Data do movimento (RF65): quando o gelo REALMENTE entrou/saiu. Informada
+    // no lançamento como dia ("AAAA-MM-DD", Cuiabá); validada no servidor: no
+    // máximo 7 dias atrás, nunca futuro, nunca antes do fechamento da última
+    // contagem pendente/aprovada da câmara (e, no retorno, nunca antes do
+    // patrocínio de origem). Hoje = o próprio registradoEm; dia passado = 12:00
+    // de Cuiabá. Ajuste, estorno e transferência gravam = registradoEm.
+    // Painel e Histórico agrupam/filtram por ela. Ausente = legado; a leitura
+    // usa registradoEm (sem migração — seria patch no ledger).
+    dataMovimento: v.optional(v.number()),
   })
     .index("by_chave_idempotencia", ["chaveIdempotencia"])
     .index("by_produto_camara", ["produtoId", "camaraId"])

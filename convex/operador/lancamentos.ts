@@ -9,6 +9,8 @@ import { derivarQtdPeso } from "../lib/movimentacao";
 import { saldoDoFormato, validarSaldoLote, type LinhaLote } from "../lib/saldo";
 import { protocoloDe, proximoNumeroComprovante } from "../lib/protocolo";
 import { veiculoTerceiroValidado } from "../lib/placa";
+import { dataMovimentoValidada } from "../lib/dataMovimento";
+import { dataEfetiva } from "../lib/data";
 
 /*
   Lançamentos do colaborador. Regras invioláveis aplicadas aqui:
@@ -53,6 +55,8 @@ export const lancarProducao = mutation({
   args: {
     token: v.string(),
     chaveIdempotencia: v.string(),
+    // Dia do movimento (RF65), "AAAA-MM-DD" em Cuiabá. Ausente = hoje.
+    dia: v.optional(v.string()),
     produtoId: v.id("produtos"),
     formatoId: v.id("formatos"),
     quantidade: v.optional(v.number()),
@@ -71,6 +75,8 @@ export const lancarProducao = mutation({
     }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [camara._id], args.dia, agora);
     const protocolo = protocoloDe(args.chaveIdempotencia);
 
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
@@ -86,7 +92,8 @@ export const lancarProducao = mutation({
       registradoPorTipo: "operador",
       operadorId: operador._id,
       autorNome: operador.nome,
-      registradoEm: Date.now(),
+      registradoEm: agora,
+      dataMovimento,
     });
     return { movimentacaoId, duplicado: false, protocolo };
   },
@@ -96,6 +103,8 @@ export const lancarSaida = mutation({
   args: {
     token: v.string(),
     chaveIdempotencia: v.string(),
+    // Dia do movimento (RF65), "AAAA-MM-DD" em Cuiabá. Ausente = hoje.
+    dia: v.optional(v.string()),
     tipo: v.union(v.literal("venda"), v.literal("patrocinio"), v.literal("perda")),
     produtoId: v.id("produtos"),
     formatoId: v.id("formatos"),
@@ -149,6 +158,8 @@ export const lancarSaida = mutation({
     }
 
     const { quantidade, pesoKg } = derivarQtdPeso(formato, args.quantidade, args.pesoKgVariavel);
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [camara._id], args.dia, agora);
 
     // Saldo insuficiente bloqueia (RF35). Nunca saldo negativo.
     const disponivel = formato.pesoVariavel
@@ -181,7 +192,8 @@ export const lancarSaida = mutation({
       registradoPorTipo: "operador",
       operadorId: operador._id,
       autorNome: operador.nome,
-      registradoEm: Date.now(),
+      registradoEm: agora,
+      dataMovimento,
     });
     return { movimentacaoId, duplicado: false, protocolo };
   },
@@ -196,6 +208,8 @@ export const lancarSaidaMultipla = mutation({
   args: {
     token: v.string(),
     carregamentoId: v.string(),
+    // Dia do movimento (RF65) — um só para o carregamento inteiro.
+    dia: v.optional(v.string()),
     tipo: v.union(v.literal("venda"), v.literal("patrocinio")),
     itens: v.array(
       v.object({
@@ -257,6 +271,9 @@ export const lancarSaidaMultipla = mutation({
       });
     }
 
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [camara._id], args.dia, agora);
+
     // Saldo do lote inteiro, somando itens do mesmo formato (RF35).
     await validarSaldoLote(ctx, linhas);
 
@@ -291,7 +308,8 @@ export const lancarSaidaMultipla = mutation({
         registradoPorTipo: "operador",
         operadorId: operador._id,
         autorNome: operador.nome,
-        registradoEm: Date.now(),
+        registradoEm: agora,
+        dataMovimento,
       });
       movimentacaoIds.push(id);
     }
@@ -303,6 +321,8 @@ export const lancarRetorno = mutation({
   args: {
     token: v.string(),
     chaveIdempotencia: v.string(),
+    // Dia do movimento (RF65), "AAAA-MM-DD" em Cuiabá. Ausente = hoje.
+    dia: v.optional(v.string()),
     patrocinioOrigemId: v.id("movimentacoes"),
     quantidade: v.optional(v.number()),
     pesoKgVariavel: v.optional(v.number()),
@@ -344,6 +364,13 @@ export const lancarRetorno = mutation({
       throw new ConvexError("Retorno maior do que o que saiu neste patrocínio.");
     }
 
+    // O gelo não pode ter voltado antes de ter saído.
+    const agora = Date.now();
+    const dataMovimento = await dataMovimentoValidada(ctx, [origem.camaraId], args.dia, agora);
+    if (dataMovimento < dataEfetiva(origem)) {
+      throw new ConvexError("A data do retorno não pode ser anterior à do patrocínio.");
+    }
+
     const protocolo = protocoloDe(args.chaveIdempotencia);
     const movimentacaoId = await ctx.db.insert("movimentacoes", {
       chaveIdempotencia: args.chaveIdempotencia,
@@ -360,7 +387,8 @@ export const lancarRetorno = mutation({
       registradoPorTipo: "operador",
       operadorId: operador._id,
       autorNome: operador.nome,
-      registradoEm: Date.now(),
+      registradoEm: agora,
+      dataMovimento,
     });
     return { movimentacaoId, duplicado: false, protocolo };
   },

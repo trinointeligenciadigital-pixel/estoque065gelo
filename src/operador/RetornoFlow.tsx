@@ -4,10 +4,10 @@ import { ChevronRight } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { mensagemErro } from "../lib/erros.ts";
-import { data } from "../lib/data.ts";
+import { data, diaDe, hoje } from "../lib/data.ts";
 import { normalizarBusca } from "../lib/busca.ts";
 import { formatarQuantidade, rotuloFormato } from "../lib/formato.ts";
-import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, Tela } from "./ui.tsx";
+import { AvisoOperador, BotaoGrande, EstadoVazio, primeiroNome, SeletorDia, Tela } from "./ui.tsx";
 
 function formatarQtd(
   n: number,
@@ -34,6 +34,7 @@ function rotuloFormatoPatrocinio(p: Patrocinio): string {
 type Patrocinio = {
   origemId: Id<"movimentacoes">;
   registradoEm: number;
+  dataMovimento: number; // dia em que o patrocínio saiu (RF65)
   produtoNome: string;
   formatoNome: string;
   formatoPesoKg: number;
@@ -65,6 +66,7 @@ export function RetornoFlow({
   const [alvo, setAlvo] = useState<Patrocinio | null>(null);
   const [valor, setValor] = useState("");
   const [chave, setChave] = useState("");
+  const [dia, setDia] = useState(hoje); // dia do movimento (RF65)
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
@@ -78,6 +80,7 @@ export function RetornoFlow({
     setAlvo(p);
     setValor("");
     setChave(crypto.randomUUID());
+    setDia(hoje());
     setErro("");
   }
 
@@ -90,6 +93,7 @@ export function RetornoFlow({
       const r = await lancar({
         token,
         chaveIdempotencia: chave,
+        dia,
         patrocinioOrigemId: alvo.origemId,
         quantidade: alvo.formatoPesoVariavel ? undefined : num,
         pesoKgVariavel: alvo.formatoPesoVariavel ? num : undefined,
@@ -159,6 +163,16 @@ export function RetornoFlow({
             Máximo em aberto: {formatarQtd(alvo.aberto, alvo)}.
           </p>
         ) : null}
+        {/* Retorno nunca antes do dia em que o patrocínio saiu. */}
+        <SeletorDia
+          dia={dia}
+          desde={diaDe(alvo.dataMovimento)}
+          disabled={enviando}
+          onMudar={(d) => {
+            setDia(d);
+            setChave(crypto.randomUUID());
+          }}
+        />
         {erro ? <div className="mt-4"><AvisoOperador>{erro}</AvisoOperador></div> : null}
       </Tela>
     );
@@ -202,7 +216,7 @@ export function RetornoFlow({
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="text-base font-medium text-texto">{p.clienteNome || "Sem cliente"}</span>
                     <span className="text-sm text-texto-suave">
-                      {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.registradoEm)}
+                      {p.produtoNome} · {rotuloFormatoPatrocinio(p)} · {data(p.dataMovimento)}
                     </span>
                     <span className="font-numero text-sm text-acento">
                       em aberto: {formatarQtd(p.aberto, p)}

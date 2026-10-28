@@ -6,6 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { exigirSessaoOperador, exigirCamaraDoProduto } from "../lib/auth";
 import { saldoDoFormato, pesoTotalDoProduto, pesoLiquidoDoFormato } from "../lib/saldo";
 import { contagemAtivaDaCamara } from "../lib/contagem";
+import { dataEfetiva } from "../lib/data";
 
 // Contagem cega (sprint PWA, tarefa 1): enquanto ESTE colaborador tiver uma
 // contagem aberta NESTA câmara, nenhuma query devolve o saldo esperado — o
@@ -197,6 +198,8 @@ export const patrociniosAbertos = query({
       resultado.push({
         origemId: p._id,
         registradoEm: p.registradoEm,
+        // Dia em que o patrocínio saiu (RF65) — o retorno não pode ser antes dele.
+        dataMovimento: dataEfetiva(p),
         produtoNome: produto.nome,
         formatoNome: formato.nome,
         formatoPesoKg: formato.pesoKg,
